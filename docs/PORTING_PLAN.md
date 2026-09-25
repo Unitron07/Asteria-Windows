@@ -10,7 +10,7 @@ The original choice to reuse Moonlight's Windows streaming stack is sound. The r
 
 ## Scope and dependency order
 
-M0 is merged. M0A build and packaging work passes CI; real-device qualification remains open. M1 identity is implemented, while its profiles/session work and M1A–M4 remain planned. Apply M5 qualification to the initial preview's inherited streaming and identity scope; later feature milestones are not prerequisites for that preview. Clipboard (M3) depends on capability work in M2. Performance changes must follow measurements, and a cross-build alone does not complete M0A.
+M0 is merged. M0A build and packaging work passes CI; real-device qualification remains open. M1 identity is implemented, while its profiles/session work and M1A–M4 (including the optional M1B PyroWave milestone) remain planned. Apply M5 qualification to the initial preview's inherited streaming and identity scope; later feature milestones are not prerequisites for that preview. Clipboard (M3) depends on capability work in M2. Performance changes must follow measurements, and a cross-build alone does not complete M0A.
 
 Primary targets: **Windows 11 x64 and native ARM64**, both intended for the first preview. Native ARM64 means the client and its process-loaded runtime DLLs run as ARM64, without x64 emulation; cross-compiling on an x64 build host is acceptable. Windows 10 x64 remains a separate compatibility target pending runtime documentation and real-machine tests. Record exact minimum OS builds before publishing qualified binaries. These are support goals, not claims of completed ARM64 testing.
 
@@ -119,6 +119,7 @@ The goal is not to blindly copy Artemis Android decoder tweaks. Artemis Android 
 
 ## M5 — Qualify and release
 
+- [ ] When M1B PyroWave support is included, qualify the host/client/GPU support matrix, runtime packaging, codec fallback, and comparisons; keep it experimental until evidenced.
 - [ ] When M1A performance changes are included, re-run the candidate-to-upstream performance comparison using the same hardware, host, display mode, codec, network, and workload for release candidates.
 - [ ] Complete required [functional and performance checks](VALIDATION.md), including GPU-specific paths available for the claimed support matrix.
 - [ ] Produce separate x64 and native ARM64 portable ZIPs for the first preview, with runtime dependencies, version information, hashes, symbols, notices, and corresponding source including pinned submodule contents. Publish exact build steps and known limitations for each architecture. Do not label an x64-emulated build as the ARM64 release.
@@ -140,4 +141,4 @@ Keep feature PRs small and avoid mass renames of upstream source directories. Re
 - Overlay rendering approach: choose only after testing the existing video-window integration and latency impact.
 - Touch-device qualification beyond the baseline keyboard/mouse/gamepad cases remains later work.
 
-Do not attach calendar estimates until the ARM64 baseline, Windows performance experiments, and Apollo protocol spikes identify actual effort. The next concrete task is M0A real-device qualification and same-commit x64 smoke testing for the initial preview. M1 identity/storage isolation is implemented; profiles, session workflows, and M1A–M4 remain future implementation work.
+Do not attach calendar estimates until the ARM64 baseline, Windows performance experiments, and Apollo protocol spikes identify actual effort. The next concrete task is M0A real-device qualification and same-commit x64 smoke testing for the initial preview. M1 identity/storage isolation is implemented; profiles, session workflows, and M1A–M4 (including M1B PyroWave) remain future implementation work.
