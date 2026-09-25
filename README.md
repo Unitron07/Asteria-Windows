@@ -2,7 +2,7 @@
 
 **Asteria** is an early-preview native Windows game-streaming client derived from [Moonlight PC](https://github.com/moonlight-stream/moonlight-qt). Enhanced integration with [Apollo](https://github.com/ClassicOldSong/Apollo) and selected desktop/workflow ideas inspired by [Artemis Android](https://github.com/MobinYengejehi/Artemis) are planned.
 
-> **Preview status:** expect bugs and incomplete Asteria-specific functionality. The Asteria identity/rebrand is implemented. x64 and native ARM64 builds and portable packaging pass CI; real Windows 11 ARM64 device qualification remains pending and is required before the first public preview. Report reproducible problems in [GitHub issues](https://github.com/Unitron07/Asteria-Windows/issues).
+> **Preview status:** expect bugs and incomplete Asteria-specific functionality. The Asteria identity/rebrand is implemented. x64 and native ARM64 builds and portable packaging pass CI; an owner-reported real-device ARM64 AV1 streaming comparison is recorded below; the remaining ARM64 qualification checks are required before the first public preview. Report reproducible problems in [GitHub issues](https://github.com/Unitron07/Asteria-Windows/issues).
 
 ## Available now
 
@@ -10,6 +10,7 @@
 - Inherited hardware decoding, HDR, and AV1 paths, subject to the client GPU, driver, host, and stream configuration; these are not blanket hardware qualification claims.
 - Implemented Asteria application, settings, pairing, log, and Windows package identity, designed for side-by-side use with Moonlight. On-device coexistence checks remain part of release qualification.
 - Separate x64 and native ARM64 CI builds and portable ZIPs. The owner reported a successful x64 baseline test; detailed hardware/host coverage remains recorded as incomplete in the [baseline report](docs/BASELINE.md).
+- **Owner-reported ARM64 observation:** on a Windows-on-ARM device, native ARM64 Asteria felt noticeably smoother and snappier in menus/settings than stock x64 Moonlight running under emulation. This is subjective and was not timed. In repeated same-game, 2560×1440, approximately 60 FPS AV1 streams against an Apollo host, the owner observed effective stream parity: no meaningful decode, render, or frame-queue difference and no stream regression. The Apollo host version, device/driver, process and decoder details, and run durations were not recorded; this is not a general hardware or host compatibility claim.
 
 Sunshine compatibility is inherited from Moonlight. Standard streaming against Apollo must be tested separately; Apollo-specific capability handling, clipboard transfer, virtual-display controls, and server commands are roadmap work, not included preview features.
 
@@ -17,12 +18,12 @@ Sunshine compatibility is inherited from Moonlight. Standard streaming against A
 
 The first preview targets **Windows 11 x64 and native ARM64**, using portable ZIPs. It covers the inherited streaming baseline and implemented Asteria identity. Installer distribution and signing follow later release validation.
 
-Before publishing, qualify the ARM64 ZIP on a real Windows 11 ARM64 device, smoke-test x64 from the same release commit, and record tested host versions, hardware, codecs, and known issues using the [validation checklist](docs/VALIDATION.md). CI packaging alone does not establish native execution, hardware decoding, or clean-machine compatibility.
+Before publishing, complete the remaining ARM64 qualification on a real Windows 11 ARM64 device, smoke-test x64 from the same release commit, and record tested host versions, hardware, codecs, and known issues using the [validation checklist](docs/VALIDATION.md). CI packaging alone does not establish native execution, hardware decoding, or clean-machine compatibility.
 
 ## Roadmap
 
 1. **M0 — baseline import:** merged.
-2. **M0A — native Windows ARM64:** build/CI/package architecture work is implemented and passes CI; real-device qualification remains.
+2. **M0A — native Windows ARM64:** build/CI/package architecture work passes CI; an owner-reported real-device AV1 comparison shows observed stream parity, while full device qualification remains open.
 3. **M1 — Asteria identity and desktop workflow:** identity/rebrand implemented; profiles, configurable shortcuts, and additional session workflows remain planned.
 4. **M1A — Windows performance/frame pacing:** planned measurement and benchmarking before changing defaults.
 5. **M1B — experimental PyroWave streaming:** planned as an optional codec path after M1A measurements and a Vibepollo protocol spike.
