@@ -1,6 +1,6 @@
 # Source audit and feature matrix
 
-Source review: September 12, 2026. Findings below describe the inspected snapshots. Subsequent x64 builds passed and the owner confirmed the client works; those results and their limits are recorded in [BASELINE.md](BASELINE.md). Current Asteria identity and x64/ARM64 CI packaging are implemented; real Windows 11 ARM64 qualification remains the next [M0A gate](NEXT_STEP.md). This historical source audit is not a list of shipped Apollo extensions; see the [README](../README.md) for current preview scope.
+Source review: September 12, 2026. Findings below describe the inspected snapshots. Subsequent x64 builds passed and the owner confirmed the client works; those results and their limits are recorded in [BASELINE.md](BASELINE.md). Current Asteria identity and x64/ARM64 CI packaging are implemented; M0A real-device native ARM64 validation is complete and [M1A instrumentation](NEXT_STEP.md) is the next development task. This historical source audit is not a list of shipped Apollo extensions; see the [README](../README.md) for current preview scope.
 
 ## Comparison snapshots
 

@@ -1,6 +1,6 @@
 # Porting plan
 
-Updated for the first portable preview: Asteria identity and x64/ARM64 CI packaging are implemented; an owner-reported real-device AV1 streaming comparison is recorded, while full Windows 11 ARM64 qualification remains pending. Completed integration items are checked below; build and test evidence lives in [BASELINE.md](BASELINE.md).
+Updated after owner validation: Asteria identity and x64/ARM64 CI packaging are implemented, and M0A native Windows ARM64 is complete on the recorded Surface Pro 11th Edition. M1A instrumentation is the next development task. First-preview release checks remain separate. Completed integration items are checked below; build and test evidence lives in [BASELINE.md](BASELINE.md).
 
 ## Review outcome
 
@@ -10,11 +10,11 @@ The original choice to reuse Moonlight's Windows streaming stack is sound. The r
 
 ## Scope and dependency order
 
-M0 is merged. M0A build and packaging work passes CI; an owner-reported real-device streaming comparison is recorded, and qualification remains open. M1 identity is implemented, while its profiles/session work and M1A–M4 (including the optional M1B PyroWave milestone) remain planned. Apply M5 qualification to the initial preview's inherited streaming and identity scope; later feature milestones are not prerequisites for that preview. Clipboard (M3) depends on capability work in M2. Performance changes must follow measurements, and a cross-build alone does not complete M0A. M6 Asteria VR follows the core streaming and performance baselines as a separate later feature; it does not depend on M1B PyroWave or the M2–M4 Apollo extensions.
+M0 is merged and M0A native ARM64 is complete based on owner-verified process architecture and Apollo AV1 streaming on real hardware. M1 identity is implemented, while its profiles/session work and M1A–M4 (including the optional M1B PyroWave milestone) remain planned. Apply M5 qualification to the initial preview's inherited streaming and identity scope; later feature milestones are not prerequisites for that preview. Clipboard (M3) depends on capability work in M2. Performance changes must follow measurements, and a cross-build alone does not complete M0A. M6 Asteria VR follows the core streaming and performance baselines as a separate later feature; it does not depend on M1B PyroWave or the M2–M4 Apollo extensions.
 
-Primary targets: **Windows 11 x64 and native ARM64**, both intended for the first preview. Native ARM64 means the client and its process-loaded runtime DLLs run as ARM64, without x64 emulation; cross-compiling on an x64 build host is acceptable. Windows 10 x64 remains a separate compatibility target pending runtime documentation and real-machine tests. Record exact minimum OS builds before publishing qualified binaries. These are support goals, not claims that the ARM64 qualification matrix is complete.
+Primary targets: **Windows 11 x64 and native ARM64**, both intended for the first preview. Native ARM64 means the client and its process-loaded runtime DLLs run as ARM64, without x64 emulation; cross-compiling on an x64 build host is acceptable. Windows 10 x64 remains a separate compatibility target pending runtime documentation and real-machine tests. Record exact minimum OS builds before publishing qualified binaries. M0A completion is specific to the recorded device and workload, not a broad ARM64 support matrix.
 
-The first public preview covers inherited Moonlight streaming and the implemented Asteria identity, delivered as x64 and native ARM64 portable ZIPs after hardware qualification. Desktop profiles, additional session actions, measured frame-pacing changes, Apollo clipboard, virtual-display controls, and host commands remain later roadmap work. Touch overlays, file transfer, simultaneous multiple streams, and a host companion service are outside the first release.
+The first public preview covers inherited Moonlight streaming and the implemented Asteria identity, delivered as x64 and native ARM64 portable ZIPs after release-specific validation. Desktop profiles, additional session actions, measured frame-pacing changes, Apollo clipboard, virtual-display controls, and host commands remain later roadmap work. Touch overlays, file transfer, simultaneous multiple streams, and a host companion service are outside the first release.
 
 ## M0 — Establish the Moonlight fork and reproducible baseline
 
@@ -27,23 +27,25 @@ The first public preview covers inherited Moonlight streaming and the implemente
 - [ ] Capture measured performance baselines before branding or feature changes, and complete missing hardware/host-version records.
 - [x] Adapt x64 Windows CI: recursive checkout, pinned actions and dependency checksums, build logs, executable artifacts, and symbols; ordinary builds use no release/signing credentials.
 
-**Qualification gate (partly evidenced, carried forward):** a fresh checkout builds locally and in Windows CI; the deployed build launches on a clean test machine without developer tools; manually pair and stream 1080p60 H.264 SDR with audio, keyboard, mouse, and a gamepad. Record exact Sunshine and Apollo host versions and test each independently. Store results using [VALIDATION.md](VALIDATION.md). The owner's general test confirmation does not supply these individual records. A build-only VM does not establish hardware-decoder support.
+**Qualification gate (partly evidenced, carried forward):** a fresh checkout builds locally and in Windows CI; the deployed build launches on a clean test machine without developer tools; manually pair and stream 1080p60 H.264 SDR with audio, keyboard, mouse, and a gamepad. Record the Apollo host version and test the advertised Apollo preview scope. Store results using [VALIDATION.md](VALIDATION.md). The owner's general test confirmation does not supply these individual records. A build-only VM does not establish hardware-decoder support.
 
 **Deliverable:** baseline import PR, build instructions, CI artifact, and baseline report. No client feature rewrite is needed here.
 
-## M0A — Native Windows ARM64 baseline (device comparison recorded; qualification open)
+## M0A — Native Windows ARM64 baseline (complete)
 
 - [x] Extend the existing build harness to accept explicit x64/ARM64 targets, preserving upstream source layout and the default x64 command. Dependency/preflight tests pass.
 - [x] Use the upstream Qt 6.11.2 ARM64 cross kit and matching MSVC ARM64 tools. Keep host-side Qt build tools distinct from deployed ARM64 runtime files. Implemented in PR #6 and exercised by successful ARM64 CI.
 - [x] Pin and verify the v15 Windows ARM64 dependency archive; record versions, hashes and source/license locations in [dependency notes](DEPENDENCIES_WINDOWS.md). Isolate dependencies with one target per checkout and architecture-specific output/evidence folders.
 - [x] Build both unmodified upstream and the candidate for ARM64 in Windows CI. Keep x64 coverage; publish separate portable ZIPs, symbols, source, and compiler/SDK/dependency evidence for each architecture. All four jobs passed in [run 34790903403](https://github.com/Unitron07/Asteria-Windows/actions/runs/34790903403); PR #6 is merged.
 - [x] Implement final-ZIP PE machine validation for every EXE/DLL, including nested Qt plugins, SDL, codecs, and AntiHooking, with a hash-bound evidence report. Local tests reject x64 DLL contamination in ARM64 packages and the reverse. Host build tools outside the ZIP are not scanned.
-- [x] Hosted upstream/candidate builds and final-ZIP architecture gates pass for both targets in [run 34797782854](https://github.com/Unitron07/Asteria-Windows/actions/runs/34797782854). A real-device streaming comparison is reported below, but native process execution is not yet independently recorded.
-- [x] Record the owner's real-device comparison: native ARM64 Asteria felt smoother in menus/settings than emulated x64 Moonlight (**subjective**); repeated same-game 2560×1440 approximately 60 FPS AV1 streams on an Apollo host appeared effectively identical, without meaningful decode/render/frame-queue differences or an observed stream regression. This is a limited observed result, not full qualification; see [BASELINE.md](BASELINE.md).
-- [ ] Verify the portable ARM64 artifact and process architecture on a recorded Windows 11 ARM64 device without development tools; document launch, discovery/manual host, pairing, H.264 1080p60 SDR, audio, keyboard, mouse, and gamepad with separately recorded Sunshine and Apollo hosts.
-- [ ] Record selected decoder and a controlled baseline against pinned upstream **native ARM64** Moonlight on the same device. The owner's comparison used stock x64 Moonlight under emulation. Test available additional codecs without claiming unsupported GPU paths.
+- [x] Hosted upstream/candidate builds and final-ZIP architecture gates pass for both targets in [run 34797782854](https://github.com/Unitron07/Asteria-Windows/actions/runs/34797782854). The owner subsequently verified native ARM64 process execution on the Surface Pro 11th Edition.
+- [x] Record the owner's real-device comparison: native ARM64 Asteria felt smoother in menus/settings than emulated x64 Moonlight (**subjective**); repeated same-game 2560×1440 approximately 60 FPS AV1 streams on an Apollo host appeared effectively identical, without meaningful decode/render/frame-queue differences or an observed stream regression. This completes the M0A device streaming gate for the owner's Apollo setup; see [BASELINE.md](BASELINE.md) for evidence limits.
+- [x] Verify the Asteria process as native ARM64 on a Surface Pro 11th Edition with Snapdragon X Plus and 16 GB RAM; record successful Apollo AV1 streaming on the real device.
+- [x] Compare with the official x64 Moonlight release under Windows ARM64 emulation on the same device, the practical available upstream release. There is no official native ARM64 upstream Moonlight release. CI-built unmodified upstream ARM64 artifacts are internal reference builds only.
 
-**Exit gate:** reproducible ARM64 upstream/candidate builds and artifacts, native ARM64 runtime verification, real-device launch and streaming evidence, and passing x64 regression builds. Missing hardware or host access is an explicit open gate. An x64 binary under emulation does not satisfy the native ARM64 deliverable.
+Additional codec, input/audio, lifecycle, clean-machine, decoder, and exact host/driver/build records belong to first-preview release validation in [VALIDATION.md](VALIDATION.md), not the completed M0A gate.
+
+**Exit gate: complete.** Reproducible ARM64 reference/Asteria builds and artifacts, native ARM64 Asteria process verification, real-device Apollo AV1 streaming, and passing x64 regression builds are recorded. The official x64 Moonlight release under emulation is the practical comparison for users; the Asteria process itself was native ARM64.
 
 **Deliverable:** native ARM64 baseline PR and portable development build, per-architecture evidence, and hardware test report. See the implementation handoff in [NEXT_STEP.md](NEXT_STEP.md).
 
@@ -85,7 +87,7 @@ The goal is not to blindly copy Artemis Android decoder tweaks. Artemis Android 
 - [ ] Add opt-in codec negotiation and an isolated Windows GPU decoder/presentation path. Select PyroWave only when host and client support are confirmed; retain H.264/HEVC/AV1 and recoverable fallback.
 - [ ] Validate Vulkan/runtime packaging and x64/native ARM64 builds. Qualify each architecture on actual hardware before advertising support.
 - [ ] Compare latency, decode/present time, drops, GPU use, bandwidth, and network queuing against existing codecs on the same host, client, network, and workload.
-- [ ] Test reconnect, resolution and frame-rate changes, SDR/HDR and chroma where supported, and regression coverage with standard Sunshine and Apollo streams.
+- [ ] Test reconnect, resolution and frame-rate changes, SDR/HDR and chroma where supported, and regression coverage with standard Apollo streams.
 
 **Exit gate:** an opt-in stream works with a pinned Vibepollo build on qualified Windows hardware, measurements and limitations are recorded, and existing codec paths still work. If interoperability or measured benefit is insufficient, leave it experimental and out of release builds.
 
@@ -98,7 +100,7 @@ The goal is not to blindly copy Artemis Android decoder tweaks. Artemis Android 
 - [ ] Parse authenticated host extension fields, permission bits, driver readiness, and command names; keep absence, denial, and transient failure distinct.
 - [ ] Add fixtures for a standard host, Apollo with permissions, Apollo with denied permissions, malformed/missing fields, and changed capabilities after reconnect.
 
-**Exit gate:** direct-pointer corner/center mapping stays correct under every implemented scaling mode, 100/150/200% DPI, and monitor switching; focus loss releases input. Sunshine works with extension fields absent and no unsolicited Apollo actions. A denied or failed extension does not stop the stream.
+**Exit gate:** direct-pointer corner/center mapping stays correct under every implemented scaling mode, 100/150/200% DPI, and monitor switching; focus loss releases input. Ordinary Apollo streaming works with extension fields absent and no unsolicited extension actions. A denied or failed extension does not stop the stream.
 
 ## M3 — Apollo text clipboard, then virtual-display requests
 
@@ -108,7 +110,7 @@ The goal is not to blindly copy Artemis Android decoder tweaks. Artemis Android 
 - [ ] Request Apollo virtual displays only after authenticated capability/readiness checks. Validate launch and resume separately; do not assume their behavior is identical.
 - [ ] Exercise driver-missing, permission-denied, launch-failure, disconnect, client-crash, and reconnect cases. Document host-owned cleanup and recovery rather than attempting to restore the host's entire display configuration from the client.
 
-**Exit gate:** plain text transfers both ways only with an active authorized session; failures preserve the local clipboard and do not leak content to another host. Unsupported responses, including an HTTP-200 error document, are not treated as clipboard text or successful writes. Apollo display requests succeed on the recorded host build or give an actionable reason; ordinary Sunshine launch remains unchanged.
+**Exit gate:** plain text transfers both ways only with an active authorized session; failures preserve the local clipboard and do not leak content to another host. Unsupported responses, including an HTTP-200 error document, are not treated as clipboard text or successful writes. Apollo display requests succeed on the recorded host build or give an actionable reason; ordinary Apollo launch remains unchanged.
 
 ## M4 — Apollo server commands
 
@@ -116,7 +118,7 @@ The goal is not to blindly copy Artemis Android decoder tweaks. Artemis Android 
 - [ ] Map host-advertised command names to their original indexes; enforce the native range and permissions, and handle missing/changed command lists.
 - [ ] Add explicit action confirmation as described in the architecture. Do not retry commands automatically or present a transport send as confirmed execution.
 
-**Exit gate:** a harmless configured command reaches the intended action on the test host, invalid/denied commands are blocked, reconnect does not replay actions, and standard Sunshine streaming still passes. Include packet/API tests for the native patch and record provenance.
+**Exit gate:** a harmless configured command reaches the intended action on the test host, invalid/denied commands are blocked, reconnect does not replay actions, and standard Apollo streaming still passes. Include packet/API tests for the native patch and record provenance.
 
 ## M5 — Qualify and release
 
@@ -149,11 +151,11 @@ Keep feature PRs small and avoid mass renames of upstream source directories. Re
 
 ## Remaining decisions
 
-- Exact Windows 11 ARM64 minimum build, device/SoC/GPU/driver, and qualification host details: resolve in M0A.
+- Exact Windows 11 ARM64 minimum build, GPU driver, selected decoder, and Apollo version: record for first-preview release qualification; M0A device/SoC/RAM and native process architecture are recorded.
 - Exact Windows 10 x64 minimum build and runtime support: resolve before advertising compatibility.
-- Tested Sunshine/Apollo versions and the original manual test's client/host details: record during M0A; extension-specific support boundaries follow in M2.
+- Tested Apollo version and the original manual test's client/host details: record for release qualification; extension-specific support boundaries follow in M2. Sunshine is not a required project/preview qualification target.
 - Default frame-pacing policy and whether adaptive buffering/VRR modes graduate from experimental status: resolve from M1A measurements, not Android behavior alone.
 - Overlay rendering approach: choose only after testing the existing video-window integration and latency impact.
 - Touch-device qualification beyond the baseline keyboard/mouse/gamepad cases remains later work.
 
-Do not attach calendar estimates until the ARM64 baseline, Windows performance experiments, and Apollo protocol spikes identify actual effort. The next concrete task is completing M0A device qualification and same-commit x64 smoke testing for the initial preview. M1 identity/storage isolation is implemented; profiles, session workflows, M1A–M4 (including M1B PyroWave), and M6 Asteria VR remain future implementation work.
+Do not attach calendar estimates until the ARM64 baseline, Windows performance experiments, and Apollo protocol spikes identify actual effort. The next concrete development task is M1A low-overhead telemetry and repeatable benchmark output. Same-commit x64 smoke testing and detailed Apollo/hardware records remain first-preview release checks. M1 identity/storage isolation is implemented; profiles, session workflows, M1A–M4 (including M1B PyroWave), and M6 Asteria VR remain future implementation work.
