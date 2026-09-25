@@ -29,9 +29,9 @@ Before publishing, qualify the ARM64 ZIP on a real Windows 11 ARM64 device, smok
 6. **M3 — Apollo text clipboard and virtual-display requests:** planned.
 7. **M1B — experimental PyroWave streaming:** planned as an optional codec path after M1A measurements and a Vibepollo protocol spike.
 8. **M4 — Apollo server commands:** planned.
-8. **M5 — release qualification:** apply checks to each release's advertised scope.
+9. **M5 — release qualification:** apply checks to each release's advertised scope.
 
-Profiles, performance changes, and Apollo extensions are not prerequisites for this initial preview. Touch-overlay parity, simultaneous multi-stream viewing, and file transfer are later work.
+Profiles, performance changes, PyroWave, and Apollo extensions are not prerequisites for this initial preview. PyroWave is planned, not implemented or qualified. Touch-overlay parity, simultaneous multi-stream viewing, and file transfer are later work.
 
 Asteria retains Moonlight's Qt/QML UI, SDL input/session stack, hardware decoding paths, build structure, and upstream history. New behavior is added at narrow integration boundaries so upstream security and correctness fixes remain practical to merge.
 
