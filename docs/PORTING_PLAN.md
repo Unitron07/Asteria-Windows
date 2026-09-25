@@ -1,6 +1,6 @@
 # Porting plan
 
-Updated after owner validation: Asteria identity and x64/ARM64 CI packaging are implemented, and M0A native Windows ARM64 is complete on the recorded Surface Pro 11th Edition. M1A instrumentation is the next development task. First-preview release checks remain separate. Completed integration items are checked below; build and test evidence lives in [BASELINE.md](BASELINE.md).
+Updated after owner validation: Asteria identity and x64/ARM64 CI packaging are implemented, and M0A native Windows ARM64 is complete on the recorded Surface Pro 11th Edition. M1A starts with Moonlight's existing performance statistics; M1B protocol groundwork is the next development task. First-preview release checks remain separate. Completed integration items are checked below; build and test evidence lives in [BASELINE.md](BASELINE.md).
 
 ## Review outcome
 
@@ -65,23 +65,23 @@ Additional codec, input/audio, lifecycle, clean-machine, decoder, and exact host
 The goal is not to blindly copy Artemis Android decoder tweaks. Artemis Android and Moonlight Android use Android-specific decoder and presentation paths; Windows uses different hardware decode/render/presentation APIs. Port only platform-neutral ideas that prove beneficial on Windows.
 
 - [ ] Establish repeatable x64 and ARM64 performance comparisons against unmodified Moonlight using the same client hardware, display mode, host, codec, bitrate, frame rate, network path, and workload.
-- [ ] Instrument useful pipeline boundaries such as packet/frame arrival, decode start/finish, presentation-queue entry, present request, and presentation completion. Keep telemetry low-overhead and aggregated; do not enable per-frame logging by default.
-- [ ] Record network variance, decode timing, render/present timing, dropped frames, queue depth, CPU/GPU use, and any trustworthy end-to-end latency observations. Clearly distinguish measured values from estimates.
+- [ ] Use Moonlight PC's existing performance overlay and logs for the initial baseline: decode time, rendering time, frame-queue delay, network latency/variance, dropped frames, codec, resolution, and FPS where available. Record settings and test conditions with each run. The owner's ARM64 versus emulated x64 Moonlight AV1 comparison is initial evidence of stream parity, not a controlled benchmark.
+- [ ] Identify a concrete missing metric and the decision it would inform before adding targeted instrumentation. Do not create a telemetry subsystem or per-frame logging by default. Clearly distinguish measured values from estimates.
 - [ ] Audit Artemis Android performance-related changes and classify them as platform-neutral, Android/MediaCodec-specific, device-workaround-specific, or already present in Moonlight PC.
-- [ ] Prototype explicit presentation policies such as **Low Latency**, **Balanced**, and **Smooth**, while preserving an upstream-compatible/default mode. Define each policy by concrete queue/scheduling behavior rather than labels alone.
-- [ ] Prototype a bounded adaptive presentation/jitter queue that can absorb short network/decode timing variance and shrink when conditions improve. Cap queue growth and expose the latency cost rather than silently accumulating delay.
+- [ ] Only if repeatable measurements reveal a real pacing problem or a benefit worth testing, prototype explicit presentation policies such as **Low Latency**, **Balanced**, and **Smooth**, while preserving an upstream-compatible/default mode. Define each policy by concrete queue/scheduling behavior rather than labels alone.
+- [ ] If measured jitter or queue behavior warrants it, prototype a bounded adaptive presentation/jitter queue that can absorb short network/decode timing variance and shrink when conditions improve. Cap queue growth and expose the latency cost rather than silently accumulating delay.
 - [ ] Test stable-LAN and induced-jitter scenarios at representative 60/90/120/144 FPS targets where hardware permits. Compare smoothness, dropped/repeated frames, input feel, and measured latency against unmodified Moonlight.
 - [ ] Investigate VRR-aware presentation on supported Windows displays. Measure DXGI/compositor/fullscreen behavior and frame pacing before enabling a dedicated VRR mode; do not assume VRR automatically lowers latency.
-- [ ] Extend the performance overlay only with Windows counters whose timing boundaries are understood. Useful candidates include network latency/variance, decode time, presentation queue depth, present timing, dropped frames, codec/decoder, and active pacing mode.
+- [ ] Extend the performance overlay only for a concrete unanswered question and with Windows counters whose timing boundaries are understood. Useful candidates include network latency/variance, decode time, presentation queue depth, present timing, dropped frames, codec/decoder, and active pacing mode.
 - [ ] Avoid changing networking, decoder selection, or input paths unless measurements identify them as the actual bottleneck. Any default behavior change requires reproducible evidence that it improves a stated metric or pacing condition without unacceptable regressions.
 
-**Exit gate:** at least one representative x64 system and one ARM64 system have reproducible upstream-vs-Asteria traces. Any shipped performance mode improves a stated metric or frame-pacing condition without unacceptable latency, stability, power, or compatibility regressions. Stable-network and jittered-network cases are both tested, and the upstream-compatible mode remains available. If no prototype reliably beats upstream, retain upstream presentation behavior and keep only the useful instrumentation/diagnostics.
+**Exit gate:** the owner comparison is retained as initial parity evidence, and at least one representative x64 system and one ARM64 system have repeatable comparisons using existing Moonlight statistics. Any shipped performance mode must improve a stated metric or pacing condition without unacceptable latency, stability, power, or compatibility regressions. If no measured problem or reliable benefit warrants a pacing change, retain upstream presentation behavior. Add a targeted metric only when the built-in stats leave a concrete question unanswered.
 
-**Deliverable:** performance trace format, benchmark procedure, upstream-vs-Asteria results, and only the presentation/pacing modes that survive measurement.
+**Deliverable:** benchmark procedure and upstream-vs-Asteria results based on existing statistics, plus only justified diagnostics or pacing changes.
 
 ## M1B — Experimental PyroWave streaming with Vibepollo
 
-**Status:** planned, after M1A baseline measurements. This optional milestone is independent of M2–M4 Apollo features and is not required for the first public preview.
+**Status:** protocol groundwork is the next development task. This optional codec milestone is independent of M2–M4 Apollo features and is not required for the first public preview. See the [M1B source audit](M1B_PYROWAVE_SPIKE.md).
 
 - [ ] Pin the PyroWave implementation and a Vibepollo host revision. Verify licensing, actual codec negotiation, frame transport, color metadata, and compatibility with this fork's Moonlight protocol core.
 - [ ] Add opt-in codec negotiation and an isolated Windows GPU decoder/presentation path. Select PyroWave only when host and client support are confirmed; retain H.264/HEVC/AV1 and recoverable fallback.
@@ -158,4 +158,4 @@ Keep feature PRs small and avoid mass renames of upstream source directories. Re
 - Overlay rendering approach: choose only after testing the existing video-window integration and latency impact.
 - Touch-device qualification beyond the baseline keyboard/mouse/gamepad cases remains later work.
 
-Do not attach calendar estimates until the ARM64 baseline, Windows performance experiments, and Apollo protocol spikes identify actual effort. The next concrete development task is M1A low-overhead telemetry and repeatable benchmark output. Same-commit x64 smoke testing and detailed Apollo/hardware records remain first-preview release checks. M1 identity/storage isolation is implemented; profiles, session workflows, M1A–M4 (including M1B PyroWave), and M6 Asteria VR remain future implementation work.
+Do not attach calendar estimates until the ARM64 baseline, Windows performance experiments, and Apollo protocol spikes identify actual effort. The next concrete development task is the M1B Vibepollo/PyroWave protocol spike. M1A initial comparisons use Moonlight's existing statistics; new instrumentation or frame-pacing changes require a measured reason. Same-commit x64 smoke testing and detailed Apollo/hardware records remain first-preview release checks. M1 identity/storage isolation is implemented; profiles, session workflows, M1A–M4 (including M1B PyroWave), and M6 Asteria VR remain future implementation work.
