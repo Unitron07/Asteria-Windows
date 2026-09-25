@@ -41,6 +41,10 @@ New extension classes belong beside the existing backend/session code. Class nam
 
 **Settings and identity:** Asteria's separate app/settings/pairing/log/package identity is implemented. Qualify data-location and installer lifecycle behavior for the artifacts offered. Test coexistence with Moonlight. Do not silently copy pairing credentials. Profiles use stable host/app identifiers and explicit precedence: global defaults, host profile, app override, session-only override. Version the schema and preserve recoverable settings when migration fails. Verify whether upstream portable mode meets the intended data-location contract before promising a self-contained ZIP.
 
+## Planned PyroWave boundary (M1B)
+
+PyroWave is an optional Asteria-Windows codec experiment, not a current client feature or a first-preview requirement. Pin and inspect Vibepollo's actual negotiation and frame transport before changing the protocol core. Keep pairing, input, audio, and existing codec paths intact. Create codec-specific GPU resources only after both ends agree and local runtime support is confirmed; release resources on stop/reconnect and allow recovery using an existing codec. Verify licensing, Vulkan dependencies, x64/ARM64 packaging, color/HDR behavior, and measured performance before advertising support.
+
 ## Dependency policy
 
 Keep the pinned upstream Qt/MSVC/qmake and dependency workflow for the baseline. Do not add a CMake, SDL major-version, decoder, or framework migration to the port. Record actual compiler/SDK/runtime versions, submodule SHAs, dependency archive hashes, and build commands.
