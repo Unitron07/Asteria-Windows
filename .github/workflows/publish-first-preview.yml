@@ -1,0 +1,101 @@
+name: Publish first Asteria preview
+
+on:
+  push:
+    branches: [codex/publish-first-preview]
+    paths: [.github/workflows/publish-first-preview.yml]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - name: Checkout release harness
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Verify CI artifacts and prepare release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $runId = '36191650824'
+          $sha = '34dfd937528586babded200fafaee535e21d4a40'
+          $tag = 'v0.1.0-preview.1'
+          $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $run.conclusion -ne 'success' -or $run.head_sha -ne $sha -or $run.head_branch -ne 'main') {
+            throw 'The candidate CI run is not a successful build of the expected main commit.'
+          }
+          $tagCheck = gh api "repos/$env:GITHUB_REPOSITORY/git/ref/tags/$tag" 2>$null
+          if ($LASTEXITCODE -eq 0) { throw "Tag $tag already exists; refusing to replace it." }
+          $releaseDir = Join-Path $PWD 'release-assets'
+          New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+          foreach ($arch in @('x64', 'arm64')) {
+            $downloadDir = Join-Path $PWD "download-$arch"
+            New-Item -ItemType Directory -Force -Path $downloadDir | Out-Null
+            foreach ($kind in @('baseline', 'symbols', 'source', 'evidence')) {
+              $name = "$kind-asteria-windows-$arch-$runId"
+              $dest = Join-Path $downloadDir $kind
+              gh run download $runId --repo $env:GITHUB_REPOSITORY --name $name --dir $dest
+              if ($LASTEXITCODE -ne 0) { throw "Unable to download $name" }
+            }
+            $package = @(Get-ChildItem (Join-Path $downloadDir 'baseline') -Filter 'AsteriaPortable-*.zip' -File -Recurse)
+            $symbols = @(Get-ChildItem (Join-Path $downloadDir 'symbols') -Filter 'AsteriaDebuggingSymbols-*.zip' -File -Recurse)
+            $sources = @(Get-ChildItem (Join-Path $downloadDir 'source') -Filter 'source.tar.gz' -File -Recurse)
+            $reports = @(Get-ChildItem (Join-Path $downloadDir 'evidence') -Filter 'package-architecture.json' -File -Recurse)
+            if ($package.Count -ne 1 -or $symbols.Count -ne 1 -or $sources.Count -ne 1 -or $reports.Count -ne 1) {
+              throw "Missing or ambiguous package, symbols, source, or architecture report for $arch"
+            }
+            $report = Get-Content -LiteralPath $reports[0].FullName -Raw | ConvertFrom-Json
+            $hash = (Get-FileHash -LiteralPath $package[0].FullName -Algorithm SHA256).Hash
+            if (!$report.passed -or $report.architecture -ne $arch -or $report.package -ne $package[0].Name -or
+                $report.sha256 -ne $hash -or !$report.binaries.Count -or @($report.binaries | Where-Object { !$_.passed }).Count) {
+              throw "The final $arch package does not match a passing hash-bound architecture report."
+            }
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            $zip = [IO.Compression.ZipFile]::OpenRead($package[0].FullName)
+            try {
+              $names = @($zip.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
+              foreach ($required in @('portable.dat', 'source-notices/LICENSE', 'source-notices/PROVENANCE.txt')) {
+                if (!($names | Where-Object { $_ -ieq $required -or $_ -ilike "*/$required" })) {
+                  throw "$arch package is missing $required"
+                }
+              }
+            } finally { $zip.Dispose() }
+            Copy-Item -LiteralPath $package[0].FullName -Destination (Join-Path $releaseDir "Asteria-$tag-windows-$arch-portable.zip")
+            Copy-Item -LiteralPath $symbols[0].FullName -Destination (Join-Path $releaseDir "Asteria-$tag-windows-$arch-symbols.zip")
+            Copy-Item -LiteralPath $sources[0].FullName -Destination (Join-Path $releaseDir "Asteria-$tag-source-$arch.tar.gz")
+            Compress-Archive -Path (Join-Path $downloadDir 'evidence/*') -DestinationPath (Join-Path $releaseDir "Asteria-$tag-evidence-$arch.zip")
+            Write-Host "Verified $($report.binaries.Count) $arch binaries in $($package[0].Name), SHA-256 $hash"
+          }
+          Get-ChildItem -LiteralPath $releaseDir -File | Sort-Object Name | ForEach-Object {
+            '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
+          } | Set-Content -LiteralPath (Join-Path $releaseDir 'SHA256SUMS.txt') -Encoding ascii
+          @'
+          Asteria is a Windows game-streaming client derived from Moonlight PC. This is its first public, unsigned preview. Apollo is the project's target host.
+
+          Download the x64 or native ARM64 portable ZIP for your Windows device, extract it into a writable folder, and run Asteria.exe. Keep portable.dat in the extracted folder. No installer is included.
+
+          Both portable packages were built from commit 34dfd937528586babded200fafaee535e21d4a40 in the same successful Windows baseline run (36191650824). The release also includes SHA-256 checksums, symbols, corresponding source with pinned submodules, and architecture/build evidence. The portable ZIPs include source notices and license files.
+
+          The owner verified native ARM64 process execution on a Surface Pro 11th Edition with Snapdragon X Plus and 16 GB RAM. In repeated Apollo AV1 streams at 2560×1440 and approximately 60 FPS, native ARM64 Asteria showed stream parity with official x64 Moonlight running under Windows ARM64 emulation on the same device. Asteria's menus and settings felt smoother and snappier to the owner; this is a qualitative observation, not a timed benchmark. The owner also confirmed the completed x64 and ARM64 CI builds work. Exact OS build, driver, decoder, Apollo version, run duration, and tested artifact hashes were not recorded for the earlier comparison, so these observations are limited to the reported setup and should not be read as broad hardware qualification.
+
+          PyroWave, Apollo-specific extensions, profiles and additional session workflows, and Asteria VR are planned but not implemented. Inherited HDR, AV1, and hardware decoding paths depend on the host, client GPU, and drivers. Report reproducible issues in this repository.
+
+          Asteria retains Moonlight PC history, attribution, notices, licenses, and corresponding-source obligations. The internal application/package version inherited from the Moonlight baseline is 6.1.0; v0.1.0-preview.1 is Asteria's public preview tag. The bundled provenance file calls the build a development baseline because broad hardware qualification remains open; this release is a limited, unsigned preview.
+          '@ | Set-Content -LiteralPath (Join-Path $PWD 'release-notes.txt') -Encoding utf8
+          $assets = @(Get-ChildItem -LiteralPath $releaseDir -File | ForEach-Object { $_.FullName })
+          gh release create $tag @assets --repo $env:GITHUB_REPOSITORY --target $sha --draft --prerelease --title "Asteria $tag" --notes-file (Join-Path $PWD 'release-notes.txt')
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to create draft release with assets.' }
+          $release = gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets,isDraft,isPrerelease | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or !$release.isDraft -or !$release.isPrerelease -or $release.assets.Count -ne $assets.Count) {
+            throw 'Draft release assets or metadata are incomplete; leaving it unpublished.'
+          }
+          gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to publish the validated draft prerelease.' }
+
