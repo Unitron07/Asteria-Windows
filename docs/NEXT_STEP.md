@@ -1,6 +1,6 @@
 # Next step: qualify the first portable preview
 
-Asteria identity/rebranding and native x64/ARM64 build and packaging work are implemented. The next gate is real Windows 11 ARM64 device qualification, followed by x64 smoke testing from the same release commit. Profiles, new session workflows, performance changes, and Apollo extensions remain roadmap work and are not required for this first preview.
+Asteria identity/rebranding and native x64/ARM64 build and packaging work are implemented. The next gate is completing Windows 11 ARM64 device qualification, followed by x64 smoke testing from the same release commit. Profiles, new session workflows, performance changes, and Apollo extensions remain roadmap work and are not required for this first preview.
 
 Track device evidence in [GitHub issue #3](https://github.com/Unitron07/Asteria-Windows/issues/3).
 
@@ -14,6 +14,12 @@ Track device evidence in [GitHub issue #3](https://github.com/Unitron07/Asteria-
 
 See [BUILD_WINDOWS.md](BUILD_WINDOWS.md) for commands and [BASELINE.md](BASELINE.md) for evidence limits. CI does not establish native device execution or streaming compatibility.
 
+## Owner-reported ARM64 device comparison
+
+On a Windows-on-ARM device, the owner compared native ARM64 Asteria with stock x64 Moonlight running under emulation. **Qualitative UI observation:** Asteria's menus and settings felt noticeably smoother and snappier; no launch/UI timings were collected. **Observed streaming result:** repeated tests of the same game at 2560×1440 and approximately 60 FPS with AV1 appeared effectively identical. The displayed decode, render, and frame-queue statistics showed no meaningful difference, and no stream regression was observed. Two initial screenshots were discussed, but raw screenshots, run lengths, and a controlled benchmark record are not attached here.
+
+This is a comparison with **emulated x64 Moonlight**, not the pinned upstream native ARM64 build. The device model, Windows build, driver, process architecture confirmation, selected decoder, Apollo version, and package hashes were not supplied. Sunshine has not been separately tested or recorded. See [BASELINE.md](BASELINE.md) and [VALIDATION.md](VALIDATION.md) for the evidence and remaining gates.
+
 ## Remaining preview qualification
 
 Use the [validation checklist and result template](VALIDATION.md) to record:
@@ -24,12 +30,12 @@ Use the [validation checklist and result template](VALIDATION.md) to record:
 - Separate Sunshine and Apollo host versions and standard-streaming results. This does not qualify Apollo-specific extensions.
 - Available HEVC/AV1/HDR paths and fallback behavior; mark unsupported or untested paths explicitly.
 - Settings persistence, portable data location, and side-by-side use with Moonlight.
-- A same-device upstream ARM64 comparison and an x64 smoke test from the same release commit.
+- A same-device pinned upstream native ARM64 comparison and an x64 smoke test from the same release commit. The reported stock x64 Moonlight comparison does not satisfy the native upstream comparison.
 
 Missing hardware or host access remains an open gate. Do not mark M0A complete solely because CI passes.
 
-## Release wording after testing
+## Release wording after qualification
 
-Once the ARM64 test passes, replace “pending real Windows 11 ARM64 device qualification” with a statement tied to the recorded device, Windows build, host versions, and tested paths. Update README, BASELINE, PORTING_PLAN, and VALIDATION together and link the hardware report from release notes. Preserve untested limitations.
+When the remaining ARM64 checks pass, tie release claims to the recorded device, Windows build, host versions, and tested paths. Link the hardware report from release notes and preserve untested limitations.
 
 Publish separate x64 and ARM64 portable preview ZIPs with exact versions, hashes, symbols, corresponding source/submodules, notices, and known issues. Installer distribution/signing and new Asteria-specific features follow later qualification.
