@@ -1,24 +1,23 @@
-# Next step: M1A performance instrumentation
+# Next step: M1B Vibepollo/PyroWave protocol spike
 
-M0A native Windows ARM64 is complete based on the owner's real-device validation. M1 identity/rebrand is implemented; profiles and session workflows remain planned. The next development task is **M1A low-overhead streaming telemetry** on x64 and ARM64, followed by repeatable benchmark output. Do not change frame pacing defaults before measurements show a benefit.
+M0A native Windows ARM64 is complete based on the owner's real-device validation. M1 identity/rebrand is implemented. **The next development task is M1B groundwork:** pin and inspect the Vibepollo/PyroWave implementation, then define a small, testable Asteria integration boundary. Begin with the [source audit and open questions](M1B_PYROWAVE_SPIKE.md).
 
-## Completed M0A baseline
+## M1A baseline decision
 
-- x64 and ARM64 upstream/reference and Asteria CI builds, portable packaging, and final-ZIP architecture checks passed in [run 34797782854](https://github.com/Unitron07/Asteria-Windows/actions/runs/34797782854).
-- The owner tested a Surface Pro 11th Edition with Snapdragon X Plus and 16 GB RAM and verified that the Asteria process runs as native ARM64.
-- On the same device, native ARM64 Asteria and the official x64 Moonlight release under Windows ARM64 emulation streamed the same game repeatedly at 2560×1440, approximately 60 FPS, AV1 through Apollo. Streaming was effectively identical, without meaningful decode, render, or frame-queue regression. Asteria's menus/settings felt noticeably smoother and snappier; this was qualitative, not timed.
-- There is no official native ARM64 upstream Moonlight release. CI-built unmodified upstream ARM64 artifacts are internal engineering references, not official upstream releases.
-- Apollo is the owner's host for this project and preview. Sunshine is not a required qualification target.
+Moonlight PC's existing performance statistics are sufficient for the initial M1A comparison. Use the overlay and logs to record decode time, rendering time, frame-queue delay, network latency/variance, dropped frames, codec, resolution, and actual frame rate where exposed by the selected build. Record settings, device/driver, host version, workload, and run duration alongside the readings. The owner's repeated Surface Pro 11th Edition runs already provide **initial evidence of stream parity**: native ARM64 Asteria and the official x64 Moonlight release under Windows ARM64 emulation streamed the same Apollo AV1 workload at 2560×1440 and approximately 60 FPS with no meaningful decode, render, or frame-queue regression observed. The menus/settings felt smoother in Asteria, but that observation was qualitative. See [BASELINE.md](BASELINE.md) and [VALIDATION.md](VALIDATION.md) for limits and a repeatable comparison method.
 
-See [BASELINE.md](BASELINE.md) for evidence and unrecorded details. M0A completion does not imply a controlled benchmark or a fully qualified public release.
+Do not build a new telemetry subsystem by default. If an investigation needs a metric the existing stats cannot provide reliably, name that metric and the decision it would inform, then add the smallest targeted measurement. Do not alter frame-pacing behavior unless repeatable measurements demonstrate a real problem or a benefit without unacceptable regressions. An M1A baseline can conclude with the existing behavior retained.
 
-## M1A implementation sequence
+## M1B investigation sequence
 
-1. Add aggregated, low-overhead timestamps/counters for packet or frame arrival, decode start/end, presentation-queue entry, present request/completion, queue depth, dropped/repeated frames, and relevant CPU/GPU use where reliable.
-2. Export structured results with exact client build, host, hardware, driver, codec, resolution, frame rate, bitrate, network, workload, and run duration.
-3. Compare native ARM64 Asteria to the official emulated x64 Moonlight release for the practical user-facing comparison. Use a CI-built unmodified upstream ARM64 artifact only as an optional internal same-architecture reference.
-4. Run repeatable same-device tests before prototyping presentation policies or the optional PyroWave path. Keep the existing pacing behavior as the baseline.
+1. Pin the host, protocol, codec, and client reference revisions. The [September 24 PyroWave streaming handoff](https://github.com/joemossjr16/pyrowave-streaming) points to a Vibepollo fork and Moonlight Qt/protocol changes; verify the exact refs before implementation.
+2. Trace opt-in negotiation from host capability through RTSP/SDP to selected video format. Confirm how unsupported hosts, disabled settings, and unavailable decoders fall back.
+3. Trace video transport, `PYRW` frame framing, size limits, packet loss/FEC, and decode-unit boundaries; distinguish the private Moonlight container from the upstream PyroWave bitstream.
+4. Audit Windows x64 and native ARM64 Vulkan/PyroWave runtime dependencies, decoder and renderer integration, SDR color and 4:2:0/4:4:4 handling, and HDR metadata or explicit HDR exclusion.
+5. Write a narrow integration proposal and an interoperability test matrix against a pinned host. Preserve Asteria's H.264/HEVC/AV1 paths, pairing, audio, and input.
+
+The [M1B spike notes](M1B_PYROWAVE_SPIKE.md) record confirmed findings and unresolved checks. No PyroWave feature is claimed for Asteria yet.
 
 ## Separate first-preview release checks
 
-Use [VALIDATION.md](VALIDATION.md) for same-commit x64/ARM64 smoke tests, Apollo lifecycle/input/audio checks, clean-machine launch, artifact hashes, tested Windows build and driver, selected decoder, Apollo version, and known issues. These release records remain useful, but they do not reopen M0A. Publish portable ZIPs only with claims tied to the paths actually tested.
+Use [VALIDATION.md](VALIDATION.md) for same-commit x64/ARM64 smoke tests, Apollo lifecycle/input/audio checks, clean-machine launch, artifact hashes, tested Windows build and driver, selected decoder, Apollo version, and known issues. These release records do not reopen M0A. PyroWave is not a first-preview prerequisite.

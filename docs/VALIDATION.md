@@ -49,10 +49,12 @@ Use fixtures/unit tests for permission parsing, profiles/migrations, URL encodin
 
 ## Performance method
 
+Moonlight PC's existing performance statistics are the default M1A measurement source. The owner's repeated native ARM64 Asteria versus emulated x64 Moonlight Apollo AV1 runs above are initial evidence of stream parity, with the listed evidence limits. Add instrumentation only after naming a concrete missing metric and the decision it would support. Keep current frame pacing unless repeatable comparisons show a real problem or benefit.
+
 1. Build Asteria in Release configuration and record its SHA. Compare with the official x64 Moonlight release under Windows ARM64 emulation for the practical user comparison; a CI-built unmodified upstream ARM64 artifact may be used as an optional internal engineering reference. Record the exact comparison versions/SHAs.
 2. Use the same client GPU/driver, host build/GPU/encoder, resolution, refresh rate, codec, bitrate, display, power mode, and network path.
 3. Warm up for two minutes, then collect at least three five-minute runs of each build. Alternate their order and use the same reproducible workload. Start with wired LAN 1080p60 H.264 SDR, then test enabled extensions.
-4. Record median and p95 decode/render/frame-queue times where available, frame drops, frame pacing, CPU/GPU load, memory trend, audio glitches, and connection failures. Keep raw logs and the workload description.
+4. Capture Moonlight's built-in performance overlay/log readings: decode time, rendering time, frame-queue delay, network latency/variance, dropped frames, codec, resolution, and observed FPS where available. Record median and p95 only if the source supplies enough samples or a trustworthy aggregate; do not infer percentiles from a screenshot. Note unavailable metrics, plus frame pacing observations, CPU/GPU load, memory trend, audio glitches, and connection failures where measured. Keep screenshots or raw logs and the workload description.
 5. Measure input-to-photon latency with a high-speed camera or suitable hardware if reporting that metric. Internal decode/network stats are not an input-to-photon measurement.
 6. Perform a 30-minute session soak and the connect/disconnect lifecycle test with clipboard/overlays enabled, if included.
 
