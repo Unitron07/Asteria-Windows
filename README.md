@@ -30,8 +30,15 @@ Before publishing, qualify the ARM64 ZIP on a real Windows 11 ARM64 device, smok
 7. **M1B — experimental PyroWave streaming:** planned as an optional codec path after M1A measurements and a Vibepollo protocol spike.
 8. **M4 — Apollo server commands:** planned.
 9. **M5 — release qualification:** apply checks to each release's advertised scope.
+10. **M6 — Asteria VR (remote PCVR):** planned after core streaming and performance work, with separate proof-of-concept and headset qualification gates.
 
-Profiles, performance changes, PyroWave, and Apollo extensions are not prerequisites for this initial preview. PyroWave is planned, not implemented or qualified. Touch-overlay parity, simultaneous multi-stream viewing, and file transfer are later work.
+Profiles, performance changes, PyroWave, Apollo extensions, and Asteria VR are not prerequisites for this initial preview. PyroWave and Asteria VR are planned, not implemented or qualified. Touch-overlay parity, simultaneous multi-stream viewing, and file transfer are later work.
+
+### Planned Asteria VR
+
+Asteria VR is a PC-to-PC remote PCVR feature: the host PC runs SteamVR and renders the game, while the VR headset is physically connected to a Windows client PC. The client handles the local headset/runtime and sends tracking and input back to the host. The design is headset-agnostic; a PSVR2 with its PC adapter may eventually be one locally attached configuration, alongside other PCVR headsets.
+
+This is separate from the PSVR2 wireless-adapter project, which uses a phone and wearable bridge. Asteria VR does not use that bridge. It also does not depend on the optional M1B PyroWave codec experiment, although later codec or transport work may be reusable. See [M6 in the porting plan](docs/PORTING_PLAN.md) for staged implementation and qualification.
 
 Asteria retains Moonlight's Qt/QML UI, SDL input/session stack, hardware decoding paths, build structure, and upstream history. New behavior is added at narrow integration boundaries so upstream security and correctness fixes remain practical to merge.
 

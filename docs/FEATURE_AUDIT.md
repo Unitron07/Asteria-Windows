@@ -40,6 +40,13 @@ The parent repositories' gitlinks establish those SHAs; their [.gitmodules (Andr
 | Virtual buttons/layout import/export, touchpad overlay | Defer | Windows touch-device follow-up; investigate Android layout schema before claiming import compatibility [S5] |
 | Android soft keyboard, DeX, foldable positioning, device vibration fallback | Omit direct port | Use Windows equivalents only when an actual requirement exists [S5] |
 | File transfer, simultaneous multiple streams | Out of first release | Not implied by clipboard support or local monitor selection |
+| Asteria VR (remote PCVR) | Plan, M6 | New PC-to-PC SteamVR driver/protocol and Windows client headset path; no shipped support or qualification is established by this source audit |
+
+## Planned Asteria VR scope
+
+This is a future design item, not a feature found in the pinned Moonlight, Artemis, or Apollo snapshots. The host PC will run SteamVR/game rendering; a VR headset will be physically connected to the Windows client PC. The proposed bidirectional path covers stereoscopic video, head/controller/tracker poses, buttons/analog inputs, haptics, audio, and microphone input, with hand/eye/full-body tracking optional later. Clock synchronization, pose prediction, motion-to-photon latency, and client-side reprojection/timewarp need proof-of-concept measurements before compatibility claims.
+
+Keep the headset backend generic. PSVR2 with a PC adapter could be one qualified local headset configuration, but the phone/wearable PSVR2 wireless-adapter project is separate. M6 may reuse proven codec/transport work, but does not depend on M1B PyroWave. See the [architecture](ARCHITECTURE.md) and [porting plan](PORTING_PLAN.md) for boundaries and staged gates.
 
 ## Apollo contract findings
 

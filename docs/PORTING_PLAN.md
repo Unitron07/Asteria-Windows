@@ -10,7 +10,7 @@ The original choice to reuse Moonlight's Windows streaming stack is sound. The r
 
 ## Scope and dependency order
 
-M0 is merged. M0A build and packaging work passes CI; real-device qualification remains open. M1 identity is implemented, while its profiles/session work and M1A–M4 (including the optional M1B PyroWave milestone) remain planned. Apply M5 qualification to the initial preview's inherited streaming and identity scope; later feature milestones are not prerequisites for that preview. Clipboard (M3) depends on capability work in M2. Performance changes must follow measurements, and a cross-build alone does not complete M0A.
+M0 is merged. M0A build and packaging work passes CI; real-device qualification remains open. M1 identity is implemented, while its profiles/session work and M1A–M4 (including the optional M1B PyroWave milestone) remain planned. Apply M5 qualification to the initial preview's inherited streaming and identity scope; later feature milestones are not prerequisites for that preview. Clipboard (M3) depends on capability work in M2. Performance changes must follow measurements, and a cross-build alone does not complete M0A. M6 Asteria VR follows the core streaming and performance baselines as a separate later feature; it does not depend on M1B PyroWave or the M2–M4 Apollo extensions.
 
 Primary targets: **Windows 11 x64 and native ARM64**, both intended for the first preview. Native ARM64 means the client and its process-loaded runtime DLLs run as ARM64, without x64 emulation; cross-compiling on an x64 build host is acceptable. Windows 10 x64 remains a separate compatibility target pending runtime documentation and real-machine tests. Record exact minimum OS builds before publishing qualified binaries. These are support goals, not claims of completed ARM64 testing.
 
@@ -128,6 +128,20 @@ The goal is not to blindly copy Artemis Android decoder tweaks. Artemis Android 
 
 **Exit gate:** all required checks for the advertised release scope pass, unsupported hardware/OS combinations are listed honestly, artifacts can be reproduced from the published inputs, and no unresolved regression defeats an included feature.
 
+## M6 — Asteria VR (remote PCVR)
+
+**Status:** planned for after the core Windows streaming and M1A performance work. Asteria VR is PC-to-PC: the host PC runs SteamVR and renders the game; the VR headset is physically connected to the Windows client PC. This milestone is separate from the phone/wearable PSVR2 wireless-adapter project. PSVR2 plus its PC adapter may eventually be one qualified client-side headset configuration, but the architecture must remain headset-agnostic. M6 may reuse suitable codec/transport work from M1B, but PyroWave is neither required nor the default design.
+
+- [ ] Prove a host SteamVR driver/protocol path and client headset/runtime backend. Define device capabilities, coordinate spaces, timestamps, and a clock-synchronization method; transport head/controller/tracker poses to the host and measure pose age and jitter.
+- [ ] Deliver stereoscopic, low-latency frames from the host renderer to the client headset. Measure encode, network, decode, presentation, and motion-to-photon timing with a supported test headset.
+- [ ] Add bidirectional interaction: client-to-host buttons/analog inputs and microphone audio, and host-to-client controller haptics and audio. Check device identity, reconnect, and loss behavior.
+- [ ] Investigate local pose prediction and client-side reprojection/timewarp, then tune latency and jitter handling from measurements. Document runtime-specific support and a safe fallback for unavailable features.
+- [ ] Qualify broader locally attached PCVR headsets and runtimes, then consider optional hand, eye, and full-body tracking only where exposed by the client runtime and explicitly negotiated.
+
+**Exit gate:** a documented headset/runtime matrix demonstrates stable stereo presentation, tracked input, haptics, audio/mic, reconnect behavior, and measured latency on named host/client hardware. Report unsupported devices and optional tracking capabilities explicitly; successful desktop streaming alone does not qualify VR.
+
+**Deliverable:** SteamVR integration proof of concept, timestamped transport design, staged interoperability tests, latency results, and a qualified headset/runtime matrix.
+
 ## Upstream maintenance
 
 Keep feature PRs small and avoid mass renames of upstream source directories. Record upstream merge points and native-library patches. Check upstream changes before every release; prioritize security and correctness fixes, then rerun affected checks and the baseline streaming smoke test. Keep upstream platform code even when Windows is the only release target.
@@ -141,4 +155,4 @@ Keep feature PRs small and avoid mass renames of upstream source directories. Re
 - Overlay rendering approach: choose only after testing the existing video-window integration and latency impact.
 - Touch-device qualification beyond the baseline keyboard/mouse/gamepad cases remains later work.
 
-Do not attach calendar estimates until the ARM64 baseline, Windows performance experiments, and Apollo protocol spikes identify actual effort. The next concrete task is M0A real-device qualification and same-commit x64 smoke testing for the initial preview. M1 identity/storage isolation is implemented; profiles, session workflows, and M1A–M4 (including M1B PyroWave) remain future implementation work.
+Do not attach calendar estimates until the ARM64 baseline, Windows performance experiments, and Apollo protocol spikes identify actual effort. The next concrete task is M0A real-device qualification and same-commit x64 smoke testing for the initial preview. M1 identity/storage isolation is implemented; profiles, session workflows, M1A–M4 (including M1B PyroWave), and M6 Asteria VR remain future implementation work.

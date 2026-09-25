@@ -45,6 +45,14 @@ New extension classes belong beside the existing backend/session code. Class nam
 
 PyroWave is an optional Asteria-Windows codec experiment, not a current client feature or a first-preview requirement. Pin and inspect Vibepollo's actual negotiation and frame transport before changing the protocol core. Keep pairing, input, audio, and existing codec paths intact. Create codec-specific GPU resources only after both ends agree and local runtime support is confirmed; release resources on stop/reconnect and allow recovery using an existing codec. Verify licensing, Vulkan dependencies, x64/ARM64 packaging, color/HDR behavior, and measured performance before advertising support.
 
+## Planned Asteria VR boundary (M6)
+
+Asteria VR is a separate, later PC-to-PC remote PCVR path. The host PC runs the game and SteamVR rendering; a Windows client PC has the headset physically attached and interfaces with its local VR runtime/driver. A host-side SteamVR driver/protocol integration should expose the remote headset and controllers to SteamVR. The client-side headset backend should adapt locally supported PCVR hardware without making any one headset or vendor protocol the transport definition. Both x64 and ARM64 support claims require hardware qualification, not just successful builds.
+
+The network path must carry low-latency stereoscopic frames from host to client and time-sensitive head, controller, and tracker poses plus buttons/analog inputs from client to host. It must also account for host-to-client haptics and audio, client-to-host microphone audio, and eventually optional hand, eye, and full-body tracking where the local runtime exposes them. Define timestamps, coordinate spaces, device identity, and capability negotiation explicitly; unavailable sensors must remain optional. Clock synchronization, pose prediction, jitter and motion-to-photon latency measurement are design requirements. Investigate client-side reprojection/timewarp using the freshest local pose, with a clear fallback if a headset/runtime does not support the chosen approach.
+
+Keep Asteria VR independent of desktop streaming session assumptions and of the M1B PyroWave codec experiment. Reuse proven codec or transport components later only when their timing and stereo behavior fit VR. Asteria VR is also separate from the PSVR2 wireless-adapter project, whose phone and wearable bridge are outside this architecture. PSVR2 plus its PC adapter may eventually be qualified as one headset physically connected to the Windows client; it must not dictate the driver, protocol, or client backend.
+
 ## Dependency policy
 
 Keep the pinned upstream Qt/MSVC/qmake and dependency workflow for the baseline. Do not add a CMake, SDL major-version, decoder, or framework migration to the port. Record actual compiler/SDK/runtime versions, submodule SHAs, dependency archive hashes, and build commands.
