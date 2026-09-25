@@ -1,6 +1,6 @@
 # Porting plan
 
-Updated for the first portable preview: Asteria identity and x64/ARM64 CI packaging are implemented; real Windows 11 ARM64 device qualification remains pending. Completed integration items are checked below; build and test evidence lives in [BASELINE.md](BASELINE.md).
+Updated for the first portable preview: Asteria identity and x64/ARM64 CI packaging are implemented; an owner-reported real-device AV1 streaming comparison is recorded, while full Windows 11 ARM64 qualification remains pending. Completed integration items are checked below; build and test evidence lives in [BASELINE.md](BASELINE.md).
 
 ## Review outcome
 
@@ -10,9 +10,9 @@ The original choice to reuse Moonlight's Windows streaming stack is sound. The r
 
 ## Scope and dependency order
 
-M0 is merged. M0A build and packaging work passes CI; real-device qualification remains open. M1 identity is implemented, while its profiles/session work and M1A–M4 (including the optional M1B PyroWave milestone) remain planned. Apply M5 qualification to the initial preview's inherited streaming and identity scope; later feature milestones are not prerequisites for that preview. Clipboard (M3) depends on capability work in M2. Performance changes must follow measurements, and a cross-build alone does not complete M0A. M6 Asteria VR follows the core streaming and performance baselines as a separate later feature; it does not depend on M1B PyroWave or the M2–M4 Apollo extensions.
+M0 is merged. M0A build and packaging work passes CI; an owner-reported real-device streaming comparison is recorded, and qualification remains open. M1 identity is implemented, while its profiles/session work and M1A–M4 (including the optional M1B PyroWave milestone) remain planned. Apply M5 qualification to the initial preview's inherited streaming and identity scope; later feature milestones are not prerequisites for that preview. Clipboard (M3) depends on capability work in M2. Performance changes must follow measurements, and a cross-build alone does not complete M0A. M6 Asteria VR follows the core streaming and performance baselines as a separate later feature; it does not depend on M1B PyroWave or the M2–M4 Apollo extensions.
 
-Primary targets: **Windows 11 x64 and native ARM64**, both intended for the first preview. Native ARM64 means the client and its process-loaded runtime DLLs run as ARM64, without x64 emulation; cross-compiling on an x64 build host is acceptable. Windows 10 x64 remains a separate compatibility target pending runtime documentation and real-machine tests. Record exact minimum OS builds before publishing qualified binaries. These are support goals, not claims of completed ARM64 testing.
+Primary targets: **Windows 11 x64 and native ARM64**, both intended for the first preview. Native ARM64 means the client and its process-loaded runtime DLLs run as ARM64, without x64 emulation; cross-compiling on an x64 build host is acceptable. Windows 10 x64 remains a separate compatibility target pending runtime documentation and real-machine tests. Record exact minimum OS builds before publishing qualified binaries. These are support goals, not claims that the ARM64 qualification matrix is complete.
 
 The first public preview covers inherited Moonlight streaming and the implemented Asteria identity, delivered as x64 and native ARM64 portable ZIPs after hardware qualification. Desktop profiles, additional session actions, measured frame-pacing changes, Apollo clipboard, virtual-display controls, and host commands remain later roadmap work. Touch overlays, file transfer, simultaneous multiple streams, and a host companion service are outside the first release.
 
@@ -31,16 +31,17 @@ The first public preview covers inherited Moonlight streaming and the implemente
 
 **Deliverable:** baseline import PR, build instructions, CI artifact, and baseline report. No client feature rewrite is needed here.
 
-## M0A — Native Windows ARM64 baseline (device qualification pending)
+## M0A — Native Windows ARM64 baseline (device comparison recorded; qualification open)
 
 - [x] Extend the existing build harness to accept explicit x64/ARM64 targets, preserving upstream source layout and the default x64 command. Dependency/preflight tests pass.
 - [x] Use the upstream Qt 6.11.2 ARM64 cross kit and matching MSVC ARM64 tools. Keep host-side Qt build tools distinct from deployed ARM64 runtime files. Implemented in PR #6 and exercised by successful ARM64 CI.
 - [x] Pin and verify the v15 Windows ARM64 dependency archive; record versions, hashes and source/license locations in [dependency notes](DEPENDENCIES_WINDOWS.md). Isolate dependencies with one target per checkout and architecture-specific output/evidence folders.
 - [x] Build both unmodified upstream and the candidate for ARM64 in Windows CI. Keep x64 coverage; publish separate portable ZIPs, symbols, source, and compiler/SDK/dependency evidence for each architecture. All four jobs passed in [run 34790903403](https://github.com/Unitron07/Asteria-Windows/actions/runs/34790903403); PR #6 is merged.
 - [x] Implement final-ZIP PE machine validation for every EXE/DLL, including nested Qt plugins, SDL, codecs, and AntiHooking, with a hash-bound evidence report. Local tests reject x64 DLL contamination in ARM64 packages and the reverse. Host build tools outside the ZIP are not scanned.
-- [x] Hosted upstream/candidate builds and final-ZIP architecture gates pass for both targets in [run 34797782854](https://github.com/Unitron07/Asteria-Windows/actions/runs/34797782854). Real-device execution remains unqualified.
-- [ ] Test the portable ARM64 build on a real Windows 11 ARM64 device without development tools: verify native process architecture, launch, discovery/manual host, pairing, H.264 1080p60 SDR, audio, keyboard, mouse, and gamepad with separately recorded Sunshine and Apollo hosts.
-- [ ] Record hardware decoding and a performance baseline on that device against unmodified ARM64 Moonlight built with the same inputs. Test available additional codecs without claiming unsupported GPU paths.
+- [x] Hosted upstream/candidate builds and final-ZIP architecture gates pass for both targets in [run 34797782854](https://github.com/Unitron07/Asteria-Windows/actions/runs/34797782854). A real-device streaming comparison is reported below, but native process execution is not yet independently recorded.
+- [x] Record the owner's real-device comparison: native ARM64 Asteria felt smoother in menus/settings than emulated x64 Moonlight (**subjective**); repeated same-game 2560×1440 approximately 60 FPS AV1 streams on an Apollo host appeared effectively identical, without meaningful decode/render/frame-queue differences or an observed stream regression. This is a limited observed result, not full qualification; see [BASELINE.md](BASELINE.md).
+- [ ] Verify the portable ARM64 artifact and process architecture on a recorded Windows 11 ARM64 device without development tools; document launch, discovery/manual host, pairing, H.264 1080p60 SDR, audio, keyboard, mouse, and gamepad with separately recorded Sunshine and Apollo hosts.
+- [ ] Record selected decoder and a controlled baseline against pinned upstream **native ARM64** Moonlight on the same device. The owner's comparison used stock x64 Moonlight under emulation. Test available additional codecs without claiming unsupported GPU paths.
 
 **Exit gate:** reproducible ARM64 upstream/candidate builds and artifacts, native ARM64 runtime verification, real-device launch and streaming evidence, and passing x64 regression builds. Missing hardware or host access is an explicit open gate. An x64 binary under emulation does not satisfy the native ARM64 deliverable.
 
@@ -148,11 +149,11 @@ Keep feature PRs small and avoid mass renames of upstream source directories. Re
 
 ## Remaining decisions
 
-- Exact Windows 11 ARM64 minimum build, device/SoC/GPU/driver, and qualification host access: resolve in M0A.
+- Exact Windows 11 ARM64 minimum build, device/SoC/GPU/driver, and qualification host details: resolve in M0A.
 - Exact Windows 10 x64 minimum build and runtime support: resolve before advertising compatibility.
 - Tested Sunshine/Apollo versions and the original manual test's client/host details: record during M0A; extension-specific support boundaries follow in M2.
 - Default frame-pacing policy and whether adaptive buffering/VRR modes graduate from experimental status: resolve from M1A measurements, not Android behavior alone.
 - Overlay rendering approach: choose only after testing the existing video-window integration and latency impact.
 - Touch-device qualification beyond the baseline keyboard/mouse/gamepad cases remains later work.
 
-Do not attach calendar estimates until the ARM64 baseline, Windows performance experiments, and Apollo protocol spikes identify actual effort. The next concrete task is M0A real-device qualification and same-commit x64 smoke testing for the initial preview. M1 identity/storage isolation is implemented; profiles, session workflows, M1A–M4 (including M1B PyroWave), and M6 Asteria VR remain future implementation work.
+Do not attach calendar estimates until the ARM64 baseline, Windows performance experiments, and Apollo protocol spikes identify actual effort. The next concrete task is completing M0A device qualification and same-commit x64 smoke testing for the initial preview. M1 identity/storage isolation is implemented; profiles, session workflows, M1A–M4 (including M1B PyroWave), and M6 Asteria VR remain future implementation work.

@@ -1,6 +1,6 @@
 # M0 baseline report and provenance
 
-M0 baseline integration is **merged and accepted as the starting point for further development**. Both Windows x64 CI builds passed and the project owner confirmed that the tested client works. Detailed hardware and interoperability qualification is not yet fully recorded. Asteria identity and x64/ARM64 CI packaging are now implemented; the next priority is [real Windows 11 ARM64 qualification](NEXT_STEP.md). Historical M0 observations below retain their original scope.
+M0 baseline integration is **merged and accepted as the starting point for further development**. Both Windows x64 CI builds passed and the project owner confirmed that the tested client works. Detailed hardware and interoperability qualification is not yet fully recorded. Asteria identity and x64/ARM64 CI packaging are implemented; an owner-reported ARM64 device streaming comparison is recorded below, and the next priority is [completing Windows 11 ARM64 qualification](NEXT_STEP.md). Historical M0 observations below retain their original scope.
 
 ## Imported history
 
@@ -44,12 +44,12 @@ Observed DLL product versions: FFmpeg revision `d32b387` (avcodec/avformat 63.1.
 | Owner's manual baseline test | Owner reported success before merging PR #1; exact client, host versions, and individual cases were not supplied |
 | Native ARM64 upstream and candidate builds | Pass; all four x64/ARM64 jobs passed in [run 34790903403](https://github.com/Unitron07/Asteria-Windows/actions/runs/34790903403), PR #6 head `be43f5d6fe692b0884ec8cdb2486f8457f4fdd7d`; merged as `86c2ce98129ba27b975540624c9f262ed86279b9` |
 | Final portable ZIP architecture gate | Implemented for both targets; local synthetic package tests pass, including deliberately injected foreign-architecture DLLs and malformed PE headers. Hosted upstream/candidate checks for both targets now pass in [run 34797782854](https://github.com/Unitron07/Asteria-Windows/actions/runs/34797782854) |
-| Native ARM64 hardware validation | No real-device qualification evidence recorded; remains the M0A priority |
+| Native ARM64 real-device comparison | Owner reported repeated 2560×1440 approximately 60 FPS AV1 streaming parity with emulated x64 Moonlight and subjectively smoother native Asteria menus/settings; full M0A qualification remains open |
 | Local compile | Not run: Qt/MSVC absent |
 | Clean-machine portable launch | No separate clean-machine evidence recorded |
 | Sunshine pairing and 1080p60 H.264 SDR with audio/input/gamepad | Per-case results and host version not recorded |
 | Apollo pairing and the same stream test | Per-case results and host version not recorded |
-| GPU decoder, performance measurements, Windows 10 minimum build | No qualification evidence recorded |
+| GPU decoder, controlled performance measurements, Windows 10 minimum build | Decoder selection and controlled measurement protocol not recorded; Windows 10 minimum build remains unqualified |
 
 Import review: [PR #1](https://github.com/Unitron07/Asteria-Windows/pull/1). Initial integration commit: `cf43c38fa443316d444c8a71a808acfb5aeac609`; its two parents are the planning and upstream revisions above.
 
@@ -57,7 +57,7 @@ The first upstream CI job successfully built and packaged Moonlight 6.1.0. Its p
 
 The project owner's statement, "i have confirmed it works", is recorded as a successful manual baseline test, not as evidence that every release-checklist case or both host products were exercised. The owner subsequently merged PR #1. The historical M0 qualification gate is therefore only partly evidenced; its remaining local-build, clean-machine, host-version, decoder, and performance records carry forward into M0A/M5 rather than holding the completed source import open.
 
-The [feature audit](FEATURE_AUDIT.md) remains the source-based feature inventory. No performance numbers are claimed. Use [VALIDATION.md](VALIDATION.md) to record the actual client architecture, hardware, drivers, host versions, stream settings, and results for both x64 and ARM64. Broad support claims remain gated on those results.
+The [feature audit](FEATURE_AUDIT.md) remains the source-based feature inventory. No controlled benchmark or broad performance advantage is claimed. Use [VALIDATION.md](VALIDATION.md) to record the actual client architecture, hardware, drivers, host versions, stream settings, and results for both x64 and ARM64. Broad support claims remain gated on those results.
 
 ## M0A package architecture evidence
 
@@ -75,4 +75,12 @@ The harness now runs `repair-arm64-package.ps1` before the unchanged strict arch
 
 ## Current preview baseline
 
-[PR #9](https://github.com/Unitron07/Asteria-Windows/pull/9) merged the Asteria identity/rebrand. All four upstream/candidate x64/ARM64 jobs passed in [run 34797782854](https://github.com/Unitron07/Asteria-Windows/actions/runs/34797782854) at `ab69dc3f76ff6b163ab91c35c3795d4da478f022`, including the CRT correction and strict final-ZIP architecture checks described above. This supersedes earlier pending hosted-validation notes; it does not qualify native ARM64 execution, clean-machine launch, decoding, or streaming. Real Windows 11 ARM64 device evidence remains pending.
+[PR #9](https://github.com/Unitron07/Asteria-Windows/pull/9) merged the Asteria identity/rebrand. All four upstream/candidate x64/ARM64 jobs passed in [run 34797782854](https://github.com/Unitron07/Asteria-Windows/actions/runs/34797782854) at `ab69dc3f76ff6b163ab91c35c3795d4da478f022`, including the CRT correction and strict final-ZIP architecture checks described above. This supersedes earlier pending hosted-validation notes; it does not qualify native ARM64 execution, clean-machine launch, decoding, or streaming. A limited owner-reported real-device streaming comparison is recorded below; the full Windows 11 ARM64 qualification record remains pending.
+
+## Owner-reported Windows ARM64 comparison (2026-09-25)
+
+The owner used a Windows-on-ARM device to compare native ARM64 Asteria against stock **x64 Moonlight under emulation**, on an Apollo host with the same game, resolution, frame rate, and AV1 codec. The owner repeated the streaming comparison and described performance as effectively identical. In the initial pair of on-screen statistics, both were near 60 FPS at 2560×1440 with AV1; decode, render, and frame-queue times differed only slightly, and no network or jitter drops were shown. No meaningful stream regression was observed. The samples do not establish a statistical performance result or lower latency for either client.
+
+**Qualitative UI observation:** native Asteria felt noticeably smoother and snappier in menus and settings than emulated x64 Moonlight. This is subjective and was not instrumented. It should not be presented as a measured launch, CPU, or frame-pacing improvement.
+
+**Scope and missing records:** the comparison was against emulated x64 Moonlight, not the pinned upstream native ARM64 Moonlight candidate. The exact Asteria artifact/commit and ZIP hash, device/SoC/GPU, driver, Windows build, native process verification, selected decoder, Apollo version, bitrate, network path, run durations, and raw test log were not recorded. The report establishes an Apollo streaming observation, but does not establish Sunshine coverage or Apollo version-specific qualification, hardware decode selection, H.264 1080p60 SDR, audio/input, clean-machine launch, DPI/sleep-resume, or the 30-minute soak and reconnect cases. Keep [issue #3](https://github.com/Unitron07/Asteria-Windows/issues/3) open until the applicable qualification evidence is recorded.

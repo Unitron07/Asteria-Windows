@@ -1,6 +1,6 @@
 # Windows baseline builds
 
-Moonlight PC at `e3fd29e4d7dc5723d8d0da7d19e2698daec74456` was imported through PR #1 and merged into `main`. The candidate now identifies as Asteria; the unmodified upstream comparison remains Moonlight. The harness accepts `-Architecture x64` (default) or `-Architecture arm64`. Upstream and candidate builds passed for both targets in [run 34790903403](https://github.com/Unitron07/Asteria-Windows/actions/runs/34790903403). Real ARM64 device qualification remains pending.
+Moonlight PC at `e3fd29e4d7dc5723d8d0da7d19e2698daec74456` was imported through PR #1 and merged into `main`. The candidate now identifies as Asteria; the unmodified upstream comparison remains Moonlight. The harness accepts `-Architecture x64` (default) or `-Architecture arm64`. Upstream and candidate builds passed for both targets in [run 34790903403](https://github.com/Unitron07/Asteria-Windows/actions/runs/34790903403). An owner-reported real-device AV1 streaming comparison is recorded in [BASELINE.md](BASELINE.md); full ARM64 qualification remains pending.
 
 ## Prerequisites
 
@@ -57,7 +57,7 @@ Set-Location C:\src\Asteria-arm64
 ./scripts/build-baseline.ps1 -Architecture arm64 -QtBin C:\Qt\6.11.2\msvc2022_arm64\bin
 ```
 
-CI exercises these build arguments for both ARM64 upstream and candidate. Use the same arguments with `-SourceRoot` for a separate pinned upstream ARM64 checkout. `-QtBin` is optional when PATH contains exactly one supported kit. Keep 7-Zip on PATH as for x64. The package gate passes in [run 34797782854](https://github.com/Unitron07/Asteria-Windows/actions/runs/34797782854); real Windows 11 ARM64 device tests remain [M0A work](NEXT_STEP.md). Run `pwsh -File scripts/test-baseline-preflight.ps1` to test the dependency and kit guards without Qt/MSVC.
+CI exercises these build arguments for both ARM64 upstream and candidate. Use the same arguments with `-SourceRoot` for a separate pinned upstream ARM64 checkout. `-QtBin` is optional when PATH contains exactly one supported kit. Keep 7-Zip on PATH as for x64. The package gate passes in [run 34797782854](https://github.com/Unitron07/Asteria-Windows/actions/runs/34797782854); remaining Windows 11 ARM64 device qualification remains [M0A work](NEXT_STEP.md). Run `pwsh -File scripts/test-baseline-preflight.ps1` to test the dependency and kit guards without Qt/MSVC.
 
 ## Final ZIP architecture gate
 
@@ -86,4 +86,4 @@ Hosted builds do not validate GPU decoding, pairing, performance, or OS compatib
 
 ### CI artifact names
 
-Each successful upstream/candidate architecture job uploads `baseline-<label>-windows-<architecture>-<run>`, `symbols-<label>-windows-<architecture>-<run>`, `source-<label>-windows-<architecture>-<run>`, and `evidence-<label>-windows-<architecture>-<run>`. Source includes recursive submodule contents. Evidence includes source and harness revisions, Qt host/target paths and versions for ARM64, compiler/SDK details, dependency inventory, SHA-256 hashes for the portable, symbols, and source archives, and the new `package-architecture.json` report. Evidence uploads are attempted on failure as well. Real-device qualification remains a separate M0A gate.
+Each successful upstream/candidate architecture job uploads `baseline-<label>-windows-<architecture>-<run>`, `symbols-<label>-windows-<architecture>-<run>`, `source-<label>-windows-<architecture>-<run>`, and `evidence-<label>-windows-<architecture>-<run>`. Source includes recursive submodule contents. Evidence includes source and harness revisions, Qt host/target paths and versions for ARM64, compiler/SDK details, dependency inventory, SHA-256 hashes for the portable, symbols, and source archives, and the new `package-architecture.json` report. Evidence uploads are attempted on failure as well. A limited real-device stream comparison is recorded in [BASELINE.md](BASELINE.md); remaining qualification is a separate M0A gate.

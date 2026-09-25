@@ -11,6 +11,15 @@ This is the qualification checklist. The [baseline report](BASELINE.md) records 
 
 Use the result template below to fill those gaps during M0A qualification.
 
+## Owner-reported Windows ARM64 comparison (2026-09-25)
+
+- **Clients and workload:** native ARM64 Asteria versus stock x64 Moonlight under emulation on one Windows-on-ARM device and an Apollo host; same game, 2560×1440, approximately 60 FPS, AV1. The owner repeated the comparison.
+- **Observed streaming result:** effectively identical streaming in these runs, with no meaningful decode, render, or frame-queue difference and no observed stream regression. The initial on-screen samples were near 60 FPS with zero displayed network/jitter drops. This is an observed result for this setup, not a controlled median/p95 benchmark or a universal performance claim.
+- **Qualitative UI observation:** Asteria menus/settings felt noticeably smoother and snappier. Subjective, with no timing measurement.
+- **Evidence limits:** exact device, Windows build, driver, artifact/commit/hash, process architecture verification, selected decoder, host product/version, run duration, and raw logs were not recorded. The host was Apollo, but its version was not recorded; Sunshine coverage remains an open item. Stock emulated x64 Moonlight is not the pinned upstream native ARM64 comparator required by M0A.
+
+The remaining hardware and release checks below are still open; details also appear in [BASELINE.md](BASELINE.md).
+
 ## Automated package architecture checks
 
 Both upstream and candidate CI jobs run the offline package guard tests, then validate the final portable ZIP during the build wrapper. Review `package-architecture.json` in the architecture-specific evidence artifact: `passed` must be true, its SHA-256 must match the tested ZIP, and every EXE/DLL must have the target's machine type. The scanner includes nested Qt plugins and rejects foreign architectures and malformed headers. Its regression suite deliberately adds an x64 DLL to an ARM64 package and verifies rejection, with the reverse case for x64.
@@ -79,8 +88,8 @@ Windows 10 x64 still needs its own declared minimum OS/runtime and hardware qual
 - [x] M0 x64 upstream and candidate CI builds pass; see run 34736992552.
 - [x] Upstream and candidate x64/ARM64 CI builds and final-ZIP architecture checks pass; see run 34797782854.
 - [ ] Documented release builds reproduced locally.
-- [ ] ARM64 portable package contains native target binaries and runs natively on the recorded ARM64 device.
-- [ ] Functional and regression gates pass for the advertised scope.
+- [ ] ARM64 portable package contains native target binaries and runs natively on the recorded ARM64 device; owner-reported streaming used an ARM64-labeled Asteria build, but process architecture and exact artifact remain unrecorded.
+- [ ] Functional and regression gates pass for the advertised scope; the reported AV1 stream comparison covers only one workload.
 - [ ] Separate x64 and ARM64 portable builds run with deployed runtimes on clean machines; data-location behavior is documented for each.
 - [ ] Exact versions, hashes, source, submodule contents, licenses/notices, and symbols are available.
 - [ ] Stable executable/installer signing and installer lifecycle checks pass when those artifacts are offered.
