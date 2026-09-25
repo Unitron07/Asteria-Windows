@@ -4,7 +4,7 @@
 
 Use Moonlight PC as the application, retaining its source history and layout. Do not build a second Windows shell or extract its streaming internals into a new framework for the first release. This follows the project owner's September 12, 2026 direction.
 
-The [audit](FEATURE_AUDIT.md) pins the reviewed code. M0 integration is merged, x64 CI passed, and the owner confirmed the tested client works; see [BASELINE.md](BASELINE.md) for the evidence and remaining qualification records. Native x64/ARM64 builds and packaging pass CI, and the Asteria identity is implemented. M0A real-device ARM64 validation is complete; M1A instrumentation is the next development task before frame-pacing changes. The extension architecture below describes planned work.
+The [audit](FEATURE_AUDIT.md) pins the reviewed code. M0 integration is merged, x64 CI passed, and the owner confirmed the tested client works; see [BASELINE.md](BASELINE.md) for the evidence and remaining qualification records. Native x64/ARM64 builds and packaging pass CI, and the Asteria identity is implemented. M0A real-device ARM64 validation is complete; M1A begins with Moonlight's built-in statistics; M1B Vibepollo/PyroWave protocol groundwork is the next development task. Frame-pacing changes require measured evidence. The extension architecture below describes planned work.
 
 ## Native Windows targets
 
@@ -43,7 +43,7 @@ New extension classes belong beside the existing backend/session code. Class nam
 
 ## Planned PyroWave boundary (M1B)
 
-PyroWave is an optional Asteria-Windows codec experiment, not a current client feature or a first-preview requirement. Pin and inspect Vibepollo's actual negotiation and frame transport before changing the protocol core. Keep pairing, input, audio, and existing codec paths intact. Create codec-specific GPU resources only after both ends agree and local runtime support is confirmed; release resources on stop/reconnect and allow recovery using an existing codec. Verify licensing, Vulkan dependencies, x64/ARM64 packaging, color/HDR behavior, and measured performance before advertising support.
+PyroWave is an optional Asteria-Windows codec experiment, not a current client feature or a first-preview requirement. Pin and inspect the PyroWave-enabled Vibepollo fork's actual negotiation and frame transport before changing the protocol core; the initial source audit is in [M1B_PYROWAVE_SPIKE.md](M1B_PYROWAVE_SPIKE.md). Keep pairing, input, audio, and existing codec paths intact. Create codec-specific GPU resources only after both ends agree and local runtime support is confirmed; release resources on stop/reconnect and allow recovery using an existing codec. Verify licensing, Vulkan dependencies, x64/ARM64 packaging, color/HDR behavior, and measured performance before advertising support.
 
 ## Planned Asteria VR boundary (M6)
 
