@@ -86,6 +86,17 @@ Windows 10 x64 still needs its own declared minimum OS/runtime and hardware qual
 - Raw evidence:
 - Known limitations, blockers, and linked fixes:
 
+## First public preview record (2026-09-25)
+
+[v0.1.0-preview.1](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0-preview.1) is an unsigned, portable Windows x64 and native ARM64 prerelease. Both packages came from main commit [`34dfd937528586babded200fafaee535e21d4a40`](https://github.com/Unitron07/Asteria-Windows/commit/34dfd937528586babded200fafaee535e21d4a40) in successful [CI run 36191650824](https://github.com/Unitron07/Asteria-Windows/actions/runs/36191650824). The tag resolves to that commit. The release job checked each original ZIP against its passing, hash-bound `package-architecture.json` and confirmed 69 x64 and 68 ARM64 EXE/DLL entries, including deployed runtimes and plugins. It also checked `portable.dat`, root license, and provenance notices before attaching the unchanged ZIPs.
+
+| Portable release asset | SHA-256 |
+| --- | --- |
+| `Asteria-v0.1.0-preview.1-windows-x64-portable.zip` | `1b55c39006ec333716414c167031a71585921f1112cca634ac02e7e897d54a60` |
+| `Asteria-v0.1.0-preview.1-windows-arm64-portable.zip` | `0c7de9bf6a34ca1aef7fe7ef66b2fa15a3f01ef1d26eec615fcb7b7cf8efb05a` |
+
+The release includes `SHA256SUMS.txt`, symbols, recursive corresponding-source snapshots, and architecture/build evidence for each target. The owner confirmed the completed x64 and ARM64 CI builds work. The previously recorded Surface Pro 11th Edition native-process and repeated Apollo AV1 comparison remains evidence for that setup; exact artifact hashes and several host/client details for that earlier comparison were not recorded. No clean-machine or full functional-matrix result was supplied, so this preview does not claim broad qualification. The executable's inherited 6.1.0 metadata and bundled development-baseline provenance notice refer to the Moonlight-based build; `v0.1.0-preview.1` is Asteria's public preview version. No installer was shipped.
+
 ## Release checklist
 
 - [x] M0 x64 upstream and candidate CI builds pass; see run 34736992552.
@@ -95,6 +106,6 @@ Windows 10 x64 still needs its own declared minimum OS/runtime and hardware qual
 - [ ] Record the exact release ARM64 artifact/hash, Windows build, driver, decoder, and Apollo version.
 - [ ] Functional and regression gates pass for the advertised scope; the reported AV1 stream comparison covers only one workload.
 - [ ] Separate x64 and ARM64 portable builds run with deployed runtimes on clean machines; data-location behavior is documented for each.
-- [ ] Exact versions, hashes, source, submodule contents, licenses/notices, and symbols are available.
+- [x] Exact preview commit, hashes, corresponding source with submodules, licenses/notices, and symbols are available in the release assets.
 - [ ] Stable executable/installer signing and installer lifecycle checks pass when those artifacts are offered.
-- [ ] Release notes distinguish tested support, inherited-but-untested paths, deferred features, and known issues.
+- [x] Preview release notes distinguish the owner-reported validation, inherited-but-untested paths, deferred features, and evidence limits.
