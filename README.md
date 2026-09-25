@@ -2,7 +2,7 @@
 
 **Asteria** is an early-preview native Windows game-streaming client derived from [Moonlight PC](https://github.com/moonlight-stream/moonlight-qt). Enhanced integration with [Apollo](https://github.com/ClassicOldSong/Apollo) and selected desktop/workflow ideas inspired by [Artemis Android](https://github.com/MobinYengejehi/Artemis) are planned.
 
-> **Preview status:** expect bugs and incomplete Asteria-specific functionality. The Asteria identity/rebrand is implemented. x64 and native ARM64 builds and portable packaging pass CI. The owner has completed M0A real-device native ARM64 validation on a Surface Pro 11th Edition; release-specific checks remain in the validation checklist. Report reproducible problems in [GitHub issues](https://github.com/Unitron07/Asteria-Windows/issues).
+> **Preview status:** [v0.1.0-preview.1](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0-preview.1) is released for Windows x64 and native ARM64 as unsigned portable ZIPs. Expect bugs and incomplete Asteria-specific functionality. The owner verified both CI builds work and previously validated native ARM64 execution on a Surface Pro 11th Edition; see the [release notes](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0-preview.1) and [validation record](docs/VALIDATION.md) for the tested scope and evidence limits. Report reproducible problems in [GitHub issues](https://github.com/Unitron07/Asteria-Windows/issues).
 
 ## Available now
 
@@ -16,9 +16,9 @@ The owner uses Apollo for this project and preview; Sunshine is not a required q
 
 ## First public preview
 
-The first preview targets **Windows 11 x64 and native ARM64**, using portable ZIPs. It covers the inherited streaming baseline and implemented Asteria identity. Installer distribution and signing follow later release validation.
+**[v0.1.0-preview.1 is available now](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0-preview.1)** for Windows x64 and native ARM64 as portable ZIPs. Both packages were built from commit `34dfd937528586babded200fafaee535e21d4a40` in the same successful [CI run](https://github.com/Unitron07/Asteria-Windows/actions/runs/36191650824). The release includes SHA-256 checksums, symbols, corresponding source, and architecture/build evidence. Extract the ZIP into a writable folder and keep `portable.dat` next to `Asteria.exe`. No installer is offered in this preview.
 
-Before publishing, smoke-test x64 and ARM64 from the release commit and record the tested Apollo version, Windows builds, drivers, decoder, codecs, and known issues using the [validation checklist](docs/VALIDATION.md). M0A is complete based on the owner's real-device validation; release qualification remains separate.
+The owner confirmed the completed x64 and ARM64 builds work. Earlier native ARM64 Apollo AV1 testing is described above; exact Windows, driver, decoder, host-version, and artifact-hash details were not recorded for that comparison. Broad hardware and functional qualification remains open in the [validation checklist](docs/VALIDATION.md).
 
 ## Roadmap
 
