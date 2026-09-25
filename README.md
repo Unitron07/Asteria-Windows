@@ -27,7 +27,8 @@ Before publishing, qualify the ARM64 ZIP on a real Windows 11 ARM64 device, smok
 4. **M1A — Windows performance/frame pacing:** planned measurement and benchmarking before changing defaults.
 5. **M2 — pointer/scaling correctness and Apollo capability parsing:** planned.
 6. **M3 — Apollo text clipboard and virtual-display requests:** planned.
-7. **M4 — Apollo server commands:** planned.
+7. **M1B — experimental PyroWave streaming:** planned as an optional codec path after M1A measurements and a Vibepollo protocol spike.
+8. **M4 — Apollo server commands:** planned.
 8. **M5 — release qualification:** apply checks to each release's advertised scope.
 
 Profiles, performance changes, and Apollo extensions are not prerequisites for this initial preview. Touch-overlay parity, simultaneous multi-stream viewing, and file transfer are later work.
