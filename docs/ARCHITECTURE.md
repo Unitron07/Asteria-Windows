@@ -4,7 +4,7 @@
 
 Use Moonlight PC as the application, retaining its source history and layout. Do not build a second Windows shell or extract its streaming internals into a new framework for the first release. This follows the project owner's September 12, 2026 direction.
 
-The [audit](FEATURE_AUDIT.md) pins the reviewed code. M0 integration is merged, x64 CI passed, and the owner confirmed the tested client works; see [BASELINE.md](BASELINE.md) for the evidence and remaining qualification records. Native x64/ARM64 builds and packaging pass CI, and the Asteria identity is implemented. Real Windows 11 ARM64 qualification is the next gate before the first portable preview. The extension architecture below describes planned work.
+The [audit](FEATURE_AUDIT.md) pins the reviewed code. M0 integration is merged, x64 CI passed, and the owner confirmed the tested client works; see [BASELINE.md](BASELINE.md) for the evidence and remaining qualification records. Native x64/ARM64 builds and packaging pass CI, and the Asteria identity is implemented. M0A real-device ARM64 validation is complete; M1A instrumentation is the next development task before frame-pacing changes. The extension architecture below describes planned work.
 
 ## Native Windows targets
 

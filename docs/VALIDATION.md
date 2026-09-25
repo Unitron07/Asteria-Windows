@@ -1,6 +1,6 @@
 # Validation and release evidence
 
-This is the qualification checklist. The [baseline report](BASELINE.md) records the merged M0 import, successful x64 CI, local upstream CLI startup, and the owner's successful manual test confirmation. Exact client/host details and individual hardware cases remain undocumented. Attach new results to the relevant milestone PR and link them from release notes; distinguish source inspection, builds, general user confirmation, and measured hardware tests.
+This is the qualification checklist. The [baseline report](BASELINE.md) records the merged M0 import, successful x64 CI, local upstream CLI startup, and the owner's successful manual test confirmation. M0A native ARM64 is complete from the owner's recorded Surface Pro 11th Edition test below. Exact release artifact/host details and some individual hardware cases remain undocumented. Attach new results to the relevant milestone PR and link them from release notes; distinguish source inspection, builds, general user confirmation, and measured hardware tests.
 
 ## Recorded manual test
 
@@ -9,16 +9,17 @@ This is the qualification checklist. The [baseline report](BASELINE.md) records 
 - Test date, exact artifact, Windows build, process architecture, GPU/driver, host product/version, stream settings, and individual input/audio cases: not supplied.
 - Scope: successful user-reported baseline test. Do not infer independent Sunshine and Apollo coverage, native ARM64 execution, clean-machine status, hardware decoding, or measured performance from this statement.
 
-Use the result template below to fill those gaps during M0A qualification.
+Use the result template below to fill applicable gaps during release qualification.
 
 ## Owner-reported Windows ARM64 comparison (2026-09-25)
 
-- **Clients and workload:** native ARM64 Asteria versus stock x64 Moonlight under emulation on one Windows-on-ARM device and an Apollo host; same game, 2560×1440, approximately 60 FPS, AV1. The owner repeated the comparison.
+- **Clients and workload:** native ARM64 Asteria versus stock x64 Moonlight under emulation on a Surface Pro 11th Edition with Snapdragon X Plus and 16 GB RAM and an Apollo host; same game, 2560×1440, approximately 60 FPS, AV1. The owner repeated the comparison.
 - **Observed streaming result:** effectively identical streaming in these runs, with no meaningful decode, render, or frame-queue difference and no observed stream regression. The initial on-screen samples were near 60 FPS with zero displayed network/jitter drops. This is an observed result for this setup, not a controlled median/p95 benchmark or a universal performance claim.
 - **Qualitative UI observation:** Asteria menus/settings felt noticeably smoother and snappier. Subjective, with no timing measurement.
-- **Evidence limits:** exact device, Windows build, driver, artifact/commit/hash, process architecture verification, selected decoder, host product/version, run duration, and raw logs were not recorded. The host was Apollo, but its version was not recorded; Sunshine coverage remains an open item. Stock emulated x64 Moonlight is not the pinned upstream native ARM64 comparator required by M0A.
+- **Native execution:** the owner verified the Asteria process as native ARM64. The comparison used the official x64 Moonlight release under Windows ARM64 emulation on the same device. No official native ARM64 upstream Moonlight release exists; CI-built unmodified upstream ARM64 artifacts are internal reference builds only.
+- **Evidence limits:** Windows build, GPU driver, exact artifact/commit/hash, selected decoder, Apollo version, run duration, and raw logs were not recorded. M0A is complete from the owner's validation; these details remain useful for release qualification. Sunshine is not a required target for this Apollo-based project/preview.
 
-The remaining hardware and release checks below are still open; details also appear in [BASELINE.md](BASELINE.md).
+The remaining release checks below are separate from the completed M0A milestone; details also appear in [BASELINE.md](BASELINE.md).
 
 ## Automated package architecture checks
 
@@ -32,7 +33,7 @@ Apply this checklist to the advertised release scope. Clipboard, virtual-display
 
 | Area | Required cases | Pass condition |
 | --- | --- | --- |
-| Standard hosts | Pinned Sunshine and Apollo builds independently; discovery/manual host, pair/unpair, app list, launch/resume/disconnect/quit | Baseline functions work; disconnect and quit have distinct effects |
+| Standard host | Pinned Apollo build; discovery/manual host, pair/unpair, app list, launch/resume/disconnect/quit | Baseline functions work; disconnect and quit have distinct effects |
 | Session lifecycle | 20 connect/disconnect cycles; timeout, network interruption, sleep/resume, client crash/restart | No stuck input, stale requests, unintended host actions, or persistent new resource leak |
 | Host changes | Switch between two paired hosts; reconnect after permissions change | No stale capability state or cross-host clipboard response |
 | Keyboard/mouse | Relative/direct modes, wheel, Alt+Tab/capture release, non-US layout, dead keys; IME if claimed | Correct host input and reliable local escape; no stuck modifiers |
@@ -44,11 +45,11 @@ Apply this checklist to the advertised release scope. Clipboard, virtual-display
 | Identity/package | Moonlight side by side, portable directory, clean-machine launch, installer update/uninstall | No shared credentials/settings collisions or unintended data removal |
 | Accessibility | Keyboard-only settings/actions, focus visibility, readable scale, accessible names | Included workflows remain operable without a mouse |
 
-Use fixtures/unit tests for permission parsing, profiles/migrations, URL encoding, coordinate transforms, stale-session cancellation, and native command encoding. Use a bounded mock HTTP service for clipboard/error contracts. Run these in CI once implemented. Real Sunshine/Apollo sessions and GPU/input/display checks remain manual or hardware-lab tests; do not label hosted-runner builds as full compatibility coverage.
+Use fixtures/unit tests for permission parsing, profiles/migrations, URL encoding, coordinate transforms, stale-session cancellation, and native command encoding. Use a bounded mock HTTP service for clipboard/error contracts. Run these in CI once implemented. Real Apollo sessions and GPU/input/display checks remain manual or hardware-lab tests; do not label hosted-runner builds as full compatibility coverage.
 
 ## Performance method
 
-1. Build unmodified upstream and the Asteria candidate in Release configuration with the same dependencies. Record both SHAs.
+1. Build Asteria in Release configuration and record its SHA. Compare with the official x64 Moonlight release under Windows ARM64 emulation for the practical user comparison; a CI-built unmodified upstream ARM64 artifact may be used as an optional internal engineering reference. Record the exact comparison versions/SHAs.
 2. Use the same client GPU/driver, host build/GPU/encoder, resolution, refresh rate, codec, bitrate, display, power mode, and network path.
 3. Warm up for two minutes, then collect at least three five-minute runs of each build. Alternate their order and use the same reproducible workload. Start with wired LAN 1080p60 H.264 SDR, then test enabled extensions.
 4. Record median and p95 decode/render/frame-queue times where available, frame drops, frame pacing, CPU/GPU load, memory trend, audio glitches, and connection failures. Keep raw logs and the workload description.
@@ -59,13 +60,13 @@ Use fixtures/unit tests for permission parsing, profiles/migrations, URL encodin
 
 ## Hardware coverage
 
-Required for the first preview: the baseline H.264 1080p60 SDR path on at least one recorded Windows 11 x64 client and one real Windows 11 ARM64 client, each tested with separately recorded Sunshine and Apollo hosts. ARM64 qualification is the next milestone, not a post-preview follow-up. Retain upstream codec functionality and smoke-test each additional path available on each machine.
+For the first preview, record the baseline H.264 1080p60 SDR path on Windows 11 x64 and ARM64 clients against Apollo, plus the advertised AV1 path where supported. M0A native ARM64 qualification is complete; these are release-specific coverage checks. Sunshine is not required for this project/preview. Retain upstream codec functionality and smoke-test each additional path available on each machine.
 
 Before claiming broad stable support, test representative Intel, AMD, and NVIDIA clients; hybrid-GPU selection; supported HEVC/AV1/HDR paths; high refresh rate; and office-text quality with YUV 4:4:4 where both ends support it. List each tested GPU, driver, OS build, codec/chroma/HDR mode, and host version. Mark unavailable combinations untested; unsupported codec hardware should produce a clear fallback or error.
 
-For ARM64, record the device model, SoC/GPU, driver, Windows build, actual process architecture, and decoder in use. Verify PE machine type `ARM64` (`0xAA64`) for the client and shipped native runtime DLLs, including Qt plugins and AntiHooking. Confirm on-device native execution and runtime startup with the deployed dependencies. A successful x64-emulated launch or cross-build is insufficient. Compare performance to unmodified ARM64 Moonlight on the same device, not to unrelated x64 hardware.
+For ARM64, record the device model, SoC/GPU, driver, Windows build, actual process architecture, and decoder in use. Verify PE machine type `ARM64` (`0xAA64`) for the client and shipped native runtime DLLs, including Qt plugins and AntiHooking. Confirm on-device native execution and runtime startup with the deployed dependencies. A successful x64-emulated launch or cross-build is insufficient. For a practical same-device comparison, use the official x64 Moonlight release under Windows ARM64 emulation. CI-built unmodified upstream ARM64 artifacts may be used for internal same-architecture analysis, but are not official upstream releases.
 
-Test clean-machine portable launch, discovery/pairing, launch/resume/disconnect, stereo audio, keyboard, direct/relative mouse, gamepad, focus/capture release, DPI changes, sleep/resume, and a 30-minute streaming soak on ARM64. Record unavailable devices or host access as open gates. Test HEVC/AV1/HDR only when supported by the actual device/host combination; record fallback behavior and avoid blanket codec claims.
+Test clean-machine portable launch, discovery/pairing, launch/resume/disconnect, stereo audio, keyboard, direct/relative mouse, gamepad, focus/capture release, DPI changes, sleep/resume, and a 30-minute streaming soak on ARM64. Record unavailable devices or Apollo host access as release limitations. Test HEVC/AV1/HDR only when supported by the actual device/host combination; record fallback behavior and avoid blanket codec claims.
 
 Windows 10 x64 still needs its own declared minimum OS/runtime and hardware qualification. Local multi-monitor behavior does not establish support for simultaneous remote-monitor streams.
 
@@ -88,7 +89,8 @@ Windows 10 x64 still needs its own declared minimum OS/runtime and hardware qual
 - [x] M0 x64 upstream and candidate CI builds pass; see run 34736992552.
 - [x] Upstream and candidate x64/ARM64 CI builds and final-ZIP architecture checks pass; see run 34797782854.
 - [ ] Documented release builds reproduced locally.
-- [ ] ARM64 portable package contains native target binaries and runs natively on the recorded ARM64 device; owner-reported streaming used an ARM64-labeled Asteria build, but process architecture and exact artifact remain unrecorded.
+- [x] M0A: ARM64 package architecture gate passed and the owner verified native Asteria process execution and Apollo AV1 streaming on the recorded Surface Pro 11th Edition.
+- [ ] Record the exact release ARM64 artifact/hash, Windows build, driver, decoder, and Apollo version.
 - [ ] Functional and regression gates pass for the advertised scope; the reported AV1 stream comparison covers only one workload.
 - [ ] Separate x64 and ARM64 portable builds run with deployed runtimes on clean machines; data-location behavior is documented for each.
 - [ ] Exact versions, hashes, source, submodule contents, licenses/notices, and symbols are available.
