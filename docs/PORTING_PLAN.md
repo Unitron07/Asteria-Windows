@@ -76,6 +76,20 @@ The goal is not to blindly copy Artemis Android decoder tweaks. Artemis Android 
 
 **Deliverable:** performance trace format, benchmark procedure, upstream-vs-Asteria results, and only the presentation/pacing modes that survive measurement.
 
+## M1B — Experimental PyroWave streaming with Vibepollo
+
+**Status:** planned, after M1A baseline measurements. This optional milestone is independent of M2–M4 Apollo features and is not required for the first public preview.
+
+- [ ] Pin the PyroWave implementation and a Vibepollo host revision. Verify licensing, actual codec negotiation, frame transport, color metadata, and compatibility with this fork's Moonlight protocol core.
+- [ ] Add opt-in codec negotiation and an isolated Windows GPU decoder/presentation path. Select PyroWave only when host and client support are confirmed; retain H.264/HEVC/AV1 and recoverable fallback.
+- [ ] Validate Vulkan/runtime packaging and x64/native ARM64 builds. Qualify each architecture on actual hardware before advertising support.
+- [ ] Compare latency, decode/present time, drops, GPU use, bandwidth, and network queuing against existing codecs on the same host, client, network, and workload.
+- [ ] Test reconnect, resolution and frame-rate changes, SDR/HDR and chroma where supported, and regression coverage with standard Sunshine and Apollo streams.
+
+**Exit gate:** an opt-in stream works with a pinned Vibepollo build on qualified Windows hardware, measurements and limitations are recorded, and existing codec paths still work. If interoperability or measured benefit is insufficient, leave it experimental and out of release builds.
+
+**Deliverable:** protocol spike, isolated integration, benchmark results, and a documented support matrix.
+
 ## M2 — Pointer/scaling correctness and Apollo capability foundation
 
 - [ ] Validate upstream direct/relative mouse modes, wheel input, keyboard layouts, focus behavior, and mixed-DPI monitor moves before changing them.
