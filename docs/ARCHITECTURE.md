@@ -21,7 +21,7 @@ Reuse upstream's ARM64 Qt/MSVC/qmake and packaging paths. Keep architecture-spec
 | Discovery, pairing, host HTTP | `app/backend/nvcomputer.*`, `nvhttp.*` | Parse Apollo fields and add a bounded authenticated clipboard request path |
 | Session lifecycle | `app/streaming/session.cpp` | Attach extension services to the existing session |
 | Input | `app/streaming/input/` | Extend existing capture, direct-pointer, and shortcut paths |
-| Decode/render | Existing `app/streaming/` implementation | Preserve; modify only for a demonstrated feature gap |
+| Decode/render | Existing `app/streaming/` implementation | Preserve existing codecs; prototype an isolated opt-in PyroWave GPU decode/presentation path in M1B after verifying host negotiation and transport |
 | Native protocol | `moonlight-common-c/moonlight-common-c/` | Keep the upstream pin initially; later add a minimal reviewed server-command extension |
 | Build/package | `moonlight-qt.pro`, `app/app.pro`, `scripts/`, `wix/` | Asteria identity implemented; qualify portable packages before installer distribution |
 
