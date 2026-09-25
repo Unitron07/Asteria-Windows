@@ -1,6 +1,6 @@
 # M0 baseline report and provenance
 
-M0 baseline integration is **merged and accepted as the starting point for further development**. Both Windows x64 CI builds passed and the project owner confirmed that the tested client works. Detailed hardware and interoperability qualification is not yet fully recorded. Asteria identity and x64/ARM64 CI packaging are implemented; M0A native ARM64 is complete from the owner's real-device validation below, and the next development priority is [M1A instrumentation](NEXT_STEP.md). Historical M0 observations below retain their original scope.
+M0 baseline integration is **merged and accepted as the starting point for further development**. Both Windows x64 CI builds passed and the project owner confirmed that the tested client works. Detailed hardware and interoperability qualification is not yet fully recorded. Asteria identity and x64/ARM64 CI packaging are implemented; M0A native ARM64 is complete from the owner's real-device validation below, and the next development priority is [M1B PyroWave protocol groundwork](NEXT_STEP.md), with existing Moonlight statistics as the initial M1A measurement source. Historical M0 observations below retain their original scope.
 
 ## Imported history
 
