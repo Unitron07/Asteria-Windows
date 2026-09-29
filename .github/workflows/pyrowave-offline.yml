@@ -47,20 +47,20 @@ jobs:
         continue-on-error: ${{ matrix.arch == 'arm64' }}
         shell: pwsh
         run: ./scripts/build-pyrowave-deps.ps1 -Architecture '${{ matrix.arch }}'
-      - name: Retry documented ARM64 bitops compatibility patch
+      - name: Retry documented ARM64 portable math compatibility patch
         if: matrix.arch == 'arm64' && steps.dependency.outcome == 'failure'
         shell: pwsh
         run: |
           $log = Get-Content build/pyrowave/arm64/evidence/dependency.log -Raw
-          if ($log -notmatch '__popcnt') { throw 'Dependency failure was not the known bitops intrinsic blocker; retain original evidence' }
-          ./scripts/build-pyrowave-deps.ps1 -Architecture arm64 -OutputRoot build/pyrowave-patched -ApplyArm64BitopsPatch
+          if ($log -notmatch 'simd.hpp.*C1189|muglm.cpp.*C2665') { throw 'Dependency failure was not the known portable math blocker; retain original evidence' }
+          ./scripts/build-pyrowave-deps.ps1 -Architecture arm64 -OutputRoot build/pyrowave-patched -ApplyArm64CompatibilityPatch
       - name: Compile and link experimental runtime probe
         shell: pwsh
         run: |
           $root = if (Test-Path build/pyrowave-patched/arm64/install/bin/libpyrowave-shared-0.dll) { 'build/pyrowave-patched' } else { 'build/pyrowave' }
           $deps = (Resolve-Path "$root/${{ matrix.arch }}").Path
           "PYROWAVE_DEPS=$deps" >> $env:GITHUB_ENV
-          cmake -S tests/pyrowave -B build/probe-${{ matrix.arch }} -G 'Visual Studio 18 2026' -A ${{ matrix.platform }} -DPYROWAVE_EXPERIMENTAL=ON "-DPYROWAVE_ROOT=$deps/install" "-DVULKAN_HEADERS=$deps/source/Granite/third_party/khronos/vulkan-headers/include"
+          cmake -S tests/pyrowave -B build/probe-${{ matrix.arch }} -G 'Visual Studio 18 2026' -A ${{ matrix.platform }} -DPYROWAVE_EXPERIMENTAL=ON "-DPYROWAVE_ROOT=$deps/install" "-DVULKAN_HEADERS=$deps/source/Granite/third_party/khronos/vulkan-headers/include" "-DGRANITE_ROOT=$deps/source/Granite" "-DGRANITE_BUILD=$deps/build/Granite"
           if ($LASTEXITCODE) { throw 'probe configure failed' }
           cmake --build build/probe-${{ matrix.arch }} --config Release --parallel 2
           if ($LASTEXITCODE) { throw 'probe build failed' }
@@ -97,5 +97,7 @@ jobs:
             build/pyrowave*/${{ matrix.arch }}/evidence/
             build/pyrowave*/${{ matrix.arch }}/install/
             build/probe-${{ matrix.arch }}/Release/pyrowave-offline-proof.exe
+            build/probe-${{ matrix.arch }}/Testing/
+            build/parser-${{ matrix.arch }}/Release/pyrowave-parser-tests.exe
             build/parser-${{ matrix.arch }}/Testing/
           if-no-files-found: warn

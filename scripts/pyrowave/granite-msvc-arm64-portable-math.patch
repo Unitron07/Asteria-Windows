@@ -1,0 +1,37 @@
+diff --git a/math/simd.hpp b/math/simd.hpp
+--- a/math/simd.hpp
++++ b/math/simd.hpp
+@@ -100,7 +100,18 @@ static inline bool frustum_cull(const AABB &aabb, const vec4 *planes)
+ 	return vget_lane_f32(merged_half, 0) >= 0.0f;
+ #endif
+ #else
+-#error "Implement me."
++	// Portable fallback for targets without Granite's SSE/NEON macro selection,
++	// including native MSVC ARM64. Do not assume GCC's __ARM_NEON macros.
++	for (unsigned i = 0; i < 6; i++)
++	{
++		float d = 0.0f;
++		for (unsigned j = 0; j < 4; j++)
++			d += planes[i][j] * (planes[i][j] > 0.0f ?
++				aabb.get_maximum4()[j] : aabb.get_minimum4()[j]);
++		if (d < 0.0f)
++			return false;
++	}
++	return true;
+ #endif
+ }
+ 
+diff --git a/math/muglm/muglm.cpp b/math/muglm/muglm.cpp
+--- a/math/muglm/muglm.cpp
++++ b/math/muglm/muglm.cpp
+@@ -413,9 +413,7 @@ void transpose_from_affine(mat4 &dst, const vec4 src[3])
+ 	float32x4x4_t r = { r0, r1, r2, r3 };
+ 	vst4q_f32(dst[0].data, r);
+ #else
+-	mat4 m = transpose(src);
+-	for (int i = 0; i < 3; i++)
+-		dst[i] = m[i];
++	dst = transpose(mat4(src[0], src[1], src[2], vec4(0, 0, 0, 1)));
+ #endif
+ }
+ 

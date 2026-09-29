@@ -4,7 +4,7 @@ param(
     [string]$OutputRoot = (Join-Path (Split-Path $PSScriptRoot -Parent) 'build/pyrowave'),
     [string]$CMake = 'cmake',
     [string]$Generator,
-    [switch]$ApplyArm64BitopsPatch
+    [switch]$ApplyArm64CompatibilityPatch
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'pyrowave/pe-machine.ps1')
@@ -90,13 +90,13 @@ foreach ($arch in $Architecture) {
         }
         $hashes | ConvertTo-Json | Set-Content (Join-Path $evidence 'sources.json') -Encoding utf8
         $patchHash = $null
-        if ($ApplyArm64BitopsPatch) {
-            if ($arch -ne 'arm64') { throw 'The optional bitops compatibility patch is ARM64 only' }
-            $patch = Join-Path $PSScriptRoot 'pyrowave/granite-msvc-arm64-bitops.patch'
+        if ($ApplyArm64CompatibilityPatch) {
+            if ($arch -ne 'arm64') { throw 'The optional compatibility patch is ARM64 only' }
+            $patch = Join-Path $PSScriptRoot 'pyrowave/granite-msvc-arm64-portable-math.patch'
             Invoke-Native git @('-C',$granite,'apply','--check',$patch)
             Invoke-Native git @('-C',$granite,'apply',$patch)
             $patchHash = (Get-FileHash -LiteralPath $patch).Hash.ToLowerInvariant()
-            Get-Git $granite @('diff','--','util/bitops.hpp') | Set-Content (Join-Path $evidence 'granite-patch.diff')
+            Get-Git $granite @('diff') | Set-Content (Join-Path $evidence 'granite-patch.diff')
         }
         $phase = 'configure'
         if (!$Generator) {
@@ -132,7 +132,7 @@ foreach ($arch in $Architecture) {
         [pscustomobject]@{architecture=$arch; configuration='MSVC Release'; codecOrigin=$codecOrigin;
             cmake=$cmakeVersion; cmakePath=$cmakePath; cmakeSha256=(Get-FileHash $cmakePath).Hash;
             compiler=$compiler; compilerSha256=(Get-FileHash $compiler).Hash;
-            windowsSdk=(Select-String -Path (Join-Path $build 'CMakeCache.txt') -Pattern 'CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION');
+            windowsSdk=([xml](Get-Content (Join-Path $build 'pyrowave-shared.vcxproj') -Raw)).Project.PropertyGroup.WindowsTargetPlatformVersion;
             options=$options; patchSha256=$patchHash; os=[Environment]::OSVersion.VersionString;
             workflowRun=$env:GITHUB_RUN_ID} | ConvertTo-Json -Depth 4 |
             Set-Content (Join-Path $evidence 'build.json') -Encoding utf8
