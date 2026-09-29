@@ -3,7 +3,7 @@ param(
     [ValidateSet('x64','arm64')][string[]]$Architecture = @('x64','arm64'),
     [string]$OutputRoot = (Join-Path (Split-Path $PSScriptRoot -Parent) 'build/pyrowave'),
     [string]$CMake = 'cmake',
-    [string]$Generator = 'Visual Studio 17 2022',
+    [string]$Generator,
     [switch]$ApplyArm64BitopsPatch
 )
 $ErrorActionPreference = 'Stop'
@@ -99,6 +99,17 @@ foreach ($arch in $Architecture) {
             Get-Git $granite @('diff','--','util/bitops.hpp') | Set-Content (Join-Path $evidence 'granite-patch.diff')
         }
         $phase = 'configure'
+        if (!$Generator) {
+            $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+            if (!(Test-Path $vswhere)) { throw 'MSVC/Visual Studio Installer is required' }
+            $vsVersion = & $vswhere -latest -property installationVersion
+            if ($LASTEXITCODE -ne 0 -or !$vsVersion) { throw 'No Visual Studio installation found' }
+            $Generator = switch (([version]$vsVersion).Major) {
+                17 { 'Visual Studio 17 2022' }
+                18 { 'Visual Studio 18 2026' }
+                default { throw "Select -Generator explicitly for Visual Studio $vsVersion" }
+            }
+        }
         $cmakePath = (Get-Command $CMake -ErrorAction Stop).Source
         $cmakeVersion = & $cmakePath --version
         if ($LASTEXITCODE -ne 0 -or $cmakeVersion[0] -notmatch 'cmake version (\d+\.\d+\.\d+)') { throw 'Unable to read CMake version' }

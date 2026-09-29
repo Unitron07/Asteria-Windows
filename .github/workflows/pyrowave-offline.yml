@@ -36,7 +36,7 @@ jobs:
       - name: GPU-free parser build and tests
         shell: pwsh
         run: |
-          cmake -S tests/pyrowave -B build/parser-${{ matrix.arch }} -G 'Visual Studio 17 2022' -A ${{ matrix.platform }}
+          cmake -S tests/pyrowave -B build/parser-${{ matrix.arch }} -G 'Visual Studio 18 2026' -A ${{ matrix.platform }}
           if ($LASTEXITCODE) { throw 'parser configure failed' }
           cmake --build build/parser-${{ matrix.arch }} --config Release --parallel 2
           if ($LASTEXITCODE) { throw 'parser build failed' }
@@ -60,7 +60,7 @@ jobs:
           $root = if (Test-Path build/pyrowave-patched/arm64/install/bin/libpyrowave-shared-0.dll) { 'build/pyrowave-patched' } else { 'build/pyrowave' }
           $deps = (Resolve-Path "$root/${{ matrix.arch }}").Path
           "PYROWAVE_DEPS=$deps" >> $env:GITHUB_ENV
-          cmake -S tests/pyrowave -B build/probe-${{ matrix.arch }} -G 'Visual Studio 17 2022' -A ${{ matrix.platform }} -DPYROWAVE_EXPERIMENTAL=ON "-DPYROWAVE_ROOT=$deps/install" "-DVULKAN_HEADERS=$deps/source/Granite/third_party/khronos/vulkan-headers/include"
+          cmake -S tests/pyrowave -B build/probe-${{ matrix.arch }} -G 'Visual Studio 18 2026' -A ${{ matrix.platform }} -DPYROWAVE_EXPERIMENTAL=ON "-DPYROWAVE_ROOT=$deps/install" "-DVULKAN_HEADERS=$deps/source/Granite/third_party/khronos/vulkan-headers/include"
           if ($LASTEXITCODE) { throw 'probe configure failed' }
           cmake --build build/probe-${{ matrix.arch }} --config Release --parallel 2
           if ($LASTEXITCODE) { throw 'probe build failed' }
