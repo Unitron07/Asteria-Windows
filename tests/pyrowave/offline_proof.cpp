@@ -22,7 +22,12 @@ int main(int argc, char** argv) {
         if (!runtime.load(directory)) return 1;
         std::cout << "PASS: unload/reload\n"; return 0;
     }
-    if (!runtime.createDecoder(1920,1080)) return 1;
+    if (!runtime.createDecoder(1920,1080)) {
+        // CTest/CI-style explicit unavailable result; later decode failures stay errors.
+        if (runtime.error().find("native system Vulkan loader unavailable")!=std::string::npos ||
+            runtime.error().find("device creation failed: -5")!=std::string::npos) return 77;
+        return 1;
+    }
     std::cout << "Vulkan adapter: " << runtime.deviceDescription() << '\n';
     std::vector<std::uint8_t> frame;
     if (!runtime.generateProofFrame(frame)) return 1;

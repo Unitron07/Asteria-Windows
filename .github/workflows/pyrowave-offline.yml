@@ -9,6 +9,7 @@ on:
       - 'scripts/build-pyrowave-deps.ps1'
       - 'scripts/pyrowave/**'
       - '.github/workflows/pyrowave-offline.yml'
+      - '!**/*.md'
 permissions:
   contents: read
 concurrency:
@@ -83,6 +84,7 @@ jobs:
       - name: Install Qt x64 host kit for qmake compile
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
+          host: windows
           version: '6.11.2'
           arch: win64_msvc2022_64
           cache: true
@@ -93,6 +95,7 @@ jobs:
         if: matrix.arch == 'arm64'
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
+          host: windows
           version: '6.11.2'
           arch: win64_msvc2022_arm64_cross_compiled
           cache: true
@@ -108,7 +111,8 @@ jobs:
           & ./build/probe-${{ matrix.arch }}/Release/pyrowave-offline-proof.exe --roundtrip "$env:PYROWAVE_DEPS/install/bin" "$env:PYROWAVE_DEPS/evidence/roundtrip" 2>&1 | Tee-Object "$env:PYROWAVE_DEPS/evidence/roundtrip.txt"
           $code = $LASTEXITCODE
           @{exitCode=$code; architecture='${{ matrix.arch }}'; runtimeQualified=$false; note='Inspect hardware/driver and decode output; hosted build alone is not GPU qualification'} | ConvertTo-Json | Set-Content "$env:PYROWAVE_DEPS/evidence/roundtrip-result.json"
-          # An unavailable device is evidence, not a mandatory release gate.
+          if ($code -ne 0 -and $code -ne 77) { throw 'Roundtrip failed after runtime availability; inspect evidence' }
+          # Only an explicitly unavailable Vulkan device is a recorded skip.
           exit 0
       - name: Upload experimental binaries and evidence
         if: always()

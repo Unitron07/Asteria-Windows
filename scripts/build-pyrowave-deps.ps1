@@ -133,6 +133,8 @@ foreach ($arch in $Architecture) {
             compiler=$compiler; compilerSha256=(Get-FileHash $compiler).Hash;
             windowsSdk=(@(([xml](Get-Content (Join-Path $build 'pyrowave-shared.vcxproj') -Raw)).Project.PropertyGroup | ForEach-Object { $_.WindowsTargetPlatformVersion } | Where-Object { $_ }) | Select-Object -First 1);
             options=$options; patchSha256=$patchHash; os=[Environment]::OSVersion.VersionString;
+            runnerImage=$env:ImageVersion; runnerImageOS=$env:ImageOS;
+            harnessCommit=(Get-Git (Split-Path $PSScriptRoot -Parent) @('rev-parse','HEAD'));
             workflowRun=$env:GITHUB_RUN_ID} | ConvertTo-Json -Depth 4 |
             Set-Content (Join-Path $evidence 'build.json') -Encoding utf8
         $phase = 'compile/link'
