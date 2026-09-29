@@ -1,6 +1,8 @@
 QT += core quick network quickcontrols2 svg
 CONFIG += c++17
 
+include(streaming/video/pyrowave_experimental.pri)
+
 unix:!macx {
     TARGET = asteria
 } else {

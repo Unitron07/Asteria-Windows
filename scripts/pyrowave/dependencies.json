@@ -1,0 +1,7 @@
+{
+  "pyrowave": {"url":"https://github.com/joemossjr16/pyrowave.git","commit":"f6fb84eb0d8538f43f6f54e58d2040d101c8676c"},
+  "granite": {"url":"https://github.com/Themaister/Granite.git","commit":"b6cffd5ce81f540f0855e6778428483e14763d9b"},
+  "volk": {"url":"https://github.com/zeux/volk.git","commit":"47cddf7ed97b94118a08aacb548a411188e016cc"},
+  "vulkanHeaders": {"url":"https://github.com/KhronosGroup/Vulkan-Headers.git","commit":"6802bb4733b63ed5efd3adb308a6c885ef180ea1"},
+  "sourceBundle": {"file":"pyrowave-pinned.bundle","sha256":"e4387ce6b691724aa342d6df7677f51efffe30e98e3949415718e7b2b955c56e"}
+}
