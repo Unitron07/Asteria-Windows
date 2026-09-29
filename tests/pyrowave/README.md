@@ -1,10 +1,18 @@
-# Offline P0 experiment
+# Offline P0 proof (complete)
 
 This directory builds only the parser and optional Windows runtime probe. It
 does not connect to any host. The app keeps Qt/qmake; CMake here is a standalone
 dependency/test harness. Ordinary release builds neither compile nor ship the
 runtime experiment. The new `app.pro` include is inert without
 `CONFIG+=pyrowave_experimental`.
+
+P0 offline codec/runtime validation passed on x64 RTX 4070 Ti (MAE
+0.000694444) and native ARM64 Surface Pro 11th Edition / Snapdragon X Plus /
+Adreno X1-85 (MAE 0.00104167). Both decoded a generated 60,312-byte 1920×1080
+SDR 4:2:0 frame through three decoder lifetimes and passed malformed-frame
+rejection/recovery. See [the validation record](../../docs/VALIDATION.md#m1b-p0-offline-pyrowave-validation)
+for evidence and [P0.5](../../docs/NEXT_STEP.md) for presentation gates. Live
+PyroWave streaming is not implemented; PyroWave remains off by default.
 
 ## Dependency and GPU-free tests
 
@@ -65,6 +73,25 @@ GPU/driver-dependent compression means they are not promised byte-identical
 across adapters. I420 is SDL IYUV-compatible; this milestone copies into a known
 pixel buffer and does **not** qualify an SDL window, color interpretation, GPU
 presentation performance, frame pacing, or live decode latency.
+
+## Native ARM64 hardware reproduction from the CI artifact
+
+From the extracted native ARM64 artifact root, the owner used:
+
+```powershell
+.\probe-arm64\Release\pyrowave-offline-proof.exe --load ".\pyrowave-patched\arm64\install\bin"
+.\probe-arm64\Release\pyrowave-offline-proof.exe --roundtrip ".\pyrowave-patched\arm64\install\bin" ".\roundtrip-output"
+```
+
+The CLI resolves these relative paths to absolute paths before passing them
+to the restricted runtime wrapper. API 0.6.0 load/reload and Qualcomm Adreno
+X1-85 Vulkan device creation passed; all three decode cycles reported MAE
+0.00104167 and the expected I420 planes. The repeated
+`PyroWave P0: nonzero reserved byte` diagnostics are intentional malformed-frame
+rejections, followed by successful decode recovery. The final
+`PASS: known CPU pixel buffer copied; SDL IYUV-compatible (no SDL window/pacing test)`
+does not qualify SDL presentation, display color, or pacing. ARM64 generated
+frame/output hashes and the Windows OS build were not supplied in this record.
 
 ## Qt/qmake experimental compile
 

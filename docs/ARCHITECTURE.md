@@ -4,7 +4,7 @@
 
 Use Moonlight PC as the application, retaining its source history and layout. Do not build a second Windows shell or extract its streaming internals into a new framework for the first release. This follows the project owner's September 12, 2026 direction.
 
-The [audit](FEATURE_AUDIT.md) pins the reviewed code. M0 integration is merged, x64 CI passed, and the owner confirmed the tested client works; see [BASELINE.md](BASELINE.md) for the evidence and remaining qualification records. Native x64/ARM64 builds and packaging pass CI, and the Asteria identity is implemented. M0A real-device ARM64 validation is complete; M1A begins with Moonlight's built-in statistics; M1B Vibepollo/PyroWave protocol groundwork is the next development task. Frame-pacing changes require measured evidence. The extension architecture below describes planned work.
+The [audit](FEATURE_AUDIT.md) pins the reviewed code. M0 integration is merged, x64 CI passed, and the owner confirmed the tested client works; see [BASELINE.md](BASELINE.md) for the evidence and remaining qualification records. Native x64/ARM64 builds and packaging pass CI, and the Asteria identity is implemented. M0A real-device ARM64 validation is complete; M1A begins with Moonlight's built-in statistics; M1B source-diff groundwork and P0 offline proof are complete on x64 and native ARM64; P0.5 presentation qualification is the next development task. Frame-pacing changes require measured evidence. The extension architecture below describes planned work.
 
 ## Native Windows targets
 
@@ -21,8 +21,8 @@ Reuse upstream's ARM64 Qt/MSVC/qmake and packaging paths. Keep architecture-spec
 | Discovery, pairing, host HTTP | `app/backend/nvcomputer.*`, `nvhttp.*` | Parse Apollo fields and add a bounded authenticated clipboard request path |
 | Session lifecycle | `app/streaming/session.cpp` | Attach extension services to the existing session |
 | Input | `app/streaming/input/` | Extend existing capture, direct-pointer, and shortcut paths |
-| Decode/render | Existing `app/streaming/` implementation | Preserve existing codecs; prototype an isolated opt-in PyroWave GPU decode/presentation path in M1B after verifying host negotiation and transport |
-| Native protocol | `moonlight-common-c/moonlight-common-c/` | Keep the upstream pin initially; later add a minimal reviewed server-command extension |
+| Decode/render | Existing `app/streaming/` implementation | Preserve existing codecs; isolated P0 PyroWave offline GPU decode exists. Qualify SDL presentation/color next, then add live opt-in integration in P1 |
+| Native protocol | `moonlight-common-c/moonlight-common-c/` | Keep the current upstream pin; P1 may add the reviewed minimal PyroWave protocol delta. Server-command extensions remain later work |
 | Build/package | `moonlight-qt.pro`, `app/app.pro`, `scripts/`, `wix/` | Asteria identity implemented; qualify portable packages before installer distribution |
 
 New extension classes belong beside the existing backend/session code. Class names and exact filenames can be chosen during implementation; these are responsibilities, not a demand for a new service framework.
@@ -41,9 +41,13 @@ New extension classes belong beside the existing backend/session code. Class nam
 
 **Settings and identity:** Asteria's separate app/settings/pairing/log/package identity is implemented. Qualify data-location and installer lifecycle behavior for the artifacts offered. Test coexistence with Moonlight. Do not silently copy pairing credentials. Profiles use stable host/app identifiers and explicit precedence: global defaults, host profile, app override, session-only override. Version the schema and preserve recoverable settings when migration fails. Verify whether upstream portable mode meets the intended data-location contract before promising a self-contained ZIP.
 
-## Planned PyroWave boundary (M1B)
+## PyroWave boundary (M1B)
 
-PyroWave is an optional Asteria-Windows codec experiment, not a current client feature or a first-preview requirement. Pin and inspect the PyroWave-enabled Vibepollo fork's actual negotiation and frame transport before changing the protocol core; the initial source audit is in [M1B_PYROWAVE_SPIKE.md](M1B_PYROWAVE_SPIKE.md). Keep pairing, input, audio, and existing codec paths intact. Create codec-specific GPU resources only after both ends agree and local runtime support is confirmed; release resources on stop/reconnect and allow recovery using an existing codec. Verify licensing, Vulkan dependencies, x64/ARM64 packaging, color/HDR behavior, and measured performance before advertising support.
+Merged P0 provides an isolated bounded PYRW parser, restricted dynamic runtime loader with API 0.6.0/export checks, and a generated SDR 4:2:0 GPU decode-to-I420 proof. The standalone CMake dependency/test harness complements the existing Qt/qmake app build. Inclusion requires explicit `CONFIG+=pyrowave_experimental`; ordinary builds have no codec startup import, probe, runtime copy, or Session hook. Source pins, bundle provenance, compatibility patch, and hardware evidence are recorded in [M1B_PYROWAVE_SPIKE.md](M1B_PYROWAVE_SPIKE.md).
+
+Offline GPU decoding is validated on x64 RTX 4070 Ti and native Windows ARM64 Surface Pro 11th Edition / Snapdragon X Plus / Adreno X1-85. This validates the dependency/runtime/codec path into known CPU buffers. Real SDL presentation, SDR display color/range/chroma correctness, pacing, device-loss recovery, 4:4:4, runtime deployment policy, and production latency/performance remain unqualified; HDR is excluded.
+
+PyroWave remains experimental and off by default. Live negotiation is not implemented; normal releases do not ship active PyroWave streaming support. P0.5 qualifies presentation before a separate P1 change adds runtime-gated opt-in advertisement, minimal capability/RTSP/SDP/common-c changes, safe decoder selection, standard-codec fallback/reconnect, and pinned-host interoperability. Keep pairing/input/audio, bitrate, frame pacing, and existing codecs intact. Full runtime/device/decoder/presentation preflight must precede any live offer; failure must permit ordinary streaming without replaying host-app actions.
 
 ## Planned Asteria VR boundary (M6)
 
