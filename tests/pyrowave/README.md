@@ -11,7 +11,9 @@ runtime experiment. The new `app.pro` include is inert without
 Run in PowerShell with Git, MSVC (x64 and ARM64 tools), Windows SDK and CMake
 3.27 or newer. Default helper builds **both** architectures with independent
 sources/caches/build/install/evidence paths. A target mismatch or dirty pinned
-source fails; use a fresh output root for a patched retry.
+source fails; use a fresh output root for a patched retry. The isolated portable
+math compatibility patch is applied for ARM64 by default; `-UnpatchedArm64`
+reproduces the original compilation blockers and does not change x64.
 
 ```powershell
 ./scripts/build-pyrowave-deps.ps1
@@ -40,7 +42,8 @@ ctest --test-dir build/probe-x64 -C Release --output-on-failure
 Substitute ARM64 consistently for the target, build directory, and dependency
 directory. The wrapper accepts only an absolute explicit dependency directory,
 loads the exact DLL filename with `LoadLibraryExW`, and searches its dependencies
-only in that directory and Windows System32. It checks API 0.6.0 before resolving
+only in that directory and Windows System32. Before device creation it preloads
+`vulkan-1.dll` from System32, constraining volk's indirect loader lookup. It checks API 0.6.0 before resolving
 the remaining decoder exports. No import library or Vulkan library is linked.
 CTest covers absent DLLs, incompatible API, missing exports, repeated rejected
 loads, relative-path rejection and empty output after failed decode, without a

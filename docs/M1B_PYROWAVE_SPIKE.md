@@ -1,6 +1,6 @@
 # M1B PyroWave source diff and implementation plan
 
-**2026-09-25: source-diff phase complete; conditional go for an offline prototype, no-go for advertising support yet.** This change is documentation only. No decoder, preference, constants, dependencies or build flags are enabled. Runtime-loading, fallback and Windows ARM64 gates make a speculative scaffold premature. M0A remains complete; neither Windows architecture is qualified for PyroWave. Use Moonlight's existing statistics for M1A; do not change frame pacing or add a telemetry subsystem.
+**2026-09-28: P0 offline implementation in [PR #16](https://github.com/Unitron07/Asteria-Windows/pull/16), with passing x64/native ARM64 build/tests and a local x64 GPU decode proof.** The PR #14 source-diff findings below remain the design basis. An explicit off-by-default build flag compiles an isolated parser/runtime experiment; no Session, negotiation, preference, bitrate, pacing or normal preview-package behavior changes. M0A remains complete. Native ARM64 GPU decoding and real SDL presentation remain unqualified; see the P0 evidence below. Use Moonlight's existing statistics for M1A.
 
 ## Exact comparison boundary
 
@@ -85,7 +85,7 @@ Build the dependency separately with **CMake 3.27 or newer on Windows**, MSVC Re
 | SDL2 / FFmpeg libswscale | Already in Asteria. Reference uploads 420 to SDL IYUV; 444 converts to BGRA with libswscale. No major dependency upgrade is necessary. |
 | Reference artifacts/tools | Host MSYS2 UCRT64 and SteamOS x86_64 AppImage are not native Windows ARM64 inputs. Codec `build_aarch64.sh` is a Linux cross-build recipe. Host-only D3D11/D3D12/DXGI interop tests are not client runtime dependencies. |
 
-No inherent x64-only requirement was established for the minimal design, but **the complete graph has not been shown to build or run on Windows ARM64**. MSVC intrinsics, PE import closure, Vulkan feature support and presentation remain gates. The codec API documents subgroup arithmetic/shuffle/shuffle-relative/vote/ballot/basic operations and subgroup-size control (Vulkan 1.3 core). A loader/version string is insufficient: device and decoder creation must succeed on the actual adapter. Do not qualify software Vulkan as a hardware decoder.
+The source audit did not establish an inherent x64-only requirement. **The later P0 record below supersedes the original unverified ARM64 build assessment**; native Vulkan feature support and presentation remain hardware gates. The codec API documents subgroup arithmetic/shuffle/shuffle-relative/vote/ballot/basic operations and subgroup-size control (Vulkan 1.3 core). A loader/version string is insufficient: device and decoder creation must succeed on the actual adapter. Do not qualify software Vulkan as a hardware decoder.
 
 Preserve PyroWave/Granite MIT notices, volk's MIT notice and Vulkan-Headers' applicable licenses, plus existing Moonlight GPL obligations. Include exact sources/generated shaders and build inputs in corresponding-source/evidence artifacts. Final ZIP PE architecture checks and contamination tests remain mandatory for every added runtime.
 
@@ -130,6 +130,182 @@ Before offering the real streaming prototype:
 
 P1 then adds runtime-gated opt-in 420 against pinned Pyrollo. Negative cases: ordinary Apollo, absent SCM, absent SDP, base-only host, malformed 444-only offer, missing/wrong-architecture DLL, export/API mismatch, unavailable features, forced software, HDR, forced standard codecs, setup failure after successful probe, host encoder failure, reconnect and device loss. Re-run H.264/HEVC/AV1 lifecycle/audio/input checks and existing-statistics comparisons on both available architectures. Hosted runners are not GPU/Apollo interoperability tests.
 
-## Validation of this documentation change
+## Historical validation of the source-diff change
 
 Local `scripts/test-baseline-preflight.ps1`, `scripts/test-package-architecture-tests.ps1` and `scripts/test-arm64-package-repair.ps1` passed on 2026-09-25, including mixed-architecture rejection. No application or workflow code changed. The focused PR records the exact candidate SHA and hosted upstream/candidate x64/ARM64 results; those baseline builds do not build or qualify PyroWave. P0 dependency builds and hardware/interoperability tests remain outstanding.
+
+## P0 implementation and evidence (2026-09-28 local / 2026-09-29 UTC)
+
+[PR #16](https://github.com/Unitron07/Asteria-Windows/pull/16) adds the pinned
+dependency helper, GPU-free parser/tests, Windows dynamic runtime wrapper and
+generated 1080p SDR 420 decode-to-CPU-buffer proof. Reproduction commands and
+fixture provenance are in [tests/pyrowave/README.md](../tests/pyrowave/README.md).
+`CONFIG+=pyrowave_experimental` is explicit and off by default. The new app
+include does nothing in ordinary builds; there is no PyroWave import library,
+DLL copy, startup probe, UI setting or Session/protocol/pacing change.
+
+### Reproducible source and build boundary
+
+`scripts/build-pyrowave-deps.ps1` builds x64 and ARM64 into independent
+`build/pyrowave/<arch>/{source,build,install,evidence}` trees. It verifies every
+exact commit and both Granite gitlinks, rejects mismatched or dirty pins,
+records CMake/compiler executable hashes, MSVC/SDK versions, target, options,
+source trees/archive hashes, patch diff/hash, imports/exports and PE machine.
+It stages only the minimal shared target, its `pyrowave-shared.lib`, header and
+notices; it does not replace Asteria's qmake build or fetch development tooling.
+Use a fresh output root when changing ARM64 patch mode.
+
+The original codec fork returned GitHub 404; upstream could not serve the
+required commit. The helper attempts the original URL, then fetches the exact
+same object from the verified [source recovery bundle](../scripts/pyrowave/README.md).
+The cached audit checkout was clean at the required revision; no moving ref or
+replacement codec was selected. Bundle SHA-256:
+`e4387ce6b691724aa342d6df7677f51efffe30e98e3949415718e7b2b955c56e`.
+
+Canonical `git archive HEAD` SHA-256s from the actual dependency builds:
+
+| Component | Source archive SHA-256 |
+| --- | --- |
+| PyroWave | `ed676276ef40c7116cd7dbf88941d2af339f16c2d5bb3a0d2d50ec2eea07a555` |
+| Granite (original, before isolated patch) | `ff6fc6e7eb65b64c534fd8750db89d6097aafe3d2f88be31f3ca964d38b52690` |
+| volk | `ab1e778960783a03aa21917db92279db88601dbf4be82161a18df6d553dc72ce` |
+| Vulkan-Headers | `7329b22a6984fe21ac968840ff41fbe3ec834e82516faaa29731d70949268b89` |
+
+The unchanged source commits are the four pins above. MIT/applicable header
+licenses and generated shaders remain in the archives/notices. Experimental
+artifacts include the four source archives and compatibility diff; all regular
+release packaging and architecture-contamination tests remain intact.
+
+### Actual Windows builds and ARM64 investigation
+
+Both targets use MSVC **19.51.36257.0**, tools directory **14.51.36231**, Windows
+SDK **10.0.26100.0**, CMake **4.4.3**, Release, and the six specified minimal
+options. x64 uses `Hostx64/x64`; native ARM64 uses `Hostarm64/arm64` on GitHub's
+`windows-11-arm` runner. CMake executable SHA-256 is
+`ab8247ca4554871e5d75c0ee118ee8663727bd6fdf37ad76b17e9cc8d5f286a8` (x64) and
+`a32ae68e4b8b030a9df26a27c4094fca8eb0f3083cd0c3a9db348c9c4cdab54b` (ARM64).
+These are recorded toolchain inputs, not a promise of byte-identical DLLs on
+future hosted images; each run retains its actual hashes.
+
+Unpatched ARM64 compilation was actually attempted in
+[run 36513013000](https://github.com/Unitron07/Asteria-Windows/actions/runs/36513013000).
+It fails **at compile time** in Granite's SIMD-only frustum helper and invalid
+scalar affine transpose. The first patched build also exposed scalar mat4
+transpose recursion (C4717). The final isolated patch repairs only those three
+portable fallback bodies; x86 and existing NEON branches are untouched. No
+unrelated Granite changes or architecture macro impersonation are used.
+See [COMPATIBILITY.md](../scripts/pyrowave/COMPATIBILITY.md).
+
+The pinned generic `_MSC_VER/_WIN64` `__popcnt/__popcnt64` and bit-scan branches
+compile and pass zero/all-bit/high-bit execution tests with this native ARM64
+compiler. No speculative bitops change is necessary at this toolchain version.
+MSVC ARM64 does not select the pin's GCC-style NEON macros; the repaired portable
+path is intentional. Older MSVC versions are not established by this evidence.
+
+In [run 36513981148](https://github.com/Unitron07/Asteria-Windows/actions/runs/36513981148),
+both dependency DLL/import libraries and CMake experimental probes compile/link,
+and all five parser/runtime-rejection/Granite tests pass on each native target.
+The real codec DLL loads and unloads on both. x64 qmake also passes there; the
+ARM64 job then fails in Qt archive selection, before qmake. The corrected Qt
+host input is validated in passing
+[run 36514467221](https://github.com/Unitron07/Asteria-Windows/actions/runs/36514467221)
+at code commit `151d057e29e16904f6b828482000ba1df711fc50`: both dependency builds,
+all five tests on each native target, real runtime load/unload, no codec/Vulkan
+startup import, PE checks and **Qt 6.11.2/qmake compile/link** pass. Both hosted
+roundtrips record exit **77** (`PYROWAVE_ERROR_NO_VULKAN`, no usable Vulkan
+device); these are explicit unavailable results, not decoder successes. The
+ARM64 build has no remaining observed compile/link blocker; GPU qualification
+is still open. Local baseline preflight, package architecture, ARM64 package
+repair and a synthetic wrong-revision helper rejection also pass.
+
+Hash-bound DLL inventory from passing run 36514467221:
+
+| Target | PE machine | `libpyrowave-shared-0.dll` SHA-256 |
+| --- | --- | --- |
+| x64 | `0x8664` | `490cf7923151b573ed3efbbea8fa0157f541fb9195d8bf39a14b5503e7bb470d` |
+| ARM64 | `0xAA64` | `baca5855a5dd06b76c0786ebb34c6cb0124ceba47050879a75f618d8a59c0250` |
+
+Final portable-math patch SHA-256:
+`0ce30e7019e45677182995248af83819a2159512e9ac799a6ae33f72ace93ffe`.
+The qmake probe is likewise verified as x64 `0x8664` / ARM64 `0xAA64`.
+
+Both install `pyrowave-shared.lib` and API 0.6.0 headers. Normal DLL imports are
+`KERNEL32.dll`, `USER32.dll`, `MSVCP140.dll`, `VCRUNTIME140.dll`, and UCRT API-set
+stdio/math/string/convert/environment/heap/runtime/time DLLs. x64 also imports
+`VCRUNTIME140_1.dll`; ARM64 does not. No separate Granite/volk DLL is produced.
+Vulkan is dynamically loaded and needs a target-native system loader and ICD.
+Full normal/delay import and export data is retained in `runtime-imports.txt`,
+`runtime-dependents.txt` and `runtime-exports.txt`; the CMake probe import scan
+confirms no PyroWave or Vulkan startup import.
+
+### Parser and runtime policy
+
+Full private PYRW containers are capped at **850,000 bytes including overhead**
+and **1,024 packets**. Both are chosen P0 safety limits, not protocol universals.
+A host payload at its maximum 850,000-byte encoder budget may be rejected once
+container overhead is included. Revisit FEC/MTU/overhead policy before P1.
+Parsing validates caller/reassembly length, header fields, count, nonempty
+lengths, subtraction-based remaining-byte bounds, exact end position and length
+sum before allocating a bounded offset table. Payloads are not copied; caller
+input must stay immutable. Every error clears packet/payload state. The suite
+passes 34 explicit cases plus 10,000 bounded deterministic mutations without
+Vulkan; the wrapper separately fixes output extent to 1920x1080 and bounds I420
+allocation to 3,110,400 bytes.
+
+`LoadLibraryExW` loads only an explicit absolute codec file and searches
+dependencies in that directory/System32. API 0.6.0 is checked before decoder
+exports. Encoder exports are resolved only by the local proof. Missing, wrong
+API or missing-export DLLs remain recoverable, with useful reasons. System32
+Vulkan is preloaded before Granite's indirect loader lookup; no process-wide
+search-path change or startup hard-link is introduced. Decoder packets clear
+on success and every failure; encoder/decoder/device destruction precedes
+module unload. The pinned Granite default-device path retains its own
+process-lifetime Vulkan loader reference without an exported teardown hook;
+the wrapper releases its owned references. Do not claim a driver/module leak
+soak from these short tests; review repeated module cycling before live use.
+
+### Local x64 decode proof and limits
+
+The final x64 artifact from passing run 36514467221 was downloaded and SHA-256
+verified (`ddbb65aa7eb1acba7a6c1267fedbe8b61c25fd08249277c23d44afe0cca73e4b`).
+On Windows 11 Pro **10.0.26200**, a native x64 probe selected **NVIDIA GeForce
+RTX 4070 Ti**, vendor 4318/device 10114, Vulkan API integer 4211039 and driver
+integer 2585198592. Windows display-driver version is **32.0.16.1692**; system
+Vulkan loader file version **1.4.341.0**. This is a named-device offline result,
+not a general GPU support matrix.
+
+The pinned encoder generated a 60,312-byte PYRW frame from the deterministic
+1080p gray ramp/neutral-chroma 8-bit SDR 420 fixture. Parsing/decoding succeeded
+through three decoder lifetimes; each returned I420 planes of **2,073,600 /
+518,400 / 518,400 bytes**, sample mean absolute error **0.000694444**, and
+recovered after a malformed reserved byte. The decoded data was copied into a
+known tightly packed CPU buffer. Generated fixture SHA-256 for this run:
+`4a8856af5b774a2189b7cdaaa3908125c4ad95ae3a38648a07ba1dac6c1e1802`;
+decoded I420 SHA-256:
+`fd885fd91466133f7594c5b25722db60da8d47bbe44f4ac9fec56b2734a0ed43`.
+Generated bytes can vary with encoder initialization/GPU/driver; generate the
+fixture during test setup rather than treating that hash as protocol identity.
+
+Hosted GPU availability is recorded separately from build/test success. Native
+ARM64 parser/loader execution proves those operations on that runner, not GPU
+decoding. A roundtrip exit 77 records unavailable native Vulkan; other decode
+failures fail the optional job. **ARM64 PyroWave GPU decode/presentation remains
+unqualified.** I420 is SDL IYUV-compatible, but no SDL window, visible color
+patterns, real frame pacing or live-session presentation was tested. The
+minimal milestone uses the permitted known-pixel-buffer route.
+
+### Remaining gates before live host negotiation
+
+- Native ARM64 GPU/driver roundtrip, decoder recreation and output evidence.
+- SDL presentation/color/range/chroma-siting tests on each target, then separate
+  444 coverage; keep HDR excluded.
+- Review upstream loader lifetime, driver/device loss, repeated recreation and
+  clean-machine CRT/Vulkan deployment; scan every experimental package runtime.
+- Resolve Session's single-format selection and selected-decoder properties
+  versus missing/changed RTSP/SDP; retain safe standard-codec fallback and
+  reconnect without replaying host application actions.
+- Review application resolution/allocation limits, container overhead, FEC/MTU,
+  loss/malformed codec packets and lifecycle recovery before host input.
+- A separate P1 PR may add the minimal common-c delta, runtime-gated opt-in 420
+  and pinned-host interoperability/negative cases. P0 adds no advertisement,
+  RTSP/SDP changes, codec preference, bitrate behavior or frame-pacing changes.
