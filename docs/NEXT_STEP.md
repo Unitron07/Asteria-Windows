@@ -1,6 +1,6 @@
-# Next step: M1B Vibepollo/PyroWave protocol spike
+# Next step: M1B P0 hardware qualification, then P1 live opt-in 420
 
-M0A native Windows ARM64 is complete based on the owner's real-device validation. M1 identity/rebrand is implemented. **The next development task is M1B groundwork:** pin and inspect the Vibepollo/PyroWave implementation, then define a small, testable Asteria integration boundary. Begin with the [source audit and open questions](M1B_PYROWAVE_SPIKE.md).
+M0A native Windows ARM64 is complete based on the owner's real-device validation. M1 identity/rebrand is implemented. **PR #14 completed the source-diff phase. [PR #16](https://github.com/Unitron07/Asteria-Windows/pull/16) implements the isolated P0 dependency/parser/runtime/offline-decode experiment.** Use the [P0 evidence and remaining gates](M1B_PYROWAVE_SPIKE.md) and [reproduction commands](../tests/pyrowave/README.md); do not repeat broad protocol research or enable live negotiation as part of P0.
 
 ## M1A baseline decision
 
@@ -8,15 +8,15 @@ Moonlight PC's existing performance statistics are sufficient for the initial M1
 
 Do not build a new telemetry subsystem by default. If an investigation needs a metric the existing stats cannot provide reliably, name that metric and the decision it would inform, then add the smallest targeted measurement. Do not alter frame-pacing behavior unless repeatable measurements demonstrate a real problem or a benefit without unacceptable regressions. An M1A baseline can conclude with the existing behavior retained.
 
-## M1B investigation sequence
+## M1B after the offline implementation
 
-1. Pin the host, protocol, codec, and client reference revisions. The [September 24 PyroWave streaming handoff](https://github.com/joemossjr16/pyrowave-streaming) points to a Vibepollo fork and Moonlight Qt/protocol changes; verify the exact refs before implementation.
-2. Trace opt-in negotiation from host capability through RTSP/SDP to selected video format. Confirm how unsupported hosts, disabled settings, and unavailable decoders fall back.
-3. Trace video transport, `PYRW` frame framing, size limits, packet loss/FEC, and decode-unit boundaries; distinguish the private Moonlight container from the upstream PyroWave bitstream.
-4. Audit Windows x64 and native ARM64 Vulkan/PyroWave runtime dependencies, decoder and renderer integration, SDR color and 4:2:0/4:4:4 handling, and HDR metadata or explicit HDR exclusion.
-5. Write a narrow integration proposal and an interoperability test matrix against a pinned host. Preserve Asteria's H.264/HEVC/AV1 paths, pairing, audio, and input.
+1. Complete native ARM64 GPU P0 on actual hardware with a target-native Vulkan loader/ICD. Run the generated 1080p SDR 420 roundtrip, record selected GPU/driver/API, output hashes and three decoder lifetimes. A native hosted parser/load run is valuable but does not qualify GPU decoding.
+2. Qualify presentation and color: the P0 proof supplies a known I420 CPU buffer, not an SDL window or measured live renderer. Confirm SDR BT.709/range, chroma siting, texture upload and visible patterns on both architectures. Add a separate 444 fixture after 420 is established; keep HDR excluded.
+3. Resolve the recorded Session single-format selection/RTSP fallback problem before P1. Keep a validated ordinary-codec candidate and the correct per-decoder properties; a missing SDP mapping or failed setup must recover without feeding PyroWave to FFmpeg or replaying host-app actions.
+4. P1 is a separate focused change: runtime-gated, explicitly opted-in 420 streaming against the pinned Pyrollo host, plus only the minimal reviewed common-c protocol delta on Asteria's current gitlink. No live bits, RTSP/SDP changes or user preference are included in P0.
+5. Before any live offer, test missing/wrong DLL/export/API/driver, unavailable GPU features, absent/partial SCM/SDP, forced standard codecs, HDR, software decoder policy, setup failure after preflight, reconnect/device loss and host encoder failure. Re-run H.264/HEVC/AV1 lifecycle/audio/input and existing-statistics comparisons. Review container overhead, frame/packet limits, FEC/MTU and loss tests before accepting host-controlled allocations.
 
-The [M1B spike notes](M1B_PYROWAVE_SPIKE.md) record confirmed findings and unresolved checks. No PyroWave feature is claimed for Asteria yet.
+The P1 exit gate is a qualified opt-in stream with safe ordinary-codec fallback and measured behavior on named hardware. Normal preview builds continue to exclude PyroWave until those gates are reviewed. Preserve current bitrate and frame pacing.
 
 ## Separate first-preview release checks
 

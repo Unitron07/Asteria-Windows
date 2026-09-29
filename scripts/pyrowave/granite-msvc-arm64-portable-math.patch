@@ -1,0 +1,50 @@
+--- a/math/simd.hpp
++++ b/math/simd.hpp
+@@ -100,7 +100,18 @@
+ 	return vget_lane_f32(merged_half, 0) >= 0.0f;
+ #endif
+ #else
+-#error "Implement me."
++// Portable fallback for targets without Granite's SSE/NEON macro selection,
++	// including native MSVC ARM64. Do not assume GCC's __ARM_NEON macros.
++	for (unsigned i = 0; i < 6; i++)
++	{
++		float d = 0.0f;
++		for (unsigned j = 0; j < 4; j++)
++			d += planes[i][j] * (planes[i][j] > 0.0f ?
++				aabb.get_maximum4()[j] : aabb.get_minimum4()[j]);
++		if (d < 0.0f)
++			return false;
++	}
++	return true;
+ #endif
+ }
+ 
+--- a/math/muglm/muglm.cpp
++++ b/math/muglm/muglm.cpp
+@@ -365,7 +365,12 @@
+ 	vst1q_f32(dst[2].data, a.val[2]);
+ 	vst1q_f32(dst[3].data, a.val[3]);
+ #else
+-	dst = transpose(src);
++	// Avoid the one-argument overload, which calls this function again.
++	const mat4 result(vec4(src[0].x, src[1].x, src[2].x, src[3].x),
++	                  vec4(src[0].y, src[1].y, src[2].y, src[3].y),
++	                  vec4(src[0].z, src[1].z, src[2].z, src[3].z),
++	                  vec4(src[0].w, src[1].w, src[2].w, src[3].w));
++	dst = result;
+ #endif
+ }
+ 
+@@ -413,9 +418,8 @@
+ 	float32x4x4_t r = { r0, r1, r2, r3 };
+ 	vst4q_f32(dst[0].data, r);
+ #else
+-	mat4 m = transpose(src);
+-	for (int i = 0; i < 3; i++)
+-		dst[i] = m[i];
++	const mat4 rows(src[0], src[1], src[2], vec4(0, 0, 0, 1));
++	transpose(dst, rows);
+ #endif
+ }
+ 

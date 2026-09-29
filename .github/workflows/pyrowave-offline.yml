@@ -1,0 +1,129 @@
+name: Optional PyroWave offline P0
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/streaming/video/pyrowave*'
+      - 'tests/pyrowave/**'
+      - 'scripts/build-pyrowave-deps.ps1'
+      - 'scripts/pyrowave/**'
+      - '.github/workflows/pyrowave-offline.yml'
+      - '!**/*.md'
+permissions:
+  contents: read
+concurrency:
+  group: pyrowave-p0-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  offline:
+    name: PyroWave offline ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            platform: x64
+            runner: windows-2025
+          - arch: arm64
+            platform: ARM64
+            runner: windows-11-arm
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: GPU-free parser build and tests
+        shell: pwsh
+        run: |
+          cmake -S tests/pyrowave -B build/parser-${{ matrix.arch }} -G 'Visual Studio 18 2026' -A ${{ matrix.platform }}
+          if ($LASTEXITCODE) { throw 'parser configure failed' }
+          cmake --build build/parser-${{ matrix.arch }} --config Release --parallel 2
+          if ($LASTEXITCODE) { throw 'parser build failed' }
+          ctest --test-dir build/parser-${{ matrix.arch }} -C Release --output-on-failure
+          if ($LASTEXITCODE) { throw 'parser tests failed' }
+      - name: Build exact pinned dependency (unpatched first)
+        id: dependency
+        continue-on-error: ${{ matrix.arch == 'arm64' }}
+        shell: pwsh
+        run: ./scripts/build-pyrowave-deps.ps1 -Architecture '${{ matrix.arch }}' -UnpatchedArm64
+      - name: Retry documented ARM64 portable math compatibility patch
+        if: matrix.arch == 'arm64' && steps.dependency.outcome == 'failure'
+        shell: pwsh
+        run: |
+          $log = Get-Content build/pyrowave/arm64/evidence/dependency.log -Raw
+          if ($log -notmatch 'simd.hpp.*C1189|muglm.cpp.*C2665') { throw 'Dependency failure was not the known portable math blocker; retain original evidence' }
+          ./scripts/build-pyrowave-deps.ps1 -Architecture arm64 -OutputRoot build/pyrowave-patched
+      - name: Compile and link experimental runtime probe
+        shell: pwsh
+        run: |
+          $root = if (Test-Path build/pyrowave-patched/arm64/install/bin/libpyrowave-shared-0.dll) { 'build/pyrowave-patched' } else { 'build/pyrowave' }
+          $deps = (Resolve-Path "$root/${{ matrix.arch }}").Path
+          "PYROWAVE_DEPS=$deps" >> $env:GITHUB_ENV
+          cmake -S tests/pyrowave -B build/probe-${{ matrix.arch }} -G 'Visual Studio 18 2026' -A ${{ matrix.platform }} -DPYROWAVE_EXPERIMENTAL=ON "-DPYROWAVE_ROOT=$deps/install" "-DVULKAN_HEADERS=$deps/source/Granite/third_party/khronos/vulkan-headers/include" "-DGRANITE_ROOT=$deps/source/Granite" "-DGRANITE_BUILD=$deps/build/Granite"
+          if ($LASTEXITCODE) { throw 'probe configure failed' }
+          cmake --build build/probe-${{ matrix.arch }} --config Release --parallel 2
+          if ($LASTEXITCODE) { throw 'probe build failed' }
+          ctest --test-dir build/probe-${{ matrix.arch }} -C Release --output-on-failure
+          if ($LASTEXITCODE) { throw 'offline tests failed' }
+      - name: Verify PE types, no codec startup import, and runtime load
+        shell: pwsh
+        run: |
+          . ./scripts/pyrowave/pe-machine.ps1
+          $exe = (Resolve-Path 'build/probe-${{ matrix.arch }}/Release/pyrowave-offline-proof.exe').Path
+          Assert-PyroWavePe $exe '${{ matrix.arch }}' | ConvertTo-Json | Set-Content "$env:PYROWAVE_DEPS/evidence/probe-pe.json"
+          $compiler = Get-Content "$env:PYROWAVE_DEPS/evidence/build.json" -Raw | ConvertFrom-Json
+          $dumpbin = Join-Path (Split-Path $compiler.compiler -Parent) 'dumpbin.exe'
+          $imports = & $dumpbin /imports $exe
+          if ($LASTEXITCODE) { throw 'probe import inspection failed' }
+          $imports | Set-Content "$env:PYROWAVE_DEPS/evidence/probe-imports.txt"
+          if ($imports -match 'libpyrowave-shared|vulkan-1\.dll') { throw 'Probe has a forbidden startup dependency' }
+          & $exe --load "$env:PYROWAVE_DEPS/install/bin" | Tee-Object "$env:PYROWAVE_DEPS/evidence/runtime-load.txt"
+          if ($LASTEXITCODE) { throw 'runtime load test failed' }
+      - name: Install Qt x64 host kit for qmake compile
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          host: windows
+          version: '6.11.2'
+          arch: win64_msvc2022_64
+          cache: true
+          set-env: false
+          add-tools-to-path: false
+          aqtsource: git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e
+      - name: Install matching Qt ARM64 target kit
+        if: matrix.arch == 'arm64'
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          host: windows
+          version: '6.11.2'
+          arch: win64_msvc2022_arm64_cross_compiled
+          cache: true
+          set-env: false
+          add-tools-to-path: false
+          aqtsource: git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e
+      - name: Compile experiment through existing Qt/qmake toolchain
+        shell: pwsh
+        run: ./scripts/test-pyrowave-qmake.ps1 -Architecture '${{ matrix.arch }}' -QtRoot '${{ runner.workspace }}/Qt/6.11.2' -DependencyRoot $env:PYROWAVE_DEPS
+      - name: Attempt roundtrip (hosted runner GPU may be unavailable)
+        shell: pwsh
+        run: |
+          & ./build/probe-${{ matrix.arch }}/Release/pyrowave-offline-proof.exe --roundtrip "$env:PYROWAVE_DEPS/install/bin" "$env:PYROWAVE_DEPS/evidence/roundtrip" 2>&1 | Tee-Object "$env:PYROWAVE_DEPS/evidence/roundtrip.txt"
+          $code = $LASTEXITCODE
+          @{exitCode=$code; architecture='${{ matrix.arch }}'; runtimeQualified=$false; note='Inspect hardware/driver and decode output; hosted build alone is not GPU qualification'} | ConvertTo-Json | Set-Content "$env:PYROWAVE_DEPS/evidence/roundtrip-result.json"
+          if ($code -ne 0 -and $code -ne 77) { throw 'Roundtrip failed after runtime availability; inspect evidence' }
+          # Only an explicitly unavailable Vulkan device is a recorded skip.
+          exit 0
+      - name: Upload experimental binaries and evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: pyrowave-p0-${{ matrix.arch }}-${{ github.run_id }}
+          path: |
+            build/pyrowave*/${{ matrix.arch }}/evidence/
+            build/pyrowave*/${{ matrix.arch }}/install/
+            build/probe-${{ matrix.arch }}/Release/pyrowave-offline-proof.exe
+            build/probe-${{ matrix.arch }}/Testing/
+            build/parser-${{ matrix.arch }}/Release/pyrowave-parser-tests.exe
+            build/parser-${{ matrix.arch }}/Testing/
+          if-no-files-found: warn
