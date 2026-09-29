@@ -97,6 +97,79 @@ Windows 10 x64 still needs its own declared minimum OS/runtime and hardware qual
 
 The release includes `SHA256SUMS.txt`, symbols, recursive corresponding-source snapshots, and architecture/build evidence for each target. The owner confirmed the completed x64 and ARM64 CI builds work. The previously recorded Surface Pro 11th Edition native-process and repeated Apollo AV1 comparison remains evidence for that setup; exact artifact hashes and several host/client details for that earlier comparison were not recorded. No clean-machine or full functional-matrix result was supplied, so this preview does not claim broad qualification. The executable's inherited 6.1.0 metadata and bundled development-baseline provenance notice refer to the Moonlight-based build; `v0.1.0-preview.1` is Asteria's public preview version. No installer was shipped.
 
+## M1B P0 offline PyroWave validation
+
+**Complete: offline dependency/runtime/parser/decode proof.** The source-diff
+groundwork from PR #14 and the P0 implementation merged in
+[PR #16](https://github.com/Unitron07/Asteria-Windows/pull/16) are complete. Final
+P0 head before merge: `a02902fb58ac66ae4820373dd3978d3087de7d24`. This post-release
+experiment is separate from v0.1.0-preview.1 at
+`34dfd937528586babded200fafaee535e21d4a40` and changes no normal release behavior.
+
+| Final CI evidence at the P0 head | Result |
+| --- | --- |
+| [Optional PyroWave P0 run 36515183774](https://github.com/Unitron07/Asteria-Windows/actions/runs/36515183774) | Pass: x64 and native ARM64 dependency builds, parser/runtime/compatibility tests, load/reload, PE/import checks, and qmake probes |
+| [Baseline push run 36515181039](https://github.com/Unitron07/Asteria-Windows/actions/runs/36515181039) | Pass |
+| [Baseline PR run 36515184040](https://github.com/Unitron07/Asteria-Windows/actions/runs/36515184040) | Pass |
+
+Hosted build/test success is distinct from GPU qualification: earlier hosted
+roundtrips explicitly recorded unavailable Vulkan (exit 77). The real-hardware
+GPU results below supply the offline decode evidence.
+
+| Offline hardware result | Windows x64 | Native Windows ARM64 |
+| --- | --- | --- |
+| Device / GPU | Windows 11 build 26200 / NVIDIA RTX 4070 Ti | Surface Pro 11th Edition / Snapdragon X Plus / Qualcomm Adreno X1-85 |
+| Runtime artifact | Verified x64 artifact from run 36514467221 | Native ARM64 CI artifact, `probe-arm64/Release` and `pyrowave-patched/arm64/install/bin` |
+| Restricted runtime load | API 0.6.0; load/reload passed | API 0.6.0; required exports and load/reload passed |
+| Vulkan device | NVIDIA adapter/device creation succeeded | Qualcomm Adreno X1-85 adapter/device creation succeeded |
+| Generated PYRW frame | 60,312 bytes | 60,312 bytes |
+| Decoded output | 1920×1080, 8-bit SDR 4:2:0 I420 | 1920×1080, 8-bit SDR 4:2:0 I420 |
+| Plane sizes | Y = 2,073,600; U = 518,400; V = 518,400 bytes | Y = 2,073,600; U = 518,400; V = 518,400 bytes |
+| Mean absolute sample error | **0.000694444** | **0.00104167** |
+| Lifetimes and malformed input | Three decoder cycles; rejection and recovery passed | Three decoder cycles; rejection and recovery passed |
+| Presentation | Known CPU buffer copied; no SDL window/pacing test | Known CPU buffer copied; no SDL window/pacing test |
+
+The ARM64 owner-reported adapter record is `vendorID=20803`,
+`deviceID=909329200`, `driverVersion=2151112704`, `apiVersion=4210983` (raw
+Vulkan integers). The exact commands from the extracted CI artifact root were:
+
+```powershell
+.\probe-arm64\Release\pyrowave-offline-proof.exe --load ".\pyrowave-patched\arm64\install\bin"
+.\probe-arm64\Release\pyrowave-offline-proof.exe --roundtrip ".\pyrowave-patched\arm64\install\bin" ".\roundtrip-output"
+```
+
+Cycles 0, 1, and 2 each reported the same frame size, extent, plane sizes, and
+ARM64 MAE above. Each `PyroWave P0: nonzero reserved byte` diagnostic was an
+intentional malformed-frame rejection, followed by successful recovery; these
+lines are not failures. Final result:
+`PASS: known CPU pixel buffer copied; SDL IYUV-compatible (no SDL window/pacing test)`.
+The native ARM64 artifact's successful GPU decode validates this Snapdragon/
+Adreno hardware, not merely an ARM64 build or loader probe. ARM64 OS build,
+Windows display-driver version, artifact hash, and generated output hashes
+were not supplied; no values are inferred from the x64 record.
+
+The original codec fork returned 404. The helper prefers
+[the original source](https://github.com/joemossjr16/pyrowave) at exact commit
+`f6fb84eb0d8538f43f6f54e58d2040d101c8676c`, then uses the verified Git bundle
+with SHA-256
+`e4387ce6b691724aa342d6df7677f51efffe30e98e3949415718e7b2b955c56e`.
+This is a clean audited source-history/content snapshot preserving license and
+provenance, not a built codec binary. Optional CI checks the expected commit
+and checksum; moving HEAD or a different revision is not an accepted substitute.
+See [bundle provenance](../scripts/pyrowave/README.md) and the
+[spike evidence](M1B_PYROWAVE_SPIKE.md) for all dependency pins, toolchain,
+patch/import inventory, and x64 hashes.
+
+**Remaining scope:** PyroWave is experimental and off by default; normal
+releases do not ship active PyroWave streaming support. SDL presentation,
+display color/range/chroma correctness, pacing, 4:4:4, device-loss/recovery,
+production latency/performance comparison, and final runtime shipping/package
+policy are not yet qualified. HDR is excluded. Live RTSP/SDP negotiation is
+not implemented, and no Apollo/Vibepollo end-to-end PyroWave stream is validated.
+The next gate is [P0.5 presentation qualification](NEXT_STEP.md), then a
+separate P1 live opt-in integration with safe standard-codec fallback and
+H.264/HEVC/AV1 regressions.
+
 ## Release checklist
 
 - [x] M0 x64 upstream and candidate CI builds pass; see run 34736992552.

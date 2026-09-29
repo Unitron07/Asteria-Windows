@@ -26,14 +26,14 @@ The owner confirmed the completed x64 and ARM64 builds work. Earlier native ARM6
 2. **M0A — native Windows ARM64:** complete; CI/package architecture checks and owner-verified native ARM64 execution with Apollo AV1 streaming on a Surface Pro 11th Edition are recorded.
 3. **M1 — Asteria identity and desktop workflow:** identity/rebrand implemented; profiles, configurable shortcuts, and additional session workflows remain planned.
 4. **M1A — Windows performance baseline:** use Moonlight's built-in statistics for initial Asteria ARM64 versus emulated x64 Moonlight comparisons. The owner's repeated AV1 runs are initial evidence of stream parity, not a controlled benchmark. Add instrumentation only for a concrete missing metric; change frame pacing only when measurements show a real problem or benefit.
-5. **M1B — experimental PyroWave streaming:** next development task is a focused Vibepollo/PyroWave protocol spike. The codec remains optional and unimplemented in Asteria; see [the spike notes](docs/M1B_PYROWAVE_SPIKE.md).
+5. **M1B — experimental PyroWave:** source-diff groundwork and P0 offline proof are complete: pinned dependency build, bounded parser, dynamic runtime loading, and GPU decode on x64 and native ARM64. ARM64 was validated on a Surface Pro 11th Edition / Snapdragon X Plus / Adreno X1-85. The next gate is SDL presentation and SDR color/range/chroma correctness, recreation/device loss, separate 4:4:4 qualification, and runtime deployment review; P1 opt-in live negotiation follows. See [the spike evidence](docs/M1B_PYROWAVE_SPIKE.md) and [next step](docs/NEXT_STEP.md).
 6. **M2 — pointer/scaling correctness and Apollo capability parsing:** planned.
 7. **M3 — Apollo text clipboard and virtual-display requests:** planned. 
 8. **M4 — Apollo server commands:** planned.
 9. **M5 — release qualification:** apply checks to each release's advertised scope.
 10. **M6 — Asteria VR (remote PCVR):** planned after core streaming and performance work, with separate proof-of-concept and headset qualification gates.
 
-Profiles, performance changes, PyroWave, Apollo extensions, and Asteria VR are not prerequisites for this initial preview. PyroWave and Asteria VR are planned, not implemented or qualified. Touch-overlay parity, simultaneous multi-stream viewing, and file transfer are later work.
+Profiles, performance changes, PyroWave, Apollo extensions, and Asteria VR are not prerequisites for this initial preview. PyroWave remains experimental and off by default: live PyroWave streaming is not implemented, and normal Asteria releases do not ship active PyroWave streaming support. Its offline proof does not qualify presentation, pacing, or production performance; PyroWave HDR remains excluded. Asteria VR, touch-overlay parity, simultaneous multi-stream viewing, and file transfer are later work.
 
 ### Planned Asteria VR
 

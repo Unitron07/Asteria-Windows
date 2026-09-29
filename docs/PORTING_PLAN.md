@@ -1,6 +1,6 @@
 # Porting plan
 
-Updated after owner validation: Asteria identity and x64/ARM64 CI packaging are implemented, and M0A native Windows ARM64 is complete on the recorded Surface Pro 11th Edition. M1A starts with Moonlight's existing performance statistics; M1B protocol groundwork is the next development task. First-preview release checks remain separate. Completed integration items are checked below; build and test evidence lives in [BASELINE.md](BASELINE.md).
+Updated after owner validation: Asteria identity and x64/ARM64 CI packaging are implemented, and M0A native Windows ARM64 is complete on the recorded Surface Pro 11th Edition. M1A starts with Moonlight's existing performance statistics. M1B source-diff groundwork and P0 offline proof are complete on x64 and native ARM64; P0.5 presentation qualification is next. [v0.1.0-preview.1](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0-preview.1) is released for both targets. Completed items are checked below; baseline evidence lives in [BASELINE.md](BASELINE.md), and PyroWave hardware evidence in [VALIDATION.md](VALIDATION.md#m1b-p0-offline-pyrowave-validation).
 
 ## Review outcome
 
@@ -10,9 +10,9 @@ The original choice to reuse Moonlight's Windows streaming stack is sound. The r
 
 ## Scope and dependency order
 
-M0 is merged and M0A native ARM64 is complete based on owner-verified process architecture and Apollo AV1 streaming on real hardware. M1 identity is implemented, while its profiles/session work and M1A–M4 (including the optional M1B PyroWave milestone) remain planned. Apply M5 qualification to the initial preview's inherited streaming and identity scope; later feature milestones are not prerequisites for that preview. Clipboard (M3) depends on capability work in M2. Performance changes must follow measurements, and a cross-build alone does not complete M0A. M6 Asteria VR follows the core streaming and performance baselines as a separate later feature; it does not depend on M1B PyroWave or the M2–M4 Apollo extensions.
+M0 is merged and M0A native ARM64 is complete based on owner-verified process architecture and Apollo AV1 streaming on real hardware. M1 identity is implemented; its profiles/session work, M1A performance work, and M2–M4 remain planned. M1B has completed source-diff groundwork and P0 offline proof; presentation qualification and live integration remain open. Apply M5 qualification to the initial preview's inherited streaming and identity scope; later feature milestones are not prerequisites for that preview. Clipboard (M3) depends on capability work in M2. Performance changes must follow measurements, and a cross-build alone does not complete M0A. M6 Asteria VR follows the core streaming and performance baselines as a separate later feature; it does not depend on M1B PyroWave or the M2–M4 Apollo extensions.
 
-Primary targets: **Windows 11 x64 and native ARM64**, both intended for the first preview. Native ARM64 means the client and its process-loaded runtime DLLs run as ARM64, without x64 emulation; cross-compiling on an x64 build host is acceptable. Windows 10 x64 remains a separate compatibility target pending runtime documentation and real-machine tests. Record exact minimum OS builds before publishing qualified binaries. M0A completion is specific to the recorded device and workload, not a broad ARM64 support matrix.
+Primary targets: **Windows 11 x64 and native ARM64**, both included in v0.1.0-preview.1. Native ARM64 means the client and its process-loaded runtime DLLs run as ARM64, without x64 emulation; cross-compiling on an x64 build host is acceptable. Windows 10 x64 remains a separate compatibility target pending runtime documentation and real-machine tests. Record exact minimum OS builds before publishing qualified binaries. M0A completion is specific to the recorded device and workload, not a broad ARM64 support matrix.
 
 The first public preview covers inherited Moonlight streaming and the implemented Asteria identity, delivered as x64 and native ARM64 portable ZIPs after release-specific validation. Desktop profiles, additional session actions, measured frame-pacing changes, Apollo clipboard, virtual-display controls, and host commands remain later roadmap work. Touch overlays, file transfer, simultaneous multiple streams, and a host companion service are outside the first release.
 
@@ -79,19 +79,38 @@ The goal is not to blindly copy Artemis Android decoder tweaks. Artemis Android 
 
 **Deliverable:** benchmark procedure and upstream-vs-Asteria results based on existing statistics, plus only justified diagnostics or pacing changes.
 
-## M1B — Experimental PyroWave streaming with Vibepollo
+## M1B — Experimental PyroWave
 
-**Status:** protocol groundwork is the next development task. This optional codec milestone is independent of M2–M4 Apollo features and is not required for the first public preview. See the [M1B source audit](M1B_PYROWAVE_SPIKE.md).
+**Status:** source-diff groundwork and **P0 offline dependency/runtime/parser/decode proof are complete**, merged in [PR #16](https://github.com/Unitron07/Asteria-Windows/pull/16). PyroWave remains experimental and off by default. Normal Asteria releases do not ship active PyroWave streaming support. This optional milestone is independent of M2–M4 and was not required for v0.1.0-preview.1. See the [spike evidence](M1B_PYROWAVE_SPIKE.md) and [next step](NEXT_STEP.md).
 
-- [ ] Pin the PyroWave implementation and a Vibepollo host revision. Verify licensing, actual codec negotiation, frame transport, color metadata, and compatibility with this fork's Moonlight protocol core.
-- [ ] Add opt-in codec negotiation and an isolated Windows GPU decoder/presentation path. Select PyroWave only when host and client support are confirmed; retain H.264/HEVC/AV1 and recoverable fallback.
-- [ ] Validate Vulkan/runtime packaging and x64/native ARM64 builds. Qualify each architecture on actual hardware before advertising support.
-- [ ] Compare latency, decode/present time, drops, GPU use, bandwidth, and network queuing against existing codecs on the same host, client, network, and workload.
-- [ ] Test reconnect, resolution and frame-rate changes, SDR/HDR and chroma where supported, and regression coverage with standard Apollo streams.
+### P0 complete: offline codec/runtime validation
 
-**Exit gate:** an opt-in stream works with a pinned Vibepollo build on qualified Windows hardware, measurements and limitations are recorded, and existing codec paths still work. If interoperability or measured benefit is insufficient, leave it experimental and out of release builds.
+- [x] Complete the source diff, pin the codec/dependency graph and reference host, and record protocol/licensing/provenance findings.
+- [x] Build the exact pinned dependencies for x64 and native ARM64, including the isolated ARM64 portable-math compatibility patch and source-history recovery bundle.
+- [x] Implement the bounded GPU-free PYRW parser, restricted dynamic runtime loading, API/export checks, and parser/runtime/compatibility tests under an off-by-default experimental build flag.
+- [x] Validate x64 offline 1920×1080 SDR 4:2:0 GPU decode on Windows 11 / RTX 4070 Ti (MAE 0.000694444).
+- [x] Validate native Windows ARM64 offline 1920×1080 SDR 4:2:0 GPU decode on Surface Pro 11th Edition / Snapdragon X Plus / Adreno X1-85 (MAE 0.00104167).
 
-**Deliverable:** protocol spike, isolated integration, benchmark results, and a documented support matrix.
+Both hardware proofs passed three decoder lifetimes and malformed-frame rejection/recovery into known I420 CPU buffers. They do not qualify SDL presentation or live end-to-end streaming.
+
+### P0.5 next: hardware/presentation qualification
+
+- [ ] Exercise real SDL IYUV presentation on x64 and ARM64; verify SDR color/range/chroma siting with visible test patterns and record pacing behavior.
+- [ ] Test resize, decoder/device recreation, repeated runtime lifetimes, and device-loss/recovery behavior.
+- [ ] Qualify 4:4:4 separately after 4:2:0; keep HDR excluded.
+- [ ] Review runtime deployment/import closure, clean-machine CRT/Vulkan requirements, licenses, and packaging/shipping policy.
+
+### P1 planned: opt-in live integration
+
+- [ ] Add explicit opt-in, runtime-gated advertisement, and the minimal reviewed capability/RTSP/SDP/common-c changes on Asteria's current gitlink.
+- [ ] Implement safe decoder selection and standard H.264/HEVC/AV1 fallback/reconnect, with correct per-decoder properties and no replay of host-app actions.
+- [ ] Validate interoperability against the pinned PyroWave-enabled Pyrollo host; no Apollo/Vibepollo end-to-end PyroWave stream is yet validated.
+- [ ] Exercise negative negotiation/runtime cases and H.264/HEVC/AV1 lifecycle/audio/input regressions on both targets. Preserve current bitrate and frame pacing.
+- [ ] Compare production latency, decode/present time, drops, GPU use, bandwidth, and network queuing against standard codecs under the same conditions.
+
+**Live exit gate:** a qualified opt-in stream works with the pinned host on named hardware, safe fallback and regressions pass, and measurements/limitations are recorded. P1 has not started. Keep PyroWave experimental and out of normal release behavior until these gates and shipping policy are reviewed.
+
+**Deliverables:** completed source diff and P0 offline proof; next, presentation/color results; later, live integration, benchmarks, and a qualified support matrix.
 
 ## M2 — Pointer/scaling correctness and Apollo capability foundation
 
@@ -125,7 +144,7 @@ The goal is not to blindly copy Artemis Android decoder tweaks. Artemis Android 
 - [ ] When M1B PyroWave support is included, qualify the host/client/GPU support matrix, runtime packaging, codec fallback, and comparisons; keep it experimental until evidenced.
 - [ ] When M1A performance changes are included, re-run the candidate-to-upstream performance comparison using the same hardware, host, display mode, codec, network, and workload for release candidates.
 - [ ] Complete required [functional and performance checks](VALIDATION.md), including GPU-specific paths available for the claimed support matrix.
-- [ ] Produce separate x64 and native ARM64 portable ZIPs for the first preview, with runtime dependencies, version information, hashes, symbols, notices, and corresponding source including pinned submodule contents. Publish exact build steps and known limitations for each architecture. Do not label an x64-emulated build as the ARM64 release.
+- [x] Publish v0.1.0-preview.1 as separate x64 and native ARM64 portable ZIPs, with hashes, symbols, notices, corresponding source including submodules, and architecture/build evidence; see the [release record](VALIDATION.md#first-public-preview-record-2026-09-25). Repeat artifact checks and publish build steps/limitations for each later release.
 - [ ] Validate ZIP data location, update, and clean-machine launch. Adapt upstream installer infrastructure after the portable preview is stable; test install/upgrade/uninstall and preservation of user data.
 - [ ] Sign public stable executables/installers when release credentials are provisioned. Treat signing as a release gate, not a dependency for local development or clearly labeled unsigned previews.
 
@@ -158,4 +177,4 @@ Keep feature PRs small and avoid mass renames of upstream source directories. Re
 - Overlay rendering approach: choose only after testing the existing video-window integration and latency impact.
 - Touch-device qualification beyond the baseline keyboard/mouse/gamepad cases remains later work.
 
-Do not attach calendar estimates until the ARM64 baseline, Windows performance experiments, and Apollo protocol spikes identify actual effort. The next concrete development task is the M1B Vibepollo/PyroWave protocol spike. M1A initial comparisons use Moonlight's existing statistics; new instrumentation or frame-pacing changes require a measured reason. Same-commit x64 smoke testing and detailed Apollo/hardware records remain first-preview release checks. M1 identity/storage isolation is implemented; profiles, session workflows, M1A–M4 (including M1B PyroWave), and M6 Asteria VR remain future implementation work.
+Do not attach calendar estimates until the ARM64 baseline, Windows performance experiments, and Apollo protocol spikes identify actual effort. The next concrete development task is M1B P0.5 presentation/color qualification, followed by a separate P1 live opt-in negotiation change. M1A initial comparisons use Moonlight's existing statistics; new instrumentation or frame-pacing changes require a measured reason. Same-commit x64 smoke testing and detailed Apollo/hardware records remain first-preview release checks. M1 identity/storage isolation is implemented; profiles, session workflows, M1A performance work, M1B presentation/live integration, M2–M4, and M6 Asteria VR remain future work.
