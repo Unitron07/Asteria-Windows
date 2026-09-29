@@ -23,6 +23,7 @@ int main(int argc, char** argv) {
         std::cout << "PASS: unload/reload\n"; return 0;
     }
     if (!runtime.createDecoder(1920,1080)) return 1;
+    std::cout << "Vulkan adapter: " << runtime.deviceDescription() << '\n';
     std::vector<std::uint8_t> frame;
     if (!runtime.generateProofFrame(frame)) return 1;
     for (int cycle=0;cycle<3;++cycle) {

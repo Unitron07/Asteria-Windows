@@ -29,6 +29,7 @@ public:
     void resetDecoder();
     void close();
     const std::string& error() const { return m_Error; }
+    const std::string& deviceDescription() const { return m_DeviceDescription; }
 
     // Offline proof only: resolves encoder exports lazily and generates a frame
     // with this exact loaded codec. Does not accept host or Session inputs.
@@ -42,6 +43,7 @@ private:
         decltype(&pyrowave_get_api_version) version = nullptr;
         decltype(&pyrowave_create_default_device) createDevice = nullptr;
         decltype(&pyrowave_device_destroy) destroyDevice = nullptr;
+        decltype(&pyrowave_device_get_vk_device_handles) deviceHandles = nullptr;
         decltype(&pyrowave_decoder_create) createDecoder = nullptr;
         decltype(&pyrowave_decoder_destroy) destroyDecoder = nullptr;
         decltype(&pyrowave_decoder_clear) clear = nullptr;
@@ -50,10 +52,12 @@ private:
         decltype(&pyrowave_decoder_decode_cpu_buffer_synchronous) decode = nullptr;
     } m_Api;
     void* m_Module = nullptr;
+    void* m_Vulkan = nullptr;
     pyrowave_device m_Device = nullptr;
     pyrowave_decoder m_Decoder = nullptr;
     int m_Width = 0;
     int m_Height = 0;
     std::string m_Error;
+    std::string m_DeviceDescription;
 };
 }

@@ -4,7 +4,7 @@ param(
     [string]$OutputRoot = (Join-Path (Split-Path $PSScriptRoot -Parent) 'build/pyrowave'),
     [string]$CMake = 'cmake',
     [string]$Generator,
-    [switch]$ApplyArm64CompatibilityPatch
+    [switch]$UnpatchedArm64
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'pyrowave/pe-machine.ps1')
@@ -90,8 +90,7 @@ foreach ($arch in $Architecture) {
         }
         $hashes | ConvertTo-Json | Set-Content (Join-Path $evidence 'sources.json') -Encoding utf8
         $patchHash = $null
-        if ($ApplyArm64CompatibilityPatch) {
-            if ($arch -ne 'arm64') { throw 'The optional compatibility patch is ARM64 only' }
+        if ($arch -eq 'arm64' -and !$UnpatchedArm64) {
             $patch = Join-Path $PSScriptRoot 'pyrowave/granite-msvc-arm64-portable-math.patch'
             Invoke-Native git @('-C',$granite,'apply','--check',$patch)
             Invoke-Native git @('-C',$granite,'apply',$patch)
@@ -132,7 +131,7 @@ foreach ($arch in $Architecture) {
         [pscustomobject]@{architecture=$arch; configuration='MSVC Release'; codecOrigin=$codecOrigin;
             cmake=$cmakeVersion; cmakePath=$cmakePath; cmakeSha256=(Get-FileHash $cmakePath).Hash;
             compiler=$compiler; compilerSha256=(Get-FileHash $compiler).Hash;
-            windowsSdk=([xml](Get-Content (Join-Path $build 'pyrowave-shared.vcxproj') -Raw)).Project.PropertyGroup.WindowsTargetPlatformVersion;
+            windowsSdk=(@(([xml](Get-Content (Join-Path $build 'pyrowave-shared.vcxproj') -Raw)).Project.PropertyGroup | ForEach-Object { $_.WindowsTargetPlatformVersion } | Where-Object { $_ }) | Select-Object -First 1);
             options=$options; patchSha256=$patchHash; os=[Environment]::OSVersion.VersionString;
             workflowRun=$env:GITHUB_RUN_ID} | ConvertTo-Json -Depth 4 |
             Set-Content (Join-Path $evidence 'build.json') -Encoding utf8

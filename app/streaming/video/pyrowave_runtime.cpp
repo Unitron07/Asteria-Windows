@@ -48,6 +48,7 @@ bool Runtime::load(const std::filesystem::path& directory) {
 #define RESOLVE(member, name) m_Api.member = reinterpret_cast<decltype(m_Api.member)>(symbol(#name)); if (!m_Api.member) { close(); return false; }
     RESOLVE(createDevice, pyrowave_create_default_device)
     RESOLVE(destroyDevice, pyrowave_device_destroy)
+    RESOLVE(deviceHandles, pyrowave_device_get_vk_device_handles)
     RESOLVE(createDecoder, pyrowave_decoder_create)
     RESOLVE(destroyDecoder, pyrowave_decoder_destroy)
     RESOLVE(clear, pyrowave_decoder_clear)
@@ -67,6 +68,9 @@ void Runtime::close() {
     m_Device = nullptr;
     if (m_Module) FreeLibrary(static_cast<HMODULE>(m_Module));
     m_Module = nullptr; m_Api = {};
+    if (m_Vulkan) FreeLibrary(static_cast<HMODULE>(m_Vulkan));
+    m_Vulkan = nullptr;
+    m_DeviceDescription.clear();
 }
 bool Runtime::createDecoder(int width, int height) {
     resetDecoder();
@@ -74,8 +78,27 @@ bool Runtime::createDecoder(int width, int height) {
     if (!m_Module) return fail("runtime is not loaded");
     // Fixed P0 extent. Broader stream dimensions/color contracts are a later gate.
     if (width != 1920 || height != 1080) return fail("P0 decoder accepts only 1920x1080 SDR 420");
+    // volk at this pin calls LoadLibraryA("vulkan-1.dll"). Preload only the system
+    // loader so that indirect call cannot select a loader from CWD or PATH.
+    if (!m_Vulkan) {
+        m_Vulkan = LoadLibraryExW(L"vulkan-1.dll",nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if (!m_Vulkan) return fail("native system Vulkan loader unavailable, Windows error " + std::to_string(GetLastError()));
+    }
     if (!m_Device && !check(m_Api.createDevice(&m_Device), "device creation")) { close(); return false; }
     if (!m_Device) return fail("device creation returned a null device");
+    auto getProc = reinterpret_cast<PFN_vkGetInstanceProcAddr>(
+        GetProcAddress(static_cast<HMODULE>(m_Vulkan),"vkGetInstanceProcAddr"));
+    VkInstance instance=VK_NULL_HANDLE; VkPhysicalDevice physical=VK_NULL_HANDLE;
+    m_Api.deviceHandles(m_Device,&instance,&physical,nullptr);
+    if (!getProc || !instance || !physical) return fail("cannot inspect selected Vulkan adapter");
+    auto getProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties>(
+        getProc(instance,"vkGetPhysicalDeviceProperties"));
+    if (!getProperties) return fail("Vulkan physical-device properties entry point unavailable");
+    VkPhysicalDeviceProperties properties{};
+    getProperties(physical,&properties);
+    m_DeviceDescription=std::string(properties.deviceName) + " vendorID=" + std::to_string(properties.vendorID) +
+        " deviceID=" + std::to_string(properties.deviceID) + " driverVersion=" + std::to_string(properties.driverVersion) +
+        " apiVersion=" + std::to_string(properties.apiVersion);
     pyrowave_decoder_create_info info{};
     info.device=m_Device; info.width=width; info.height=height;
     info.chroma=PYROWAVE_CHROMA_SUBSAMPLING_420; info.fragment_path=false;

@@ -46,14 +46,14 @@ jobs:
         id: dependency
         continue-on-error: ${{ matrix.arch == 'arm64' }}
         shell: pwsh
-        run: ./scripts/build-pyrowave-deps.ps1 -Architecture '${{ matrix.arch }}'
+        run: ./scripts/build-pyrowave-deps.ps1 -Architecture '${{ matrix.arch }}' -UnpatchedArm64
       - name: Retry documented ARM64 portable math compatibility patch
         if: matrix.arch == 'arm64' && steps.dependency.outcome == 'failure'
         shell: pwsh
         run: |
           $log = Get-Content build/pyrowave/arm64/evidence/dependency.log -Raw
           if ($log -notmatch 'simd.hpp.*C1189|muglm.cpp.*C2665') { throw 'Dependency failure was not the known portable math blocker; retain original evidence' }
-          ./scripts/build-pyrowave-deps.ps1 -Architecture arm64 -OutputRoot build/pyrowave-patched -ApplyArm64CompatibilityPatch
+          ./scripts/build-pyrowave-deps.ps1 -Architecture arm64 -OutputRoot build/pyrowave-patched
       - name: Compile and link experimental runtime probe
         shell: pwsh
         run: |
@@ -80,6 +80,28 @@ jobs:
           if ($imports -match 'libpyrowave-shared|vulkan-1\.dll') { throw 'Probe has a forbidden startup dependency' }
           & $exe --load "$env:PYROWAVE_DEPS/install/bin" | Tee-Object "$env:PYROWAVE_DEPS/evidence/runtime-load.txt"
           if ($LASTEXITCODE) { throw 'runtime load test failed' }
+      - name: Install Qt x64 host kit for qmake compile
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          version: '6.11.2'
+          arch: win64_msvc2022_64
+          cache: true
+          set-env: false
+          add-tools-to-path: false
+          aqtsource: git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e
+      - name: Install matching Qt ARM64 target kit
+        if: matrix.arch == 'arm64'
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          version: '6.11.2'
+          arch: win64_msvc2022_arm64_cross_compiled
+          cache: true
+          set-env: false
+          add-tools-to-path: false
+          aqtsource: git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e
+      - name: Compile experiment through existing Qt/qmake toolchain
+        shell: pwsh
+        run: ./scripts/test-pyrowave-qmake.ps1 -Architecture '${{ matrix.arch }}' -QtRoot '${{ runner.workspace }}/Qt/6.11.2' -DependencyRoot $env:PYROWAVE_DEPS
       - name: Attempt roundtrip (hosted runner GPU may be unavailable)
         shell: pwsh
         run: |
