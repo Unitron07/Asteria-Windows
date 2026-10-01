@@ -48,7 +48,9 @@ def verify_pe(data, expected, architecture):
         for i in range(named + ids):
             key, target = struct.unpack_from("<II", data, base + relative + 16 + i * 8)
             if key & 0x80000000:
-                continue  # Only numeric icon/group resource IDs are relevant.
+                name_offset = base + (key & 0x7FFFFFFF)
+                length = struct.unpack_from("<H", data, name_offset)[0]
+                key = data[name_offset + 2:name_offset + 2 + length * 2].decode("utf-16le")
             if target & 0x80000000:
                 walk(target & 0x7FFFFFFF, path + (key,))
             else:
