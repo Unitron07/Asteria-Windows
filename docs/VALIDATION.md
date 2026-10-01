@@ -1,159 +1,110 @@
-# P0-R Vibepollo compatibility contract
+# Validation and release evidence
 
-## M1B P1a implementation / live qualification pending
+## M1B P1a live integration validation
 
-The explicit **PyroWave (Experimental)** live path is implemented behind
-`CONFIG+=pyrowave_experimental`. Live owner qualification remains **PENDING**;
-build/test evidence is recorded in [VALIDATION.md](VALIDATION.md). The implementation
-is **COMPLETE / READY FOR HARDWARE INTEROPERABILITY TEST**: both optional client
-builds and baseline CI pass as recorded there. P0-R and P0.5 qualification history is unchanged.
+Implementation is **COMPLETE / READY FOR HARDWARE INTEROPERABILITY TEST** behind
+the explicit optional build flag. Live owner
+Vibepollo qualification is **PENDING** on RTX 4070 Ti x64 and native Surface
+Pro 11 / Snapdragon X Plus / Adreno X1-85 ARM64. P0-R/P0.5 history below is unchanged.
+The live guide is
+[LIVE-OWNER-TEST.md](../tests/pyrowave/LIVE-OWNER-TEST.md).
 
-The contract is Vibepollo at `8a8c4b03a280ab9f567beb380110abb80f5220b8`, codec
-`186f0393b77f7755953b5ecde994bb1cec2e4155`, bitstream ID `186f0393`, C API 0.6.0.
-Only SDR 8-bit 4:2:0 is advertised: `SCM_PYROWAVE=0x00800000`, client format
-`0x010000`, exact DESCRIBE `a=rtpmap:99 PYROWAVE/90000` and exactly one valid,
-matching `a=x-ss-pyrowave.bitstream:186f0393`; ANNOUNCE uses `bitStreamFormat=3`.
-No record-feature or adaptive-FEC attribute is sent, preserving compatibility framing.
+Local native ARM64 portable Zig tests pass: existing parser (150 cases plus
+20,000 mutations), new strict SDP/capability/collision tests, and live-frame
+assembly/profile/bounds/recovery tests including a valid 3,546,016-byte frame.
+Baseline dependency/preflight, package architecture and ARM64 CRT-repair guard
+suites pass.
 
-Session tests restricted runtime loading, required exports/API, packaged build
-metadata/DLL SHA-256, Vulkan device/decoder creation and a real hidden SDL IYUV
-upload/presentation before launch. Host capability is rechecked using paired,
-certificate-pinned HTTPS without HTTP fallback before sending launch/resume.
-PyroWave has its own `IVideoDecoder`, never FFmpeg: complete common-c decode unit
-→ LE compatibility envelope/codec-record validation → individual codec packets
-→ full readiness → CPU I420 → main-thread SDL presentation. Audio/input and
-ordinary Session cleanup remain on existing Moonlight paths.
+### First owner P1a interoperability failure and range fix
 
-Auto and standard codec candidate ordering are unchanged. HDR, 4:4:4 and forced
-software decode reject PyroWave attempts. Missing/mismatched IDs abort DESCRIBE.
-Malformed independent frames clear decoder state and can recover on the next frame;
-runtime/presentation failure ends the attempt. Retry is manual: choose a standard
-codec and reconnect. No hot switch or automatic host launch/resume replay occurs.
+Owner-reported Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 testing against
+Vibepollo reached live video transport successfully. PyroWave negotiation,
+pinned runtime initialization, Vulkan decoder creation, SDL I420 initialization,
+audio and live video packet receipt succeeded. All live frames were rejected with
+`live P1a requires BT.709 limited range` because valid host SDR 4:2:0 sequence
+metadata indicated full range. Decoded/rendered live video was not confirmed.
 
-The common-c gitlink remains `f900dd4767759c7b9d0e93bcea666b55c69ea62f`.
-`scripts/pyrowave/common-c-p1a.patch` is a maintained, separately reviewable delta
-to Limelight constants, strict SDP validation, ANNOUNCE and opaque-picture
-validation. qmake verifies the pin and applies it idempotently; the explicit
-PowerShell helper does the same for CMake tests. The submodule is not flattened.
-Reserved host HDR/444 bits are consumed by Session's SCM mapping with zero client
-formats; standard HDR/444 masks are unchanged. SCM and VIDEO_FORMAT namespaces
-are never interchanged.
+The focused interoperability fix supports BT.709 full and limited SDR 8-bit
+4:2:0, preserves parsed range through decode to SDL3 texture colorspace properties,
+and rejects unexpected range changes before submitting packets. HDR/PQ, BT.2020,
+4:4:4, malformed sequence/framing and extent mismatches remain rejected.
+First-sequence logging identifies range once; malformed-frame logs stay rate-limited.
+P1a owner qualification remains **PENDING** until a new hardware retest confirms
+decoded/rendered live video. Earlier passing CI below predates this fix.
 
-Live bounds: even 128..4096 dimensions, at most 3840×2160 pixels; 8 MiB envelopes,
-65,536 codec packets, at most 4,000 transport fragments and 1024..2048-byte transport
-packet sizes. The byte bound covers Vibepollo's 4,000-packet complete-frame budget
-at the largest permitted MTU, including compatibility overhead. Codec packet
-count is independent of RTP count. Output is at most 12,441,600 CPU bytes/frame;
-one replaceable pending image bounds the render queue. Offline limits remain
-850,000 bytes / 1,024 packets. Only 1080p has prior offline hardware qualification.
+Validation for this fix is recorded with the focused PR; existing parser/runtime,
+offline compatibility/record, standard-codec policy and package isolation gates
+remain required. GPU-free SDL tests verify rendered full/limited endpoints and
+BT.709 chromatic values. `--live-range-test` exercises both real compatibility
+fixtures through the runtime decoder, metadata propagation and transition recovery;
+unavailable hosted Vulkan is an explicit skip, not live interoperability evidence.
 
-The first owner P1a test on Surface Pro 11 reached live video transport:
-negotiation, pinned runtime/API, Vulkan decoder on Adreno X1-85, SDL I420
-initialization, audio and live video packet receipt succeeded. Every frame was
-rejected because Asteria incorrectly required sequence bit 30 to indicate limited
-range; Vibepollo sent valid BT.709 full-range SDR 4:2:0 frames. The range fix
-accepts both full and limited SDR 8-bit 4:2:0 without relaxing framing, dimensions,
-chroma or SDR checks. BT.2020, PQ/HDR and 4:4:4 remain rejected.
+### Original P1a implementation build evidence (2026-10-01 UTC)
 
-Sequence range is parsed into `YuvRange` and carried with decoded I420. The first
-valid live sequence establishes the range for that decoder lifetime; changes
-are rejected before codec packet submission with a reconnect diagnostic. Malformed
-frames cannot establish range. SDL3 texture properties explicitly select
-`SDL_COLORSPACE_BT709_FULL` or `SDL_COLORSPACE_BT709_LIMITED` on the pinned
-SDL2-compat renderer, without changing global conversion mode or FFmpeg rendering.
-The preflight black image does not establish live range. P1a owner qualification
-remains **PENDING** until a new hardware retest confirms decoded/rendered live video.
+Tested code commit: `be884ce1564c9651080ff991f82228d859617f80`.
+The subsequent documentation commit records these results without changing code.
 
-Presentation retains aspect fit and linear scaling. Source chroma
-is CENTER; the SDL3 BT.709 colorspaces use LEFT. P0.5 found no visible issue on the
-named targets, but exact phase remains formally unqualified. Session V-sync is
-retained; advanced pacing/latency work is deferred. The existing statistics
-overlay receives VIDEO_STATS-derived rates, bytes, drops, timing and RTT.
+| Gate | Result and evidence |
+| --- | --- |
+| Upstream/candidate baseline, x64 and ARM64 | All four jobs PASS in [run 36818828101](https://github.com/Unitron07/Asteria-Windows/actions/runs/36818828101); ordinary H.264/HEVC/AV1 builds and packaging retained |
+| Optional x64/native ARM64 | Both jobs PASS in [run 36818827871](https://github.com/Unitron07/Asteria-Windows/actions/runs/36818827871), including full live client builds, qmake probe, loader/API tests, parser/legacy/presentation regressions and package gates |
+| Native ARM64 dependency | `Hostarm64/arm64` MSVC; the original unpatched Granite failure is retained, then the existing portable math compatibility patch builds and its tests PASS |
+| GPU-free tests | Five parser/policy/presentation tests and nine optional offline tests PASS on each target; existing 150 cases + 20,000 mutations and legacy 34 cases + 10,000 mutations retained |
+| P0.5 hosted lifecycle | Raw I420 hidden lifecycle PASS on both targets; codec roundtrip/recreation record exit 77 for unavailable Vulkan device. These skips do not replace prior owner P0-R/P0.5 qualification |
+| Independent package inspection | Experimental x64: 73 PE files, ARM64: 71; ordinary x64: 69, ARM64: 68. Every file has its target machine type; client imports contain no startup codec/Vulkan dependency; ordinary packages contain no runtime/manifest |
+| Provenance and state | Downloaded artifact digests, inner package hashes, DLL metadata/hashes and CI architecture reports match; notices and native runtime/CRT closure included. `git diff --check` passes; recursive gitlinks remain pinned and clean |
 
-Optional CI builds separate x64 and native ARM64 experimental portable packages,
-with runtime provenance, matching PE types, import/CRT closure, source notices,
-an owner guide and log collection. Ordinary packages contain no PyroWave DLL,
-no startup Vulkan/codec imports and no PyroWave UI option. See
-[the live owner guide](../tests/pyrowave/LIVE-OWNER-TEST.md) for launch/test steps.
+Owner packages are available in the optional run above. Extract the artifact's
+inner ZIP and follow `RUN-ME.md`; the package includes the log collector.
 
-Deferred P1b/later: live records, record-start/lost-buffer metadata, critical
-packet handling, adaptive FEC, partial recovery, sideband readiness, bandwidth
-probing, bitrate usability tuning, 4:4:4, HDR and advanced pacing/latency work.
+| Package | Inner ZIP SHA-256 |
+| --- | --- |
+| `Asteria-P1a-Experimental-x64-36818827871` | `99e3eec1601a5c7d7cf767adfb0180e5a01ae8a278bc02afd8c8e32d028a83e7` |
+| `Asteria-P1a-Experimental-arm64-36818827871` | `fad91b4afeead1c3247c5a4af5e8ad061277386563ee0dcf65aea6ca4d0066bc` |
 
-The earlier milestone descriptions below retain the P0/P0-R/P0.5 history;
-future P1a statements there are superseded by the implementation above.
+Runtime negatives retained: missing DLL, relative path, missing exports, wrong
+API and repeated cleanup. Vulkan absence/device/decoder failure is handled by
+the same runtime wrapper; unavailable hosted Vulkan is a recorded skip, while
+failures after device availability fail optional CI. Live SDL preflight and
+authenticated host behavior require the owner tests; no hosted GPU test proves
+Vibepollo interoperability, audio/input, true device loss or visual correctness.
+
+Manual failure/retry does not relaunch a host app automatically. Deferred scope:
+live records/loss metadata/critical counts, adaptive FEC, partial/sideband decode,
+bandwidth probing, 444/HDR and advanced pacing. See the
+[current implementation contract](PYROWAVE_VIBEPOLLO.md).
 
 
-Nonary/Vibepollo is Asteria's primary PyroWave host target. The authoritative
-[host protocol](https://github.com/Nonary/Vibepollo/blob/8a8c4b03a280ab9f567beb380110abb80f5220b8/docs/pyrowave-protocol.md)
-and [vendored codec/patches](https://github.com/Nonary/Vibepollo/tree/8a8c4b03a280ab9f567beb380110abb80f5220b8/third-party/pyrowave)
-were audited at `8a8c4b03a280ab9f567beb380110abb80f5220b8`.
-Nonary/moonlight-qt's PyroWave branch was inspected at
-`5f9ce4a46d2b8fd2191f47cef043bc43f3d772d0`, including its framing/parser tests,
-vendor lock and decoder. The host protocol and pinned upstream codec remain
-the primary authority; live recovery behavior is reserved for P1b.
-The joemossjr16/pyrollo comparisons and old `PYRW` proof remain historical evidence.
+This is the qualification checklist. The [baseline report](BASELINE.md) records the merged M0 import, successful x64 CI, local upstream CLI startup, and the owner's successful manual test confirmation. M0A native ARM64 is complete from the owner's recorded Surface Pro 11th Edition test below. Exact release artifact/host details and some individual hardware cases remain undocumented. Attach new results to the relevant milestone PR and link them from release notes; distinguish source inspection, builds, general user confirmation, and measured hardware tests.
 
-## Independent compatibility axes
+## Recorded manual test
 
-- Active upstream codec: Themaister/pyrowave
-  `186f0393b77f7755953b5ecde994bb1cec2e4155`.
-- Experimental built bitstream ID: `186f0393` (`PyroWave::BitstreamId`).
-- C API: **0.6.0**, verified in pinned headers, at compile time, and on DLL load.
-- Granite, volk and Vulkan-Headers retain their already tested revisions in
-  [dependencies.json](../scripts/pyrowave/dependencies.json).
+- Tester: project owner.
+- Result: owner confirmed the tested client works, then merged PR #1.
+- Test date, exact artifact, Windows build, process architecture, GPU/driver, host product/version, stream settings, and individual input/audio cases: not supplied.
+- Scope: successful user-reported baseline test. Do not infer independent Sunshine and Apollo coverage, native ARM64 execution, clean-machine status, hardware decoding, or measured performance from this statement.
 
-The bitstream has no version field. API 0.6.0 alone does not establish codec
-compatibility. P1a reads `a=x-ss-pyrowave.bitstream:...` and compares it
-with the local build ID and refuses a mismatch. Runtime load checks the
-API and exports; it cannot discover a DLL's source commit. Deployments must bind
-the DLL to the build's source/patch/inventory hashes.
+Use the result template below to fill applicable gaps during release qualification.
 
-The historical P0-R scope was **1920x1080, 8-bit SDR 4:2:0**, offline only. No Session
-hooks, host advertisement, RTSP negotiation, UI choice, HDR path, bandwidth probe,
-release packaging or frame-pacing change was included. H.264/HEVC/AV1 retain their
-existing behavior. Complete local roundtrip does not prove network interoperability.
+## Owner-reported Windows ARM64 comparison (2026-09-25)
 
-## Patch decisions
+- **Clients and workload:** native ARM64 Asteria versus stock x64 Moonlight under emulation on a Surface Pro 11th Edition with Snapdragon X Plus and 16 GB RAM and an Apollo host; same game, 2560×1440, approximately 60 FPS, AV1. The owner repeated the comparison.
+- **Observed streaming result:** effectively identical streaming in these runs, with no meaningful decode, render, or frame-queue difference and no observed stream regression. The initial on-screen samples were near 60 FPS with zero displayed network/jitter drops. This is an observed result for this setup, not a controlled median/p95 benchmark or a universal performance claim.
+- **Qualitative UI observation:** Asteria menus/settings felt noticeably smoother and snappier. Subjective, with no timing measurement.
+- **Native execution:** the owner verified the Asteria process as native ARM64. The comparison used the official x64 Moonlight release under Windows ARM64 emulation on the same device. No official native ARM64 upstream Moonlight release exists; CI-built unmodified upstream ARM64 artifacts are internal reference builds only.
+- **Evidence limits:** Windows build, GPU driver, exact artifact/commit/hash, selected decoder, Apollo version, run duration, and raw logs were not recorded. M0A is complete from the owner's validation; these details remain useful for release qualification. Sunshine is not a required target for this Apollo-based project/preview.
 
-The lock file records immutable Vibepollo provenance and SHA-256 for all three
-verbatim patches (LF endings). The dependency helper checks every hash and
-`git apply --check` against the exact upstream revision on both architectures.
-It archives unmodified source hashes, applied diffs, modified-file hashes and
-patch inventory; retained patches ship in experimental source notices.
+The remaining release checks below are separate from the completed M0A milestone; details also appear in [BASELINE.md](BASELINE.md).
 
-| Patch | Build decision | Effect |
-| --- | --- | --- |
-| 0001 encoder buffer pool | Retained, not applied | Encoder allocation/performance only; unnecessary for a single-frame fixture |
-| 0002 4:4:4 payload sizing | Retained, not applied | Encoder buffer safety for 4:4:4; apply before future 4:4:4 fixture work |
-| 0003 decoder short-block rejection | Applied x64 + ARM64 | Decoder safety: prevents non-advancing parse loops on malformed duplicate blocks |
+## Automated package architecture checks
 
-These local patches preserve the bitstream. Encoder-only fixes do not qualify
-4:4:4 client decode or presentation. The separate Granite MSVC ARM64 portable
-math patch remains architecture-scoped; see [COMPATIBILITY.md](../scripts/pyrowave/COMPATIBILITY.md).
-The old `f6fb84...` source bundle is retained for history and never used by the
-active build helper. Failed exact fetch or revision mismatch fails the build.
+Both upstream and candidate CI jobs run the offline package guard tests, then validate the final portable ZIP during the build wrapper. Review `package-architecture.json` in the architecture-specific evidence artifact: `passed` must be true, its SHA-256 must match the tested ZIP, and every EXE/DLL must have the target's machine type. The scanner includes nested Qt plugins and rejects foreign architectures and malformed headers. Its regression suite deliberately adds an x64 DLL to an ARM64 package and verifies rejection, with the reverse case for x64.
 
-## Complete-frame parsing
+The gate has local synthetic test coverage and passes for upstream/candidate x64 and ARM64 packages in [run 34797782854](https://github.com/Unitron07/Asteria-Windows/actions/runs/34797782854). Retain the hash-bound reports for the exact release ZIPs. Passing PE inspection does not prove native process execution, clean-machine launch, dependency completeness, or hardware decoding. Those remain real-device checks below.
 
-`parseFrame` selects framing from bit 31 of the first LE word: set means records;
-clear means compatibility packet count. Invalid input is rejected deterministically;
-it never retries the legacy wrapper. `parseLegacyOfflineFrame` is only an explicitly
-called historical fixture helper.
+## Functional checks
 
-Compatibility format:
-
-```text
-[u32 LE packet_count] { [u32 LE size] [size bytes] } * packet_count
-```
-
-`parseCompatibilityFrame` validates the envelope/count/lengths and returns packet
-offsets into immutable caller-owned bytes, without copying payload. Supplying a
-`StreamContext` to `parseFrame` additionally validates the codec records in those
-packets before any decoder call. Codec packet boundaries differ from RTP boundaries:
-the pinned packetizer keeps each record intact, using a 1024-byte packing target.
-
-R…3904 tokens truncated…ed. The first portable preview covers inherited streaming and Asteria identity.
+Apply this checklist to the advertised release scope. Clipboard, virtual-display controls, server commands, profiles, and new performance modes are future work; mark their checks not applicable until implemented and included. Installer lifecycle checks apply when installers are offered. The first portable preview covers inherited streaming and Asteria identity.
 
 | Area | Required cases | Pass condition |
 | --- | --- | --- |
