@@ -33,7 +33,8 @@ public:
 
     // Offline proof only: resolves encoder exports lazily and generates a frame
     // with this exact loaded codec. Does not accept host or Session inputs.
-    bool generateProofFrame(std::vector<std::uint8_t>& container);
+    bool generateProofFrame(std::vector<std::uint8_t>& container,
+                            Framing framing = Framing::Compatibility);
 
 private:
     bool fail(const std::string& reason);

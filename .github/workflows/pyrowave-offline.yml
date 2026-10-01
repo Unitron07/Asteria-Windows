@@ -1,4 +1,4 @@
-name: Optional PyroWave offline P0
+name: Optional PyroWave offline P0-R
 on:
   workflow_dispatch:
   pull_request:
@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-      - name: GPU-free parser build and tests
+      - name: GPU-free compatibility, record and legacy parser tests
         shell: pwsh
         run: |
           cmake -S tests/pyrowave -B build/parser-${{ matrix.arch }} -G 'Visual Studio 18 2026' -A ${{ matrix.platform }}
@@ -111,6 +111,7 @@ jobs:
           & ./build/probe-${{ matrix.arch }}/Release/pyrowave-offline-proof.exe --roundtrip "$env:PYROWAVE_DEPS/install/bin" "$env:PYROWAVE_DEPS/evidence/roundtrip" 2>&1 | Tee-Object "$env:PYROWAVE_DEPS/evidence/roundtrip.txt"
           $code = $LASTEXITCODE
           @{exitCode=$code; architecture='${{ matrix.arch }}'; runtimeQualified=$false; note='Inspect hardware/driver and decode output; hosted build alone is not GPU qualification'} | ConvertTo-Json | Set-Content "$env:PYROWAVE_DEPS/evidence/roundtrip-result.json"
+          if (Test-Path "$env:PYROWAVE_DEPS/evidence/roundtrip") { Get-ChildItem "$env:PYROWAVE_DEPS/evidence/roundtrip" -File | Get-FileHash -Algorithm SHA256 | Select-Object Path,Hash | ConvertTo-Json | Set-Content "$env:PYROWAVE_DEPS/evidence/roundtrip-sha256.json" }
           if ($code -ne 0 -and $code -ne 77) { throw 'Roundtrip failed after runtime availability; inspect evidence' }
           # Only an explicitly unavailable Vulkan device is a recorded skip.
           exit 0
@@ -118,7 +119,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: pyrowave-p0-${{ matrix.arch }}-${{ github.run_id }}
+          name: pyrowave-p0-r-${{ matrix.arch }}-${{ github.run_id }}
           path: |
             build/pyrowave*/${{ matrix.arch }}/evidence/
             build/pyrowave*/${{ matrix.arch }}/install/

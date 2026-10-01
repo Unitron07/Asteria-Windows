@@ -34,3 +34,4 @@ NEON implementation.
 transpose, inside/outside frustum results and the actual target's bitops. These
 tests link only Granite's static math library and need no Vulkan/GPU. They must
 pass on native ARM64 before considering the patched build validated.
+Historical compatibility evidence for the unchanged Granite revision; the active PyroWave pin and patches are recorded in dependencies.json and docs/PYROWAVE_VIBEPOLLO.md.

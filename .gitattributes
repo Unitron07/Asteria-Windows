@@ -1,2 +1,3 @@
 scripts/pyrowave/*.patch text eol=lf
+scripts/pyrowave/patches/*.patch text eol=lf
 scripts/pyrowave/*.bundle -text
