@@ -107,7 +107,26 @@ qmake and PE/import evidence for x64 and native ARM64.
 
 Local environment has Git/PowerShell but no MSVC/CMake/Qt. Pinned source headers
 and all patch applicability/hashes were audited locally; build execution is
-assigned to optional CI. [P0-R run 36795356376](https://github.com/Unitron07/Asteria-Windows/actions/runs/36795356376) records the implementation at `99631f93d69129c3b55fcdce6443186232351d3a`; [baseline run 36795356626](https://github.com/Unitron07/Asteria-Windows/actions/runs/36795356626) tests ordinary builds. Consult their completed job results and artifacts for exact checks/skip evidence.
+assigned to optional CI. The implementation at
+`f01d7c34cbb9538405d08f8a8cbf8e5ad0d90a2a` passed
+[P0-R run 36795604865](https://github.com/Unitron07/Asteria-Windows/actions/runs/36795604865)
+on **x64 and native ARM64**: exact dependency/API/patch verification, both framing
+parsers and legacy regressions, six runtime/compatibility CTests, restricted
+load/reload, qmake compile/link and PE/startup-import checks. ARM64 reproduced
+the known Granite C1189/C2665 failures and passed with the existing portable-math
+patch. Both GPU attempts recorded device-unavailable exit 77; neither is hardware
+qualification. Local baseline preflight/package-architecture/ARM64 packaging-repair
+tests also passed.
+
+| New-codec offline artifact | ZIP SHA-256 |
+| --- | --- |
+| [x64](https://github.com/Unitron07/Asteria-Windows/actions/runs/36795604865/artifacts/11132973864) | `3f2e0c1f9bfe167f0ff3f28a2495a72d7433c022af7e544c2b54051a1f0689b2` |
+| [ARM64](https://github.com/Unitron07/Asteria-Windows/actions/runs/36795604865/artifacts/11133762570) | `2687e7d04a5ab73d9874b86895d33642993c5c59f1bf81bd377c150a661fd2af` |
+
+[Baseline run 36795605261](https://github.com/Unitron07/Asteria-Windows/actions/runs/36795605261)
+**passed all four ordinary upstream/Asteria x64/ARM64 builds** at the same implementation.
+The following documentation-only evidence update does not alter tested code.
+
 New RTX 4070 Ti and Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 GPU
 requalification is **pending**. Both formats must decode expected I420 output,
 match one another, reject malformed frames and recover across three lifetimes.

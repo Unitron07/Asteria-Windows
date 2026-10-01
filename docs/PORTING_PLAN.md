@@ -98,7 +98,7 @@ Both hardware proofs passed three decoder lifetimes and malformed-frame rejectio
 - [x] Realign active upstream codec to `186f0393b77f7755953b5ecde994bb1cec2e4155`, bitstream ID `186f0393`, preserving API 0.6.0 and architecture isolation.
 - [x] Add LE compatibility and complete record-framing parsers; keep PYRW as an explicit historical fixture helper.
 - [x] Apply decoder short-block safety patch with exact provenance/hashes; retain encoder-only pool/4:4:4 sizing patches.
-- [ ] Complete x64/native ARM64 dependency/parser/loader/qmake/PE CI for the new codec.
+- [x] Complete x64/native ARM64 dependency/parser/loader/qmake/PE CI for the new codec; see run 36795604865 in VALIDATION.md. Hosted GPU attempts were unavailable skips.
 - [ ] Rerun both framing modes on RTX 4070 Ti and native Surface Pro 11 / Snapdragon X Plus / Adreno X1-85; old GPU results are historical.
 
 See [the current Vibepollo contract](PYROWAVE_VIBEPOLLO.md). No live negotiation,
