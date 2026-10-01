@@ -18,7 +18,7 @@
           HelpUrl="https://github.com/Unitron07/Asteria-Windows"
           UpdateUrl="https://github.com/Unitron07/Asteria-Windows/releases"
           DisableModify="yes"
-          IconSourceFile="..\..\app\moonlight.ico">
+          IconSourceFile="..\..\app\asteria.ico">
 
     <bal:Condition Message="This version of Asteria requires Windows 10 or later." Condition="VersionNT &gt;= v10.0" />
     <bal:Condition Message="This version of Asteria requires a 64-bit version of Windows." Condition="NativeMachine &lt;&gt; 332" />
@@ -48,11 +48,11 @@
     <BootstrapperApplication>
       <bal:WixStandardBootstrapperApplication ShowVersion="yes"
                                               LicenseFile="license.rtf"
-                                              LogoFile="..\..\app\moonlight_wix.png"
+                                              LogoFile="..\..\app\asteria-wix.png"
                                               LaunchTarget="[InstallFolder]\Asteria.exe"
                                               ThemeFile="RtfTheme.xml"
                                               Theme="rtfLicense" />
-      <Payload Name="Moonlight.ico" SourceFile="..\..\app\moonlight.ico" Compressed="yes" />
+      <Payload Name="Asteria.ico" SourceFile="..\..\app\asteria.ico" Compressed="yes" />
     </BootstrapperApplication>
 
     <Chain>

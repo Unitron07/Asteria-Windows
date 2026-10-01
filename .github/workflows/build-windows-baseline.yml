@@ -73,6 +73,10 @@ jobs:
             default { throw "Unsupported target: $env:TARGET_ARCH" }
           }
           ./harness/scripts/build-baseline.ps1 -SourceRoot ./source -Architecture $env:TARGET_ARCH -QtBin "$env:QT_ROOT/$kit/bin"
+      - name: Verify packaged Asteria icon resources
+        if: inputs.label == 'asteria'
+        shell: pwsh
+        run: python ./harness/scripts/verify-asteria-package-icons.py --source-root ./source --architecture '${{ inputs.architecture }}'
       - name: Upload portable package
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
