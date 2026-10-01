@@ -17,6 +17,9 @@ Use the included `pyrowave/` directory intact; do not copy a different codec DLL
    Vulkan adapter, pinned HTTPS SCM support, exact DESCRIBE marker and matching
    host ID, negotiated format `0x10000`, extent/FPS, first complete compatibility
    decode unit, packet count/bytes, successful I420 decode and SDL initialization.
+   The first valid sequence must log `PyroWave sequence: BT.709 full-range, SDR 4:2:0`
+   or `limited-range`, followed by the first successful I420 decode diagnostic.
+   Retest full-range Vibepollo output that previously caused every frame to be rejected.
 4. Confirm continuously updating video, clean output, audio, controller/mouse/
    keyboard input, resize/fullscreen, minimize/restore and clean disconnect.
 5. Reconnect using PyroWave. Then select Auto, H.264, HEVC and AV1 and verify
@@ -35,7 +38,12 @@ Failures use normal cleanup and **manual retry**. Select a standard codec and
 reconnect/resume the existing app. The client never automatically replays a host
 launch/resume command or switches codec within a running PyroWave stream.
 
-Presentation is SDR 8-bit I420, BT.709 limited, aspect fit and linear scaling.
+Presentation is SDR 8-bit I420, BT.709 full or limited according to the parsed
+sequence, with explicit SDL3 texture colorspace, aspect fit and linear scaling.
+Range changes within a connection are rejected with a diagnostic; reconnect to
+establish a different range. The first Surface test passed negotiation/runtime,
+audio and video packet receipt but rejected every full-range frame. This fix
+requires a new decoded/rendered live video retest; P1a remains **PENDING**.
 Source chroma is CENTER; qualified SDL2-compat metadata uses LEFT. No visible
 issue occurred during P0.5 tests; exact phase remains formally unqualified.
 V-sync follows the ordinary Session setting; P1a uses a bounded latest-frame

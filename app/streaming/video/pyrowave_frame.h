@@ -22,6 +22,7 @@ constexpr Limits LiveLimits{8 * 1024 * 1024, 65536};
 enum class Framing { Compatibility, Records, LegacyOffline };
 enum class RecordKind { Sequence, Block, Padding };
 enum class Chroma { Yuv420, Yuv444 };
+enum class YuvRange { Full, Limited };
 
 struct StreamContext {
     std::uint32_t width;
@@ -34,6 +35,7 @@ struct Sequence {
     std::uint32_t width = 0, height = 0, totalBlocks = 0, blockCapacity = 0;
     std::uint8_t number = 0;
     Chroma chroma = Chroma::Yuv420;
+    YuvRange range = YuvRange::Full;
 };
 
 struct Record {
@@ -82,7 +84,7 @@ bool parseRecordFrame(const std::uint8_t* data, std::size_t size,
                       std::size_t declaredSize, Frame& frame, std::string& error,
                       const StreamContext* context = nullptr);
 // P1a only: compatibility envelope plus complete codec-record validation.
-// Rejects record framing, extent/chroma changes, HDR and full-range metadata.
+// Accepts BT.709 full/limited SDR; rejects record framing, extent/chroma changes and HDR.
 bool parseLiveCompatibilityFrame(const std::uint8_t* data, std::size_t size,
                                  std::size_t declaredSize, Frame& frame,
                                  std::string& error, const StreamContext& context);

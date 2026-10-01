@@ -15,7 +15,31 @@ assembly/profile/bounds/recovery tests including a valid 3,546,016-byte frame.
 Baseline dependency/preflight, package architecture and ARM64 CRT-repair guard
 suites pass.
 
-### Recorded implementation gates (2026-10-01 UTC)
+### First owner P1a interoperability failure and range fix
+
+Owner-reported Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 testing against
+Vibepollo reached live video transport successfully. PyroWave negotiation,
+pinned runtime initialization, Vulkan decoder creation, SDL I420 initialization,
+audio and live video packet receipt succeeded. All live frames were rejected with
+`live P1a requires BT.709 limited range` because valid host SDR 4:2:0 sequence
+metadata indicated full range. Decoded/rendered live video was not confirmed.
+
+The focused interoperability fix supports BT.709 full and limited SDR 8-bit
+4:2:0, preserves parsed range through decode to SDL3 texture colorspace properties,
+and rejects unexpected range changes before submitting packets. HDR/PQ, BT.2020,
+4:4:4, malformed sequence/framing and extent mismatches remain rejected.
+First-sequence logging identifies range once; malformed-frame logs stay rate-limited.
+P1a owner qualification remains **PENDING** until a new hardware retest confirms
+decoded/rendered live video. Earlier passing CI below predates this fix.
+
+Validation for this fix is recorded with the focused PR; existing parser/runtime,
+offline compatibility/record, standard-codec policy and package isolation gates
+remain required. GPU-free SDL tests verify rendered full/limited endpoints and
+BT.709 chromatic values. `--live-range-test` exercises both real compatibility
+fixtures through the runtime decoder, metadata propagation and transition recovery;
+unavailable hosted Vulkan is an explicit skip, not live interoperability evidence.
+
+### Original P1a implementation build evidence (2026-10-01 UTC)
 
 Tested code commit: `be884ce1564c9651080ff991f82228d859617f80`.
 The subsequent documentation commit records these results without changing code.

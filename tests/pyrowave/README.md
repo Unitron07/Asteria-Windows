@@ -7,7 +7,7 @@ CMake commands below. The qmake application build applies this maintained patch
 automatically against the checked gitlink. New GPU-free negotiation tests use
 the actual RTSP policy; live-frame tests use the production decode-unit assembly
 and parser, test arbitrary fragment cuts, malformed/truncated/oversized inputs,
-HDR/444/range rejection, recovery and a structurally valid 3,546,016-byte frame
+HDR/444 rejection, full/limited range acceptance, recovery and a structurally valid 3,546,016-byte frame
 with 1,501 codec packets (larger than both old offline limits). Existing parser,
 legacy, loader/export/API, Granite and P0.5 presentation suites are retained.
 

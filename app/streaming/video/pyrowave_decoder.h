@@ -15,6 +15,7 @@ public:
     bool isHdrSupported() override { return false; }
     int getDecoderCapabilities() override { return 0; } // Dedicated common-c decoder thread
     int getDecoderColorspace() override { return COLORSPACE_REC_709; }
+    // Negotiation preference only; parsed sequence metadata controls presentation.
     int getDecoderColorRange() override { return COLOR_RANGE_LIMITED; }
     QSize getDecoderMaxResolution() override { return QSize(3840,2160); }
     int submitDecodeUnit(PDECODE_UNIT du) override;
@@ -42,4 +43,6 @@ private:
     uint64_t m_Bytes = 0, m_StatsTime = 0, m_Rejected = 0;
     bool m_TestOnly = true, m_EventQueued = false, m_Failed = false;
     bool m_FirstFrame = true, m_HaveTextureFrame = false;
+    bool m_FirstSequence = true;
+    std::optional<PyroWave::YuvRange> m_TextureRange;
 };

@@ -8,6 +8,7 @@
 #include <vulkan/vulkan_core.h>
 #include <pyrowave/pyrowave.h>
 #include <filesystem>
+#include <optional>
 
 namespace PyroWave {
 // Serialized P0/live owner. Module outlives every device/decoder and API call.
@@ -24,6 +25,7 @@ public:
     bool decodeLive(const std::vector<std::uint8_t>& container, Pixels& output,
                     std::size_t& packetCount);
     bool frameRejected() const { return m_FrameRejected; }
+    std::optional<YuvRange> liveRange() const { return m_LiveRange; }
     void discardFrame();
     void resetDecoder();
     void close();
@@ -41,6 +43,7 @@ private:
     bool decodeImpl(const std::vector<std::uint8_t>& container, Pixels& output,
                     bool live, std::size_t* packetCount);
     bool m_FrameRejected = false;
+    std::optional<YuvRange> m_LiveRange;
     bool fail(const std::string& reason);
     bool check(pyrowave_result result, const char* operation);
     void* symbol(const char* name);

@@ -47,8 +47,25 @@ count is independent of RTP count. Output is at most 12,441,600 CPU bytes/frame;
 one replaceable pending image bounds the render queue. Offline limits remain
 850,000 bytes / 1,024 packets. Only 1080p has prior offline hardware qualification.
 
-Presentation stays BT.709 limited, aspect fit and linear scaling. Source chroma
-is CENTER; SDL2-compat metadata uses LEFT. P0.5 found no visible issue on the
+The first owner P1a test on Surface Pro 11 reached live video transport:
+negotiation, pinned runtime/API, Vulkan decoder on Adreno X1-85, SDL I420
+initialization, audio and live video packet receipt succeeded. Every frame was
+rejected because Asteria incorrectly required sequence bit 30 to indicate limited
+range; Vibepollo sent valid BT.709 full-range SDR 4:2:0 frames. The range fix
+accepts both full and limited SDR 8-bit 4:2:0 without relaxing framing, dimensions,
+chroma or SDR checks. BT.2020, PQ/HDR and 4:4:4 remain rejected.
+
+Sequence range is parsed into `YuvRange` and carried with decoded I420. The first
+valid live sequence establishes the range for that decoder lifetime; changes
+are rejected before codec packet submission with a reconnect diagnostic. Malformed
+frames cannot establish range. SDL3 texture properties explicitly select
+`SDL_COLORSPACE_BT709_FULL` or `SDL_COLORSPACE_BT709_LIMITED` on the pinned
+SDL2-compat renderer, without changing global conversion mode or FFmpeg rendering.
+The preflight black image does not establish live range. P1a owner qualification
+remains **PENDING** until a new hardware retest confirms decoded/rendered live video.
+
+Presentation retains aspect fit and linear scaling. Source chroma
+is CENTER; the SDL3 BT.709 colorspaces use LEFT. P0.5 found no visible issue on the
 named targets, but exact phase remains formally unqualified. Session V-sync is
 retained; advanced pacing/latency work is deferred. The existing statistics
 overlay receives VIDEO_STATS-derived rates, bytes, drops, timing and RTT.

@@ -61,6 +61,7 @@ bool Runtime::load(const std::filesystem::path& directory) {
 void Runtime::resetDecoder() {
     if (m_Decoder) m_Api.destroyDecoder(m_Decoder);
     m_Decoder = nullptr; m_Width = m_Height = 0;
+    m_LiveRange.reset();
 }
 void Runtime::discardFrame() {
     if (m_Decoder) m_Api.clear(m_Decoder);
@@ -137,11 +138,20 @@ bool Runtime::decodeImpl(const std::vector<std::uint8_t>& container, Pixels& out
         m_Error = error; // Live caller rate-limits malformed-frame diagnostics.
         return live ? false : fail(error);
     }
+    if (live) {
+        if (m_LiveRange && *m_LiveRange != frame.sequence.range) {
+            m_FrameRejected = true;
+            m_Error = "live PyroWave BT.709 range changed mid-stream; reconnect to change range";
+            return false; // Reject before submitting packets; keep the established range.
+        }
+        m_LiveRange = frame.sequence.range;
+    }
     if (packetCount) *packetCount = frame.packets.size();
     for (const auto& p : frame.packets)
         if (!check(m_Api.push(m_Decoder,container.data()+p.offset,p.size),"packet push")) return false;
     if (!m_Api.ready(m_Decoder,false)) return fail("complete frame is not decode-ready");
     Pixels pixels; pixels.width=m_Width; pixels.height=m_Height;
+    pixels.range=frame.sequence.range;
     pyrowave_cpu_buffer buffer{};
     buffer.width=m_Width; buffer.height=m_Height; buffer.format=PYROWAVE_CPU_BUFFER_FORMAT_YUV420P;
     try {
