@@ -21,13 +21,28 @@ int main() {
     };
     const auto valid=wrap(sequence(0));
     parse(valid,true,context);
+    require(frame.sequence.range==PyroWave::YuvRange::Limited);
     for (std::size_t i=0;i<valid.size();++i) parse(Bytes(valid.begin(),valid.begin()+i),false,context);
     auto bad=valid; set(bad,0,0); parse(bad,false,context);
     bad=valid; set(bad,0,PyroWave::LiveLimits.packets+1); parse(bad,false,context);
     bad=valid; set(bad,4,0xffffffffu); parse(bad,false,context);
-    bad=valid; set(bad,12,0); parse(bad,false,context); // Full-range metadata
-    bad=valid; set(bad,12,(1u<<30)|(1u<<27)); parse(bad,false,context); // HDR primaries
-    bad=valid; set(bad,12,(1u<<30)|(1u<<26)); parse(bad,false,context); // 444
+    // Exact Vibepollo regression: bit 30 clear is valid full-range BT.709 SDR.
+    auto full=valid; set(full,12,0); parse(full,true,context);
+    require(frame.sequence.range==PyroWave::YuvRange::Full);
+    require(error.find("live P1a requires BT.709 limited range")==std::string::npos);
+    for (const auto range : {0u,1u<<30}) {
+        for (unsigned bit=27;bit<=29;++bit) { // BT.2020 primaries, PQ transfer, BT.2020 matrix
+            bad=valid; set(bad,12,range|(1u<<bit)); parse(bad,false,context);
+        }
+        bad=valid; set(bad,12,range|(1u<<26)); parse(bad,false,context); // 444
+        for (unsigned code=1;code<=3;++code) {
+            bad=valid; set(bad,12,range|(code<<24)); parse(bad,false,context);
+        }
+        bad=valid; set(bad,12,range|1u); parse(bad,false,context); // Missing declared block
+        const auto duplicate=sequence(0);
+        bad=valid; bad.insert(bad.end(),duplicate.begin(),duplicate.end());
+        set(bad,4,16); set(bad,12,range); parse(bad,false,context); // Duplicate sequence
+    }
     parse(wrap(sequence(0,1280,720)),false,context);
     parse(sequence(0),false,context); // Live record framing is excluded
     bad.assign(PyroWave::LiveLimits.frameBytes+1,0); parse(bad,false,context);
@@ -66,12 +81,12 @@ complete:
     require(!PyroWave::parseFrame(large.data(),large.size(),large.size(),frame,error,&fourK));
 
     // Arbitrary common-c fragment cuts, including cuts inside lengths/records.
-    for (unsigned cut=1;cut<valid.size();++cut) {
-        LENTRY second{}; second.data=(char*)valid.data()+cut; second.length=int(valid.size()-cut); second.bufferType=BUFFER_TYPE_PICDATA;
-        LENTRY first{}; first.data=(char*)valid.data(); first.length=cut; first.bufferType=BUFFER_TYPE_PICDATA; first.next=&second;
-        DECODE_UNIT du{}; du.fullLength=int(valid.size()); du.bufferList=&first;
+    for (const auto& fixture : {valid,full}) for (unsigned cut=1;cut<fixture.size();++cut) {
+        LENTRY second{}; second.data=(char*)fixture.data()+cut; second.length=int(fixture.size()-cut); second.bufferType=BUFFER_TYPE_PICDATA;
+        LENTRY first{}; first.data=(char*)fixture.data(); first.length=cut; first.bufferType=BUFFER_TYPE_PICDATA; first.next=&second;
+        DECODE_UNIT du{}; du.fullLength=int(fixture.size()); du.bufferList=&first;
         Bytes bytes;
-        require(PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes==valid);
+        require(PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes==fixture);
         parse(bytes,true,context);
         ++du.fullLength; require(!PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes.empty());
         --du.fullLength; second.bufferType=BUFFER_TYPE_SPS;

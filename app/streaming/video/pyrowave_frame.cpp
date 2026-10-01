@@ -170,6 +170,7 @@ bool scanRecords(const std::uint8_t* data, const std::vector<Packet>& spans,
                 sequence.number = std::uint8_t((a >> 28) & 7u);
                 sequence.totalBlocks = b & 0xffffffu;
                 sequence.chroma = b & (1u << 26) ? Chroma::Yuv444 : Chroma::Yuv420;
+                sequence.range = b & (1u << 30) ? YuvRange::Limited : YuvRange::Full;
                 sequence.blockCapacity = blockCapacity(sequence);
                 if (sequence.totalBlocks > sequence.blockCapacity ||
                     sequence.totalBlocks > MaxRecords)
@@ -270,9 +271,6 @@ bool parseLiveCompatibilityFrame(const std::uint8_t* data, std::size_t size,
         for (const auto& record : frame.records)
             if (record.kind == RecordKind::Padding)
                 return reject(frame,error,"padding records are not compatibility codec packets");
-        // Sequence color bit 30: 0 full, 1 limited. P1a is limited only.
-        if (frame.packets.empty() || !(le32(data + frame.packets[0].offset + 4) & (1u << 30)))
-            return reject(frame,error,"live P1a requires BT.709 limited range");
     } catch (const std::bad_alloc&) { return reject(frame,error,"record metadata allocation failed"); }
     return true;
 }

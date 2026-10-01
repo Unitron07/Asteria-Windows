@@ -1,4 +1,5 @@
 #pragma once
+#include "pyrowave_frame.h"
 #include <cstdint>
 #include <vector>
 
@@ -6,6 +7,7 @@ namespace PyroWave {
 struct Pixels {
     int width = 0;
     int height = 0;
+    YuvRange range = YuvRange::Limited;
     std::vector<std::uint8_t> planes[3]; // tightly packed I420: Y, U, V
 };
 

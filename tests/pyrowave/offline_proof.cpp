@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     }
     const std::string mode=argv[1];
     if (mode!="--expect-missing" && mode!="--load" && mode!="--roundtrip" &&
-        mode!="--roundtrip-compatibility" && mode!="--roundtrip-records") return 2;
+        mode!="--roundtrip-compatibility" && mode!="--roundtrip-records" && mode!="--live-range-test") return 2;
     PyroWave::Runtime runtime;
     const auto directory=std::filesystem::absolute(argv[2]);
     if (mode=="--expect-missing") {
@@ -53,6 +53,33 @@ int main(int argc, char** argv) {
     std::vector<std::uint8_t> fixtures[2];
     // Generate once; serialize the same codec packets in both host formats.
     if (!runtime.generateProofFrame(fixtures[0])) return 1;
+    if (mode=="--live-range-test") {
+        // The encoder's complete compatibility packet stream is a real codec
+        // fixture. Only sequence range bit 30 differs between the two cases.
+        PyroWave::Frame live; std::string error;
+        const PyroWave::StreamContext context{1920,1080,PyroWave::Chroma::Yuv420,true};
+        if (!PyroWave::parseFrame(fixtures[0].data(),fixtures[0].size(),fixtures[0].size(),live,error,&context)) return 1;
+        const auto colorByte=live.records[0].offset+7;
+        auto full=fixtures[0], limited=fixtures[0];
+        full[colorByte]&=~0x40u; limited[colorByte]|=0x40u;
+        for (const auto range : {PyroWave::YuvRange::Full,PyroWave::YuvRange::Limited}) {
+            if (!runtime.createDecoder(1920,1080)) return 1;
+            const auto& fixture=range==PyroWave::YuvRange::Full ? full : limited;
+            PyroWave::Pixels pixels; std::size_t packets=0;
+            auto bad=fixture; bad.pop_back();
+            if (runtime.decodeLive(bad,pixels,packets) || runtime.liveRange() || !runtime.frameRejected()) return 1;
+            if (!runtime.decodeLive(fixture,pixels,packets) || pixels.range!=range ||
+                runtime.liveRange()!=range || packets==0 || pixels.planes[0].size()!=2073600) return 1;
+            const auto& transition=range==PyroWave::YuvRange::Full ? limited : full;
+            if (runtime.decodeLive(transition,pixels,packets) || !runtime.frameRejected() ||
+                runtime.error().find("range changed mid-stream")==std::string::npos ||
+                !pixels.planes[0].empty() || packets || runtime.liveRange()!=range) return 1;
+            if (!runtime.decodeLive(fixture,pixels,packets) || pixels.range!=range) return 1;
+            std::cout << "PASS: live BT.709 " << (range==PyroWave::YuvRange::Full ? "full" : "limited")
+                      << " fixture reached decoder, I420 range preserved; transition rejection/recovery\n";
+        }
+        return 0;
+    }
     PyroWave::Frame frame; std::string error;
     if (!PyroWave::parseCompatibilityFrame(fixtures[0].data(),fixtures[0].size(),fixtures[0].size(),frame,error)) return 1;
     for (const auto& p:frame.packets)

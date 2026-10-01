@@ -132,6 +132,9 @@ jobs:
       - name: Attempt roundtrip (hosted runner GPU may be unavailable)
         shell: pwsh
         run: |
+          & ./build/probe-${{ matrix.arch }}/Release/pyrowave-offline-proof.exe --live-range-test "$env:PYROWAVE_DEPS/install/bin" 2>&1 | Tee-Object "$env:PYROWAVE_DEPS/evidence/live-range-test.txt"
+          $rangeCode = $LASTEXITCODE
+          if ($rangeCode -ne 0 -and $rangeCode -ne 77) { throw 'Live range decode regression failed' }
           & ./build/probe-${{ matrix.arch }}/Release/pyrowave-offline-proof.exe --roundtrip "$env:PYROWAVE_DEPS/install/bin" "$env:PYROWAVE_DEPS/evidence/roundtrip" 2>&1 | Tee-Object "$env:PYROWAVE_DEPS/evidence/roundtrip.txt"
           $code = $LASTEXITCODE
           @{exitCode=$code; architecture='${{ matrix.arch }}'; runtimeQualified=$false; note='Inspect hardware/driver and decode output; hosted build alone is not GPU qualification'} | ConvertTo-Json | Set-Content "$env:PYROWAVE_DEPS/evidence/roundtrip-result.json"
@@ -164,6 +167,7 @@ jobs:
             build/pyrowave*/${{ matrix.arch }}/evidence/
             build/pyrowave*/${{ matrix.arch }}/install/
             build/probe-${{ matrix.arch }}/Release/pyrowave-offline-proof.exe
+            build/probe-${{ matrix.arch }}/Release/pyrowave-live-sdl-tests.exe
             build/probe-${{ matrix.arch }}/Release/SDL*.dll
             build/presentation-${{ matrix.arch }}/
             build/evidence/${{ matrix.arch }}/dependencies.json

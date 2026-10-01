@@ -1,5 +1,6 @@
 #include "pyrowave_decoder.h"
 #include "pyrowave_transport.h"
+#include "pyrowave_sdl.h"
 #include "streaming/session.h"
 #include "streaming/streamutils.h"
 #include <QCoreApplication>
@@ -95,12 +96,10 @@ bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
     if (params->enableVsync) flags |= SDL_RENDERER_PRESENTVSYNC;
     m_Renderer = SDL_CreateRenderer(params->window,-1,flags);
     if (!m_Renderer) return fail(QString("SDL renderer creation: ") + SDL_GetError());
-    // Qualified v15 SDL2-compat captures BT709_LIMITED at IYUV creation.
-    SDL_SetYUVConversionMode(SDL_YUV_CONVERSION_BT709);
-    m_Texture = SDL_CreateTexture(m_Renderer,SDL_PIXELFORMAT_IYUV,
-                                  SDL_TEXTUREACCESS_STREAMING,m_Width,m_Height);
-    if (!m_Texture || SDL_SetTextureBlendMode(m_Texture,SDL_BLENDMODE_NONE) != 0 ||
-        SDL_SetTextureScaleMode(m_Texture,SDL_ScaleModeLinear) != 0)
+    // Limited black is only a preflight image. The first parsed live sequence
+    // selects the actual texture colorspace on the main thread before upload.
+    m_Texture = PyroWave::createLiveTexture(m_Renderer,m_Width,m_Height,PyroWave::YuvRange::Limited);
+    if (!m_Texture)
         return fail(QString("SDL IYUV creation: ") + SDL_GetError());
     try {
         PyroWave::Pixels black;
@@ -115,7 +114,7 @@ bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
     } catch (const std::bad_alloc&) { return fail("I420 preflight allocation failed"); }
     SDL_RendererInfo info{};
     SDL_GetRendererInfo(m_Renderer,&info);
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave SDL presentation initialized: %s I420 BT.709 limited",
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave SDL presentation initialized: %s I420; live sequence range pending",
                 info.name ? info.name : "unknown");
     m_TestOnly = params->testOnly;
     if (!m_TestOnly) Session::get()->getOverlayManager().setOverlayRenderer(this);
@@ -157,10 +156,17 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
     std::string rejection;
     try {
         std::vector<std::uint8_t> bytes;
-        if (PyroWave::assembleLiveDecodeUnit(*du,bytes,rejection) &&
-            !m_Runtime.decodeLive(bytes,pixels,packets)) {
-            if (m_Runtime.frameRejected()) rejection = m_Runtime.error();
-            else { fail(QString::fromStdString(m_Runtime.error())); return DR_OK; }
+        if (PyroWave::assembleLiveDecodeUnit(*du,bytes,rejection)) {
+            const bool decoded = m_Runtime.decodeLive(bytes,pixels,packets);
+            if (m_FirstSequence && m_Runtime.liveRange()) {
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave sequence: BT.709 %s-range, SDR 4:2:0",
+                    *m_Runtime.liveRange() == PyroWave::YuvRange::Full ? "full" : "limited");
+                m_FirstSequence = false;
+            }
+            if (!decoded) {
+                if (m_Runtime.frameRejected()) rejection = m_Runtime.error();
+                else { fail(QString::fromStdString(m_Runtime.error())); return DR_OK; }
+            }
         }
     } catch (const std::bad_alloc&) { fail("live frame allocation failed"); return DR_OK; }
     if (!rejection.empty()) {
@@ -247,6 +253,13 @@ void PyroWaveVideoDecoder::renderFrameOnMainThread() {
     }
     const auto start = LiGetMicroseconds();
     if (!pixels.planes[0].empty()) {
+        if (!m_TextureRange) {
+            auto texture = PyroWave::createLiveTexture(m_Renderer,m_Width,m_Height,pixels.range);
+            if (!texture) { fail(QString("SDL BT.709 range texture: ") + SDL_GetError()); return; }
+            SDL_DestroyTexture(m_Texture);
+            m_Texture = texture;
+            m_TextureRange = pixels.range;
+        }
         if (SDL_UpdateYUVTexture(m_Texture,nullptr,pixels.planes[0].data(),m_Width,
             pixels.planes[1].data(),m_Width/2,pixels.planes[2].data(),m_Width/2) != 0) {
             fail(QString("SDL I420 upload: ") + SDL_GetError()); return;
