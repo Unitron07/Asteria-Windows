@@ -40,7 +40,10 @@ DESCRIBE/bitstream-ID checks gate negotiation. Compatibility complete frames fee
 the existing runtime and live main-thread SDL decoder. See
 [the current contract](PYROWAVE_VIBEPOLLO.md) and [owner guide](../tests/pyrowave/LIVE-OWNER-TEST.md).
 
-Build/test checks must pass on x64/native ARM64 before the artifacts are ready.
+Baseline and optional x64/native ARM64 build/test checks **PASS**. The P1a
+implementation is **COMPLETE / READY FOR HARDWARE INTEROPERABILITY TEST**;
+exact code commit, runs, package hashes and recorded GPU skips are in
+[VALIDATION.md](VALIDATION.md#m1b-p1a-live-integration-validation).
 Owner tests on RTX 4070 Ti x64 and Surface Pro 11 / Snapdragon X Plus / Adreno
 X1-85 ARM64 must still prove video updates, audio/input, resize/fullscreen,
 disconnect/reconnect and standard codec use afterward. Record logs, negotiated

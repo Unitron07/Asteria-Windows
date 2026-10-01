@@ -1,5 +1,10 @@
 # Source audit and feature matrix
 
+The historical audit below is separate from the new experimental P1a live path,
+whose implementation is ready for owner Vibepollo testing with live qualification
+**PENDING**. See [the current contract](PYROWAVE_VIBEPOLLO.md) and
+[build/test evidence](VALIDATION.md#m1b-p1a-live-integration-validation).
+
 Source review: September 12, 2026. Findings below describe the inspected snapshots. Subsequent x64 builds passed and the owner confirmed the client works; those results and their limits are recorded in [BASELINE.md](BASELINE.md). Current Asteria identity and x64/ARM64 CI packaging are implemented; M0A real-device native ARM64 validation and M1B P0-R Vibepollo-compatible x64/ARM64 hardware qualification are complete; [P0.5 offline SDL visual qualification](VALIDATION.md#m1b-p05-offline-sdl-qualification) is complete on both named targets; [P1a](NEXT_STEP.md) is next and remains future work, with live PyroWave negotiation still unimplemented; initial M1A comparisons use Moonlight's existing statistics. This historical source audit is not a list of shipped Apollo extensions; see the [README](../README.md) for current preview scope.
 
 ## Comparison snapshots

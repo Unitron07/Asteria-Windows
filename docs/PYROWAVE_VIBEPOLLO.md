@@ -5,8 +5,8 @@
 The explicit **PyroWave (Experimental)** live path is implemented behind
 `CONFIG+=pyrowave_experimental`. Live owner qualification remains **PENDING**;
 build/test evidence is recorded in [VALIDATION.md](VALIDATION.md). The implementation
-is ready for hardware interoperability testing only after both optional client
-builds and baseline CI pass. P0-R and P0.5 qualification history is unchanged.
+is **COMPLETE / READY FOR HARDWARE INTEROPERABILITY TEST**: both optional client
+builds and baseline CI pass as recorded there. P0-R and P0.5 qualification history is unchanged.
 
 The contract is Vibepollo at `8a8c4b03a280ab9f567beb380110abb80f5220b8`, codec
 `186f0393b77f7755953b5ecde994bb1cec2e4155`, bitstream ID `186f0393`, C API 0.6.0.

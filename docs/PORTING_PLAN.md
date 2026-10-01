@@ -3,8 +3,8 @@
 ## M1B P1a implementation / live qualification pending
 
 P1a's explicit experimental live SDR 8-bit 4:2:0 implementation is present;
-live Vibepollo qualification is **PENDING**. The next gate is passing baseline
-and optional x64/native ARM64 CI, then owner testing on the named RTX 4070 Ti
+live Vibepollo qualification is **PENDING**. Baseline and optional x64/native
+ARM64 CI pass; the implementation is ready for owner testing on the named RTX 4070 Ti
 and Snapdragon/Adreno targets. See [VALIDATION.md](VALIDATION.md) and
 [the owner guide](../tests/pyrowave/LIVE-OWNER-TEST.md). Auto remains standard
 codecs; failures require manual retry without host launch/resume replay.

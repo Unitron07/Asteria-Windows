@@ -2,19 +2,41 @@
 
 ## M1B P1a live integration validation
 
-Implementation exists behind the explicit optional build flag. Live owner
+Implementation is **COMPLETE / READY FOR HARDWARE INTEROPERABILITY TEST** behind
+the explicit optional build flag. Live owner
 Vibepollo qualification is **PENDING** on RTX 4070 Ti x64 and native Surface
 Pro 11 / Snapdragon X Plus / Adreno X1-85 ARM64. P0-R/P0.5 history below is unchanged.
-CI and artifact evidence must be recorded before declaring the implementation
-ready for owner interoperability testing. The live guide is
+The live guide is
 [LIVE-OWNER-TEST.md](../tests/pyrowave/LIVE-OWNER-TEST.md).
 
 Local native ARM64 portable Zig tests pass: existing parser (150 cases plus
 20,000 mutations), new strict SDP/capability/collision tests, and live-frame
 assembly/profile/bounds/recovery tests including a valid 3,546,016-byte frame.
 Baseline dependency/preflight, package architecture and ARM64 CRT-repair guard
-suites pass. Qt/MSVC x64/ARM64, optional loader/P0.5 tests and package production
-are CI gates; their final results belong here after the run completes.
+suites pass.
+
+### Recorded implementation gates (2026-10-01 UTC)
+
+Tested code commit: `be884ce1564c9651080ff991f82228d859617f80`.
+The subsequent documentation commit records these results without changing code.
+
+| Gate | Result and evidence |
+| --- | --- |
+| Upstream/candidate baseline, x64 and ARM64 | All four jobs PASS in [run 36818828101](https://github.com/Unitron07/Asteria-Windows/actions/runs/36818828101); ordinary H.264/HEVC/AV1 builds and packaging retained |
+| Optional x64/native ARM64 | Both jobs PASS in [run 36818827871](https://github.com/Unitron07/Asteria-Windows/actions/runs/36818827871), including full live client builds, qmake probe, loader/API tests, parser/legacy/presentation regressions and package gates |
+| Native ARM64 dependency | `Hostarm64/arm64` MSVC; the original unpatched Granite failure is retained, then the existing portable math compatibility patch builds and its tests PASS |
+| GPU-free tests | Five parser/policy/presentation tests and nine optional offline tests PASS on each target; existing 150 cases + 20,000 mutations and legacy 34 cases + 10,000 mutations retained |
+| P0.5 hosted lifecycle | Raw I420 hidden lifecycle PASS on both targets; codec roundtrip/recreation record exit 77 for unavailable Vulkan device. These skips do not replace prior owner P0-R/P0.5 qualification |
+| Independent package inspection | Experimental x64: 73 PE files, ARM64: 71; ordinary x64: 69, ARM64: 68. Every file has its target machine type; client imports contain no startup codec/Vulkan dependency; ordinary packages contain no runtime/manifest |
+| Provenance and state | Downloaded artifact digests, inner package hashes, DLL metadata/hashes and CI architecture reports match; notices and native runtime/CRT closure included. `git diff --check` passes; recursive gitlinks remain pinned and clean |
+
+Owner packages are available in the optional run above. Extract the artifact's
+inner ZIP and follow `RUN-ME.md`; the package includes the log collector.
+
+| Package | Inner ZIP SHA-256 |
+| --- | --- |
+| `Asteria-P1a-Experimental-x64-36818827871` | `99e3eec1601a5c7d7cf767adfb0180e5a01ae8a278bc02afd8c8e32d028a83e7` |
+| `Asteria-P1a-Experimental-arm64-36818827871` | `fad91b4afeead1c3247c5a4af5e8ad061277386563ee0dcf65aea6ca4d0066bc` |
 
 Runtime negatives retained: missing DLL, relative path, missing exports, wrong
 API and repeated cleanup. Vulkan absence/device/decoder failure is handled by
