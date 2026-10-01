@@ -130,11 +130,16 @@ No probe is implemented here, and bulk throughput would not prove UDP loss toler
 
 ## Qualification order
 
-1. **P0-R:** exact new codec pin and patches; both full-frame parsers; x64/ARM64
-   dependency, parser, loader, qmake and PE/import CI; rerun both formats on RTX
-   4070 Ti and Surface Pro 11 / Snapdragon X Plus / Adreno X1-85. Old GPU results
-   at `f6fb84...` do not requalify `186f0393...`, including ARM64.
-2. **P0.5:** use this Vibepollo-compatible build for SDL IYUV presentation;
+1. **P0-R COMPLETE:** exact new codec pin and patches; both full-frame parsers;
+   x64/ARM64 dependency, parser, loader, qmake and PE/import CI; both formats
+   hardware-qualified on RTX 4070 Ti x64 and native Surface Pro 11 / Snapdragon
+   X Plus / Adreno X1-85 ARM64, at `186f0393...`, bitstream ID `186f0393`, API 0.6.0,
+   with three decoder lifetimes, expected I420 output and malformed recovery.
+   See [current hardware evidence](VALIDATION.md#m1b-p0-r-vibepollo-validation).
+   Old `f6fb84...` GPU results remain historical.
+2. **P0.5 ACTIVE:** standalone raw/codec SDL IYUV harness implemented; code/CI
+   completion follows merge, while owner x64/ARM64 visual qualification is pending.
+   See [commands, patterns and limits](../tests/pyrowave/README.md#p05-offline-sdl-presentation). Test
    SDR color/range/chroma, resize/recreation/device loss, runtime deployment;
    validate 4:4:4 presentation separately after 4:2:0. Stay offline; keep HDR excluded.
 3. **P1a:** explicit SDR 4:2:0 choice, complete runtime/presentation preflight,

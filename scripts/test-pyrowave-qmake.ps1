@@ -33,13 +33,16 @@ foreach ($value in @($sourceRoot,$build,$qmake,$vcvars,$DependencyRoot)) {
 call "$vcvars" $vcArch
 if errorlevel 1 exit /b 1
 cd /d "$build"
-call "$qmake" "$sourceRoot\tests\pyrowave\offline.pro" "CONFIG+=release" "PYROWAVE_ROOT=$DependencyRoot/install" "VULKAN_HEADERS=$DependencyRoot/source/Granite/third_party/khronos/vulkan-headers/include"
+call "$qmake" "$sourceRoot\tests\pyrowave\offline.pro" "CONFIG+=release pyrowave_sdl" "SDL_ROOT=$sourceRoot/libs/windows" "SDL_ARCH=$Architecture" "PYROWAVE_ROOT=$DependencyRoot/install" "VULKAN_HEADERS=$DependencyRoot/source/Granite/third_party/khronos/vulkan-headers/include"
 if errorlevel 1 exit /b 1
 nmake /nologo
 if errorlevel 1 exit /b 1
 "@ | Set-Content (Join-Path $build 'compile.cmd') -Encoding ascii
 & cmd /d /c (Join-Path $build 'compile.cmd')
 if ($LASTEXITCODE) { throw 'Experimental qmake compile/link failed' }
+foreach ($dll in @('SDL2.dll','SDL3.dll')) {
+    Copy-Item -LiteralPath (Join-Path $sourceRoot "libs/windows/lib/$Architecture/$dll") -Destination (Join-Path $build 'release')
+}
 . (Join-Path $PSScriptRoot 'pyrowave/pe-machine.ps1')
 Assert-PyroWavePe (Join-Path $build 'release/pyrowave-offline-proof.exe') $Architecture |
     ConvertTo-Json | Set-Content (Join-Path $DependencyRoot 'evidence/qmake-probe-pe.json')

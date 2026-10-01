@@ -21,7 +21,7 @@ Reuse upstream's ARM64 Qt/MSVC/qmake and packaging paths. Keep architecture-spec
 | Discovery, pairing, host HTTP | `app/backend/nvcomputer.*`, `nvhttp.*` | Parse Apollo fields and add a bounded authenticated clipboard request path |
 | Session lifecycle | `app/streaming/session.cpp` | Attach extension services to the existing session |
 | Input | `app/streaming/input/` | Extend existing capture, direct-pointer, and shortcut paths |
-| Decode/render | Existing `app/streaming/` implementation | Preserve existing codecs; isolated P0 PyroWave offline GPU decode exists. Requalify the Vibepollo-compatible codec on hardware, then P0.5 SDL and P1a explicit integration |
+| Decode/render | Existing `app/streaming/` implementation | Preserve existing codecs; isolated P0 PyroWave offline GPU decode exists. P0-R is hardware-qualified on both targets; standalone P0.5 SDL harness awaits visual qualification, then P1a explicit integration |
 | Native protocol | `moonlight-common-c/moonlight-common-c/` | Keep the current upstream pin; P1 may add the reviewed minimal PyroWave protocol delta. Server-command extensions remain later work |
 | Build/package | `moonlight-qt.pro`, `app/app.pro`, `scripts/`, `wix/` | Asteria identity implemented; qualify portable packages before installer distribution |
 
@@ -58,8 +58,13 @@ startup load, runtime copy or Session hook. Existing H.264/HEVC/AV1, frame pacin
 and release packaging are unchanged.
 
 Old RTX 4070 Ti and ARM64 Surface Pro 11 / Snapdragon X Plus / Adreno X1-85
-GPU results at `f6fb84...` are historical. P0-R must requalify the new build on
-both hardware targets before P0.5 SDL/color/recreation/deployment qualification.
+GPU results at `f6fb84...` are historical. **P0-R is complete** at `186f0393...`
+on both named hardware targets: API 0.6.0, both formats, three decoder lifetimes,
+malformed rejection/recovery and expected I420 output. The isolated P0.5 probe
+adds raw/codec I420 patterns, SDL2 IYUV upload, explicit BT.709 limited conversion,
+aspect fit, nearest/linear scaling, recreation and reset-event handling. It uses
+the existing v15 SDL2 compatibility runtime backed by SDL3, with no Session
+coupling. Visual qualification on x64/ARM64 and true device loss remain pending.
 Separate 4:4:4 presentation validation follows; no HDR support is added.
 
 P1a later adds explicit SDR 4:2:0 choice (Auto remains standard codecs), complete

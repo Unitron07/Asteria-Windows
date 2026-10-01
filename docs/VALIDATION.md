@@ -127,12 +127,92 @@ tests also passed.
 **passed all four ordinary upstream/Asteria x64/ARM64 builds** at the same implementation.
 The following documentation-only evidence update does not alter tested code.
 
-New RTX 4070 Ti and Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 GPU
-requalification is **pending**. Both formats must decode expected I420 output,
-match one another, reject malformed frames and recover across three lifetimes.
-Hardware records require OS/driver/adapter and runtime/fixture/output hashes.
-Hosted Vulkan exit 77 is an explicit unavailable skip. No network, SDL, color,
-4:4:4 or HDR qualification is claimed. P0.5 follows real-hardware requalification.
+### P0-R real-hardware requalification COMPLETE
+
+Owner-supplied results qualify the exact codec above, bitstream ID `186f0393`
+and API 0.6.0 on **both targets**. Restricted `--load`, required exports and
+unload/reload pass. Combined `--roundtrip` and both individual framing commands
+pass. Both formats decode 1920x1080 I420 with plane bytes
+**2,073,600 / 518,400 / 518,400**, matching content through cycles **0, 1, 2**.
+
+| Target | Vulkan adapter | vendorID | deviceID | driverVersion (raw) | apiVersion (raw) | MAE, each format/cycle |
+| --- | --- | --- | --- | --- | --- | --- |
+| Windows x64 | NVIDIA GeForce RTX 4070 Ti | 4318 | 10114 | 2585198592 | 4211039 | 0.000694444 |
+| Surface Pro 11th Edition / Snapdragon X Plus / native Windows ARM64 | Qualcomm(R) Adreno(TM) X1-85 GPU | 20803 | 909329200 | 2151112704 | 4210983 | 0.00104167 |
+
+On each machine, compatibility framing is **60,352 bytes** and record framing
+is **60,076 bytes**. Intentional malformed compatibility input reports
+`truncated packet data or pathological length`; record input reports
+`block runs off frame`. Each is rejected and the following valid decode recovers.
+Final result on both: `PASS: known CPU pixel buffer copied; SDL IYUV-compatible
+(no SDL window/pacing or network interoperability test)`.
+
+The x64 runtime was `./pyrowave/x64/install/bin`; ARM64 used
+`./pyrowave-patched/arm64/install/bin`. These owner results, alongside the pinned
+CI artifact provenance above, complete P0-R. Exact Windows build, human-readable
+display-driver package version, and new owner runtime/output hashes were not
+provided; none are inferred from the raw Vulkan values.
+
+This qualifies codec/framing/API loading, Vulkan device/GPU decode, I420 output,
+three decoder lifetimes and malformed rejection/recovery. It does not qualify
+SDL display, color/range/chroma, scaling, pacing, resize, true device loss, 4:4:4,
+HDR, RTSP/SDP or live Vibepollo interoperability.
+
+## M1B P0.5 offline SDL qualification
+
+The isolated probe implements raw and both-framing I420 presentation, deterministic
+SDR BT.709 limited patterns, aspect-fit resize, nearest/linear controls, ten full
+lifecycles, reset-event recovery, synthetic resource recreation, SHA-256/log
+evidence and optional 60 FPS observation. See [manual commands and expected
+visuals](../tests/pyrowave/README.md#p05-offline-sdl-presentation).
+
+### Pre-PR implementation evidence
+
+Tested code commit: `3ef29a3e44d98641dde73d5b36623d263e967ec0`.
+[Optional run 36802307090](https://github.com/Unitron07/Asteria-Windows/actions/runs/36802307090)
+**passed on x64 and native ARM64**: three parser/pattern CTests, seven full probe
+CTests, exact dependency build, CMake and Qt/qmake SDL harness builds, loader
+load/reload and PE/import checks. Both runners completed ten raw SDL lifecycles
+with Direct3D11, SDL 2.32.70, IYUV support, reset/resource recreation and shutdown.
+Both hosted codec roundtrip/presentation attempts explicitly skipped unavailable
+Vulkan devices (`-5`, exit 77); these do not qualify GPU decode or visual output.
+ARM64 retained the documented portable-math retry after C1189/C2665.
+
+| P0.5 artifact (downloaded and hash-verified) | ZIP SHA-256 |
+| --- | --- |
+| [x64](https://github.com/Unitron07/Asteria-Windows/actions/runs/36802307090/artifacts/11135874197) | `1610bb6e441d46116e5ce962bf6e7b77c63d0d3db4dc0e103643e46f81caace8` |
+| [ARM64](https://github.com/Unitron07/Asteria-Windows/actions/runs/36802307090/artifacts/11136097994) | `999527438faa2b38e5a4ffe8e7954b4367c37d50019c429382c03ef9feb083b0` |
+
+The staged ARM64 executable, SDL2/SDL3 and codec DLLs were independently checked
+as PE `0xAA64`. [Baseline run 36802307336](https://github.com/Unitron07/Asteria-Windows/actions/runs/36802307336)
+**passed all four unchanged upstream/candidate x64/ARM64 jobs**. Both candidate
+portable ZIPs were downloaded, hashes checked and contents inspected: x64 has
+335 entries / 69 native PE files; ARM64 has 334 entries / 68 native PE files;
+**neither contains PyroWave content**. Local preflight, package-architecture and
+ARM64 packaging-repair tests pass. Diff/scope checks confirm no Session/common-c,
+normal app/build/packaging or baseline workflow change. The final evidence update
+changes documentation only; the tested compiled code above is unchanged.
+
+Additional automatic **hidden API checks** ran locally on native Windows x64
+(`Windows NT 10.0.26300.0`, OS/process architecture X64) and the RTX 4070 Ti,
+with the same raw Vulkan identifiers recorded for P0-R. All load/roundtrip modes,
+raw/compatibility/record presentation entries and ten full codec/SDL lifecycles
+pass. Every pattern decodes identically in both containers; saved I420 extents
+and SHA-256 match the log. SDL reports Direct3D11, flags 10, IYUV support and
+1920x1080 output. A ten-second bars loop records 600 intervals, mean 16.669404 ms,
+min/max 9.691900/25.920200 ms, zero counted missed intervals. These are submission
+observations, **not visual inspection, refresh/latency or true device-loss evidence**.
+Dense geometry checks are localized to preserve the existing packet/frame caps.
+
+Implementation is under review; record code/CI completion once merged. **Owner
+visual qualification is pending on RTX 4070 Ti x64 and native Adreno X1-85 ARM64.**
+Hosted CTests/builds and SDL submissions cannot establish visual correctness,
+centered-chroma alignment, leak freedom, production latency or true device-loss
+recovery. True device loss remains manual/unproven. 4:4:4 is separate and HDR
+remains excluded. Pinned SDL BT.709 limited conversion uses LEFT chroma metadata,
+against the authored CENTER pattern; SDL2 cannot independently select siting.
+Alignment is explicitly unqualified pending backend observation. Ordinary codecs, Session/common-c and release packaging stay
+unchanged; P1a negotiation and P1b transport have not started.
 
 ## M1B P0 offline PyroWave validation
 
@@ -205,7 +285,8 @@ display color/range/chroma correctness, pacing, 4:4:4, device-loss/recovery,
 production latency/performance comparison, and final runtime shipping/package
 policy are not yet qualified. HDR is excluded. Live RTSP/SDP negotiation is
 not implemented, and no Apollo/Vibepollo end-to-end PyroWave stream is validated.
-The current next gate is [P0-R hardware requalification](NEXT_STEP.md) with the new Vibepollo pin, then P0.5 and a
+P0-R new-codec hardware requalification is complete. The current gate is
+[P0.5 offline SDL visual qualification](NEXT_STEP.md), followed by a
 separate P1 live opt-in integration with safe standard-codec fallback and
 H.264/HEVC/AV1 regressions.
 

@@ -1,6 +1,9 @@
-name: Optional PyroWave offline P0-R
+name: Optional PyroWave offline P0.5
 on:
   workflow_dispatch:
+  # Allows both-target validation before opening the focused presentation PR.
+  push:
+    branches: ['codex/m1b-p0-5-*']
   pull_request:
     branches: [main]
     paths:
@@ -61,7 +64,11 @@ jobs:
           $root = if (Test-Path build/pyrowave-patched/arm64/install/bin/libpyrowave-shared-0.dll) { 'build/pyrowave-patched' } else { 'build/pyrowave' }
           $deps = (Resolve-Path "$root/${{ matrix.arch }}").Path
           "PYROWAVE_DEPS=$deps" >> $env:GITHUB_ENV
-          cmake -S tests/pyrowave -B build/probe-${{ matrix.arch }} -G 'Visual Studio 18 2026' -A ${{ matrix.platform }} -DPYROWAVE_EXPERIMENTAL=ON "-DPYROWAVE_ROOT=$deps/install" "-DVULKAN_HEADERS=$deps/source/Granite/third_party/khronos/vulkan-headers/include" "-DGRANITE_ROOT=$deps/source/Granite" "-DGRANITE_BUILD=$deps/build/Granite"
+          ./scripts/setup-baseline-deps.ps1 -Architecture '${{ matrix.arch }}'
+          . ./scripts/baseline-preflight.ps1
+          Assert-BaselineDependencies -SourceRoot $PWD.Path -Architecture '${{ matrix.arch }}'
+          $sdl = (Resolve-Path libs/windows).Path
+          cmake -S tests/pyrowave -B build/probe-${{ matrix.arch }} -G 'Visual Studio 18 2026' -A ${{ matrix.platform }} -DPYROWAVE_EXPERIMENTAL=ON -DPYROWAVE_SDL_PRESENTATION=ON "-DSDL_ROOT=$sdl" -DSDL_ARCH=${{ matrix.arch }} "-DPYROWAVE_ROOT=$deps/install" "-DVULKAN_HEADERS=$deps/source/Granite/third_party/khronos/vulkan-headers/include" "-DGRANITE_ROOT=$deps/source/Granite" "-DGRANITE_BUILD=$deps/build/Granite"
           if ($LASTEXITCODE) { throw 'probe configure failed' }
           cmake --build build/probe-${{ matrix.arch }} --config Release --parallel 2
           if ($LASTEXITCODE) { throw 'probe build failed' }
@@ -79,6 +86,12 @@ jobs:
           if ($LASTEXITCODE) { throw 'probe import inspection failed' }
           $imports | Set-Content "$env:PYROWAVE_DEPS/evidence/probe-imports.txt"
           if ($imports -match 'libpyrowave-shared|vulkan-1\.dll') { throw 'Probe has a forbidden startup dependency' }
+          foreach ($dll in @('SDL2.dll','SDL3.dll')) {
+            $path = Join-Path (Split-Path $exe -Parent) $dll
+            Assert-PyroWavePe $path '${{ matrix.arch }}' | ConvertTo-Json | Set-Content "$env:PYROWAVE_DEPS/evidence/$dll-pe.json"
+            & $dumpbin /imports $path | Set-Content "$env:PYROWAVE_DEPS/evidence/$dll-imports.txt"
+            if ($LASTEXITCODE) { throw 'SDL import inspection failed' }
+          }
           & $exe --load "$env:PYROWAVE_DEPS/install/bin" | Tee-Object "$env:PYROWAVE_DEPS/evidence/runtime-load.txt"
           if ($LASTEXITCODE) { throw 'runtime load test failed' }
       - name: Install Qt x64 host kit for qmake compile
@@ -115,15 +128,35 @@ jobs:
           if ($code -ne 0 -and $code -ne 77) { throw 'Roundtrip failed after runtime availability; inspect evidence' }
           # Only an explicitly unavailable Vulkan device is a recorded skip.
           exit 0
+      - name: Attempt SDL raw lifecycle and codec presentation (no visual qualification)
+        shell: pwsh
+        run: |
+          $exe = './build/probe-${{ matrix.arch }}/Release/pyrowave-offline-proof.exe'
+          foreach ($mode in @('--present-smoke','--present-recreate-test')) {
+            $label = $mode.TrimStart('-')
+            & $exe $mode "$env:PYROWAVE_DEPS/install/bin" "$env:PYROWAVE_DEPS/evidence/$label" --hidden 2>&1 | Tee-Object "$env:PYROWAVE_DEPS/evidence/$label-console.txt"
+            $code = $LASTEXITCODE
+            @{exitCode=$code; visualQualified=$false; deviceLossQualified=$false; note='0 is API submission/lifecycle only; 77 explicitly unavailable window/renderer/Vulkan; manual x64/ARM64 visual inspection pending'} | ConvertTo-Json | Set-Content "$env:PYROWAVE_DEPS/evidence/$label-result.json"
+            if ($code -ne 0 -and $code -ne 77) { throw "SDL probe failed: $label" }
+          }
+          exit 0
+      - name: Stage P0.5 manual probe and pinned SDL source notices
+        shell: pwsh
+        run: |
+          ./scripts/stage-pyrowave-presentation.ps1 -Architecture '${{ matrix.arch }}' -DependencyRoot $env:PYROWAVE_DEPS
       - name: Upload experimental binaries and evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: pyrowave-p0-r-${{ matrix.arch }}-${{ github.run_id }}
+          name: pyrowave-p0-5-${{ matrix.arch }}-${{ github.run_id }}
           path: |
             build/pyrowave*/${{ matrix.arch }}/evidence/
             build/pyrowave*/${{ matrix.arch }}/install/
             build/probe-${{ matrix.arch }}/Release/pyrowave-offline-proof.exe
+            build/probe-${{ matrix.arch }}/Release/SDL*.dll
+            build/presentation-${{ matrix.arch }}/
+            build/evidence/${{ matrix.arch }}/dependencies.json
+            build/evidence/${{ matrix.arch }}/dependency-files.json
             build/probe-${{ matrix.arch }}/Testing/
             build/parser-${{ matrix.arch }}/Release/pyrowave-parser-tests.exe
             build/parser-${{ matrix.arch }}/Testing/

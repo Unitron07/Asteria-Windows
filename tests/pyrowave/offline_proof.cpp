@@ -1,6 +1,9 @@
 #include "pyrowave_runtime.h"
 #include <fstream>
 #include <iostream>
+#ifdef PYROWAVE_SDL_PRESENTATION
+#include "sdl_presentation.h"
+#endif
 
 static bool verify(const PyroWave::Pixels& pixels, double& mae) {
     if (pixels.width!=1920 || pixels.height!=1080 || pixels.planes[0].size()!=2073600 ||
@@ -18,6 +21,9 @@ static bool verify(const PyroWave::Pixels& pixels, double& mae) {
     return mae<=8.0;
 }
 int main(int argc, char** argv) {
+#ifdef PYROWAVE_SDL_PRESENTATION
+    if (argc>1 && std::string(argv[1]).rfind("--present",0)==0) return runPresentation(argc,argv);
+#endif
     if (argc<3) {
         std::cerr << "Usage: pyrowave-offline-proof --expect-missing|--load|--roundtrip|--roundtrip-compatibility|--roundtrip-records ABSOLUTE_DLL_DIRECTORY [OUTPUT_DIRECTORY]\n";
         return 2;

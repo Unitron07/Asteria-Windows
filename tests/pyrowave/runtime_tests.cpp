@@ -17,5 +17,8 @@ int main(int argc, char** argv) {
     pixels.planes[0].resize(5);
     if (runtime.decode({},pixels) || !pixels.planes[0].empty()) return 1;
     if (runtime.createDecoder(1920,1080)) return 1;
+    std::vector<std::uint8_t> container{1,2,3};
+    if (runtime.encodeProofPixels(pixels,container) || !container.empty()) return 1;
+    if (runtime.error().find("tightly packed")==std::string::npos) return 1;
     std::cout << "PASS: relative-path rejection, rejected DLL reason, repeated cleanup, no decoder state\n";
 }
