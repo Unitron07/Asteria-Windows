@@ -184,6 +184,10 @@ foreach ($arch in $Architecture) {
         Copy-Item (Join-Path $PSScriptRoot 'pyrowave/dependencies.json') (Join-Path $install 'source-notices')
         Copy-Item (Join-Path $PSScriptRoot 'pyrowave/patches') (Join-Path $install 'source-notices/patches') -Recurse
         $runtime = Join-Path $install 'bin/libpyrowave-shared-0.dll'
+        @{codecCommit=$lock.pyrowave.commit; bitstreamId=$lock.bitstreamId;
+          apiVersion=$lock.apiVersion; architecture=$arch;
+          sha256=(Get-FileHash -LiteralPath $runtime -Algorithm SHA256).Hash.ToLowerInvariant()} |
+            ConvertTo-Json | Set-Content (Join-Path $install 'bin/pyrowave-runtime.json') -Encoding utf8
         Assert-PyroWavePe $runtime $arch | ConvertTo-Json | Set-Content (Join-Path $evidence 'runtime-pe.json')
         foreach ($kind in @('headers','imports','dependents','exports')) {
             & $dumpbin "/$kind" $runtime | Set-Content (Join-Path $evidence "runtime-$kind.txt")

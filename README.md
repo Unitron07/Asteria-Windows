@@ -1,5 +1,13 @@
 # Asteria
 
+**M1B P1a:** optional explicit **PyroWave (Experimental)** live Vibepollo SDR
+8-bit 4:2:0 path implemented; live owner qualification **PENDING**. Auto remains
+standard codecs. Experimental x64/ARM64 owner packages and test steps are in the
+[live owner guide](tests/pyrowave/LIVE-OWNER-TEST.md); the
+[protocol contract](docs/PYROWAVE_VIBEPOLLO.md) records limits and exclusions.
+Normal builds/packages retain their existing codecs and omit the PyroWave runtime.
+
+
 **Asteria** is an early-preview native Windows game-streaming client derived from [Moonlight PC](https://github.com/moonlight-stream/moonlight-qt). Enhanced integration with [Apollo](https://github.com/ClassicOldSong/Apollo) and selected desktop/workflow ideas inspired by [Artemis Android](https://github.com/MobinYengejehi/Artemis) are planned.
 
 > **Preview status:** [v0.1.0-preview.1](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0-preview.1) is released for Windows x64 and native ARM64 as unsigned portable ZIPs. Expect bugs and incomplete Asteria-specific functionality. The owner verified both CI builds work and previously validated native ARM64 execution on a Surface Pro 11th Edition; see the [release notes](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0-preview.1) and [validation record](docs/VALIDATION.md) for the tested scope and evidence limits. Report reproducible problems in [GitHub issues](https://github.com/Unitron07/Asteria-Windows/issues).

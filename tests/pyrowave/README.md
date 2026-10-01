@@ -1,5 +1,28 @@
 # Offline P0-R proof and P0.5 SDL presentation
 
+## P1a live implementation tests and owner artifacts
+
+Run `./scripts/apply-common-c-p1a.ps1` after recursive checkout and before the
+CMake commands below. The qmake application build applies this maintained patch
+automatically against the checked gitlink. New GPU-free negotiation tests use
+the actual RTSP policy; live-frame tests use the production decode-unit assembly
+and parser, test arbitrary fragment cuts, malformed/truncated/oversized inputs,
+HDR/444/range rejection, recovery and a structurally valid 3,546,016-byte frame
+with 1,501 codec packets (larger than both old offline limits). Existing parser,
+legacy, loader/export/API, Granite and P0.5 presentation suites are retained.
+
+The optional workflow also builds the full experimental app on x64/native ARM64.
+`scripts/build-pyrowave-live.ps1` invokes the established Qt/MSVC build with
+`CONFIG+=pyrowave_experimental`, verifies metadata, then stages the verified
+portable client plus `pyrowave/` runtime in a separate experimental ZIP. Normal
+CI does not build the runtime. No Vulkan/PyroWave startup imports are permitted.
+The restricted loader's CRT closure is staged in the runtime directory; all
+packaged PE types, notices and hashes are checked. See
+[LIVE-OWNER-TEST.md](LIVE-OWNER-TEST.md) for extracting, launching, selection,
+logging, manual retry and live qualification criteria. Live owner qualification
+remains PENDING; passing CI only establishes build/API/test evidence.
+
+
 This standalone parser/Windows runtime harness does not connect to a host.
 Normal Asteria builds and release packages stay unchanged; Qt/qmake remains the
 application toolchain. Experimental app compilation needs

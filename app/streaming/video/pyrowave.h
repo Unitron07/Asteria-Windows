@@ -1,0 +1,45 @@
+#pragma once
+#include "decoder.h"
+#include "overlaymanager.h"
+#include "pyrowave_runtime.h"
+#include <mutex>
+
+// Decode on common-c's VideoDec thread; all SDL resources belong to the SDL main
+// thread. One replaceable pending frame bounds queue memory and render latency.
+class PyroWaveVideoDecoder : public IVideoDecoder, public Overlay::IOverlayRenderer {
+public:
+    ~PyroWaveVideoDecoder() override;
+    bool initialize(PDECODER_PARAMETERS params) override;
+    bool isHardwareAccelerated() override { return true; }
+    bool isAlwaysFullScreen() override { return false; }
+    bool isHdrSupported() override { return false; }
+    int getDecoderCapabilities() override { return 0; } // Dedicated common-c decoder thread
+    int getDecoderColorspace() override { return COLORSPACE_REC_709; }
+    int getDecoderColorRange() override { return COLOR_RANGE_LIMITED; }
+    QSize getDecoderMaxResolution() override { return QSize(3840,2160); }
+    int submitDecodeUnit(PDECODE_UNIT du) override;
+    void renderFrameOnMainThread() override;
+    void setHdrMode(bool) override {} // Desktop HDR state never changes this SDR path
+    bool notifyWindowChanged(PWINDOW_STATE_CHANGE_INFO info) override;
+    void notifyOverlayUpdated(Overlay::OverlayType) override;
+    QString getError() override;
+
+private:
+    bool fail(const QString& reason);
+    void wakeRenderer(); // m_Mutex held
+    void updateStats();
+    void renderOverlays();
+    PyroWave::Runtime m_Runtime;
+    SDL_Renderer* m_Renderer = nullptr;
+    SDL_Texture* m_Texture = nullptr;
+    SDL_Texture* m_OverlayTextures[Overlay::OverlayMax] = {};
+    std::mutex m_Mutex;
+    PyroWave::Pixels m_Pending;
+    VIDEO_STATS m_Stats = {};
+    QString m_Error;
+    int m_Width = 0, m_Height = 0;
+    uint32_t m_LastFrameNumber = 0;
+    uint64_t m_Bytes = 0, m_StatsTime = 0, m_Rejected = 0;
+    bool m_TestOnly = true, m_EventQueued = false, m_Failed = false;
+    bool m_FirstFrame = true, m_HaveTextureFrame = false;
+};

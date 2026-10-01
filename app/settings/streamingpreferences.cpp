@@ -158,6 +158,10 @@ void StreamingPreferences::reload()
                                                   static_cast<int>(AudioConfig::AC_STEREO)).toInt());
     videoCodecConfig = static_cast<VideoCodecConfig>(settings.value(SER_VIDEOCFG,
                                                   static_cast<int>(VideoCodecConfig::VCC_AUTO)).toInt());
+    // A normal build must not retain a selectable experimental codec.
+    if (!pyrowaveAvailable() && videoCodecConfig == VCC_FORCE_PYROWAVE) {
+        videoCodecConfig = VCC_AUTO;
+    }
     videoDecoderSelection = static_cast<VideoDecoderSelection>(settings.value(SER_VIDEODEC,
                                                   static_cast<int>(VideoDecoderSelection::VDS_AUTO)).toInt());
     rendererSelection = static_cast<RendererSelection>(settings.value(SER_RENDERER,

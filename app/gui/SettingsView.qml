@@ -1610,6 +1610,9 @@ Flickable {
                 AutoResizingComboBox {
                     // ignore setting the index at first, and actually set it when the component is loaded
                     Component.onCompleted: {
+                        if (StreamingPreferences.pyrowaveAvailable) {
+                            codecListModel.append({text: qsTr("PyroWave (Experimental)"), val: StreamingPreferences.VCC_FORCE_PYROWAVE})
+                        }
                         var saved_vcc = StreamingPreferences.videoCodecConfig
 
                         // Default to Automatic (relevant if HDR is enabled,

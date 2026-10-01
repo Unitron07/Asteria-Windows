@@ -1,0 +1,163 @@
+diff --git a/src/Limelight.h b/src/Limelight.h
+index 22bee46..61c20c7 100644
+--- a/src/Limelight.h
++++ b/src/Limelight.h
+@@ -234,6 +234,15 @@ typedef struct _DECODE_UNIT {
+ #define VIDEO_FORMAT_AV1_HIGH10_444  0x8000 // AV1 High 4:4:4 10-bit profile
+ 
+ // Masks for clients to use to match video codecs without profile-specific details.
++// Asteria experimental Vibepollo SDR 8-bit 4:2:0, client-local namespace.
++#define VIDEO_FORMAT_PYROWAVE        0x010000
++#define VIDEO_FORMAT_MASK_PYROWAVE   0x0F0000
++#define ML_ERROR_PYROWAVE_PROFILE    -1100
++#define ML_ERROR_PYROWAVE_SCM        -1101
++#define ML_ERROR_PYROWAVE_RTPMAP     -1102
++#define ML_ERROR_PYROWAVE_BITSTREAM  -1103
++#define ML_ERROR_PYROWAVE_MISMATCH   -1104
++
+ #define VIDEO_FORMAT_MASK_H264   0x000F
+ #define VIDEO_FORMAT_MASK_H265   0x0F00
+ #define VIDEO_FORMAT_MASK_AV1    0xF000
+@@ -514,6 +523,13 @@ void LiInitializeConnectionCallbacks(PCONNECTION_LISTENER_CALLBACKS clCallbacks)
+ #define SCM_AV1_HIGH8_444   0x00200000 // Sunshine extension
+ #define SCM_AV1_HIGH10_444  0x00400000 // Sunshine extension
+ 
++// Vibepollo host namespace. Non-SDR420 bits are reserved/recognized only.
++#define SCM_PYROWAVE           0x00800000
++#define SCM_PYROWAVE_444       0x01000000
++#define SCM_PYROWAVE_HDR10     0x02000000
++#define SCM_PYROWAVE_HDR10_444 0x04000000
++#define SCM_MASK_PYROWAVE      0x07800000
++
+ // SCM masks to identify various codec capabilities
+ #define SCM_MASK_H264   (SCM_H264 | SCM_H264_HIGH8_444)
+ #define SCM_MASK_HEVC   (SCM_HEVC | SCM_HEVC_MAIN10 | SCM_HEVC_REXT8_444 | SCM_HEVC_REXT10_444)
+diff --git a/src/PyroWave.h b/src/PyroWave.h
+new file mode 100644
+index 0000000..9e8c744
+--- /dev/null
++++ b/src/PyroWave.h
+@@ -0,0 +1,57 @@
++#pragma once
++
++// Small, GPU-free P1a policy shared with negotiation tests. No profile fallback.
++#include "Limelight.h"
++#include <stddef.h>
++#include <string.h>
++
++typedef struct _PYROWAVE_SDP_INFO {
++    int offered;
++    char bitstream[9];
++} PYROWAVE_SDP_INFO;
++
++static inline const char* pyrowaveNegotiationError(int error) {
++    switch (error) {
++    case ML_ERROR_PYROWAVE_PROFILE: return "explicit SDR 8-bit 4:2:0 PyroWave format required";
++    case ML_ERROR_PYROWAVE_SCM: return "authenticated host lacks SCM_PYROWAVE (SDR 4:2:0)";
++    case ML_ERROR_PYROWAVE_RTPMAP: return "DESCRIBE lacks a=rtpmap:99 PYROWAVE/90000";
++    case ML_ERROR_PYROWAVE_BITSTREAM: return "DESCRIBE bitstream ID missing, malformed or duplicated";
++    case ML_ERROR_PYROWAVE_MISMATCH: return "host bitstream ID does not match local 186f0393";
++    default: return "PyroWave negotiation failed";
++    }
++}
++
++static inline int validatePyroWaveSdp(int formats, int scm, const char* sdp,
++                                     size_t size, PYROWAVE_SDP_INFO* info) {
++    const char marker[] = "a=rtpmap:99 PYROWAVE/90000";
++    const char prefix[] = "a=x-ss-pyrowave.bitstream:";
++    size_t start = 0;
++    int ids = 0, malformed = 0;
++    memset(info, 0, sizeof(*info));
++    if (sdp) while (start < size) {
++        size_t end = start, length, i;
++        while (end < size && sdp[end] != '\n') ++end;
++        length = end - start;
++        if (length && sdp[start + length - 1] == '\r') --length;
++        if (length == sizeof(marker) - 1 && !memcmp(sdp + start, marker, length)) info->offered = 1;
++        if (length >= sizeof(prefix) - 1 && !memcmp(sdp + start, prefix, sizeof(prefix) - 1)) {
++            ++ids;
++            if (length != sizeof(prefix) - 1 + 8) malformed = 1;
++            else {
++                const char* id = sdp + start + sizeof(prefix) - 1;
++                for (i = 0; i < 8; ++i)
++                    if (!((id[i] >= '0' && id[i] <= '9') || (id[i] >= 'a' && id[i] <= 'f') ||
++                          (id[i] >= 'A' && id[i] <= 'F'))) malformed = 1;
++                if (!malformed) memcpy(info->bitstream, id, 8);
++            }
++        }
++        start = end + 1;
++    }
++    // Mixed masks (including HDR/444) are refused rather than choosing another codec.
++    if (formats != VIDEO_FORMAT_PYROWAVE) return ML_ERROR_PYROWAVE_PROFILE;
++    if (!(scm & SCM_PYROWAVE)) return ML_ERROR_PYROWAVE_SCM;
++    if (!info->offered) return ML_ERROR_PYROWAVE_RTPMAP;
++    if (ids != 1 || malformed) return ML_ERROR_PYROWAVE_BITSTREAM;
++    if (strcmp(info->bitstream, "186f0393")) return ML_ERROR_PYROWAVE_MISMATCH;
++    return 0;
++}
+diff --git a/src/RtspConnection.c b/src/RtspConnection.c
+index e958101..45e4a7f 100644
+--- a/src/RtspConnection.c
++++ b/src/RtspConnection.c
+@@ -1,4 +1,5 @@
+ #include "Limelight-internal.h"
++#include "PyroWave.h"
+ #include "Rtsp.h"
+ 
+ #define RTSP_CONNECT_TIMEOUT_SEC 10
+@@ -1087,7 +1088,22 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
+             goto Exit;
+         }
+ 
+-        if ((StreamConfig.supportedVideoFormats & VIDEO_FORMAT_MASK_AV1) && strstr(response.payload, "AV1/90000")) {
++        if (StreamConfig.supportedVideoFormats & VIDEO_FORMAT_MASK_PYROWAVE) {
++            PYROWAVE_SDP_INFO info;
++            ret = validatePyroWaveSdp(StreamConfig.supportedVideoFormats,
++                                     serverInfo->serverCodecModeSupport,
++                                     response.payload, response.payloadLength, &info);
++            Limelog("PyroWave DESCRIBE: SCM=%s PYROWAVE/90000=%s host bitstream=%s local=186f0393\n",
++                    (serverInfo->serverCodecModeSupport & SCM_PYROWAVE) ? "yes" : "no",
++                    info.offered ? "yes" : "no", info.bitstream[0] ? info.bitstream : "missing/invalid");
++            if (ret != 0) {
++                Limelog("PyroWave rejected: %s\n", pyrowaveNegotiationError(ret));
++                freeMessage(&response);
++                goto Exit;
++            }
++            NegotiatedVideoFormat = VIDEO_FORMAT_PYROWAVE;
++        }
++        else if ((StreamConfig.supportedVideoFormats & VIDEO_FORMAT_MASK_AV1) && strstr(response.payload, "AV1/90000")) {
+             if ((serverInfo->serverCodecModeSupport & SCM_AV1_HIGH10_444) && (StreamConfig.supportedVideoFormats & VIDEO_FORMAT_AV1_HIGH10_444)) {
+                 NegotiatedVideoFormat = VIDEO_FORMAT_AV1_HIGH10_444;
+             }
+diff --git a/src/SdpGenerator.c b/src/SdpGenerator.c
+index 22467c0..318b907 100644
+--- a/src/SdpGenerator.c
++++ b/src/SdpGenerator.c
+@@ -431,7 +431,11 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
+         snprintf(payloadStr, sizeof(payloadStr), "%d", slicesPerFrame);
+         err |= addAttributeString(&optionHead, "x-nv-video[0].videoEncoderSlicesPerFrame", payloadStr);
+ 
+-        if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_AV1) {
++        if (NegotiatedVideoFormat == VIDEO_FORMAT_PYROWAVE) {
++            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "3");
++            // Omit PyroWave features and adaptiveFec: either opts into P1b records.
++        }
++        else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_AV1) {
+             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "2");
+         }
+         else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
+diff --git a/src/VideoDepacketizer.c b/src/VideoDepacketizer.c
+index 5baa1d5..b33ef6f 100644
+--- a/src/VideoDepacketizer.c
++++ b/src/VideoDepacketizer.c
+@@ -215,8 +215,8 @@ void validateDecodeUnitForPlayback(PDECODE_UNIT decodeUnit) {
+             LC_ASSERT_VT(decodeUnit->bufferList->next->next->bufferType == BUFFER_TYPE_PPS);
+             LC_ASSERT_VT(decodeUnit->bufferList->next->next->next != NULL);
+         }
+-        else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_AV1) {
+-            // We don't parse the AV1 bitstream
++        else if (NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_AV1 | VIDEO_FORMAT_MASK_PYROWAVE)) {
++            // AV1 and PyroWave are opaque picture data; retain full-frame assembly
+             LC_ASSERT_VT(decodeUnit->bufferList->bufferType == BUFFER_TYPE_PICDATA);
+         }
+         else {

@@ -1,5 +1,28 @@
 # Architecture
 
+## M1B P1a implementation / live qualification pending
+
+The explicit experimental PyroWave path now uses a dedicated `IVideoDecoder`
+with the existing runtime/parser, common-c complete decode units and main-thread
+SDL IYUV presentation. Session gates host launch on runtime/API/provenance,
+Vulkan/device/decoder and SDL preflight; paired pinned HTTPS SCM plus strict
+DESCRIBE/bitstream-ID checks gate negotiation. Audio/input remain on existing
+Moonlight paths. Auto and standard codec selection are unchanged.
+
+Only SDR 8-bit I420 BT.709 limited is accepted. The render queue contains one
+replaceable pending image; the existing statistics overlay receives decoder
+rates, bytes, loss, timing and RTT. Failures clean up normally and require manual
+retry with a standard codec, avoiding automatic launch/resume replay. The
+maintained common-c patch keeps the upstream gitlink and submodule layout intact.
+Optional x64/ARM64 packages stage runtime/CRT closure and provenance separately
+from ordinary builds. See [the current contract](PYROWAVE_VIBEPOLLO.md) for bounds,
+strict parsing, chroma caveat and P1b/later exclusions. Live owner qualification
+is **PENDING**; build success alone does not establish interoperability.
+
+The earlier milestone descriptions below retain the P0/P0-R/P0.5 history;
+future P1a statements there are superseded by the implementation above.
+
+
 ## Decision: extend a Moonlight PC fork
 
 Use Moonlight PC as the application, retaining its source history and layout. Do not build a second Windows shell or extract its streaming internals into a new framework for the first release. This follows the project owner's September 12, 2026 direction.

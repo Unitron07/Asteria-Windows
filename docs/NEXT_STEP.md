@@ -1,4 +1,4 @@
-# Next step: M1B P1a live Vibepollo SDR 4:2:0 integration (future)
+# Next step: qualify M1B P1a live Vibepollo SDR 4:2:0
 
 **P0-R is COMPLETE** on Windows x64 RTX 4070 Ti and native Windows ARM64
 Surface Pro 11th Edition / Snapdragon X Plus / Adreno X1-85. The exact codec is
@@ -31,18 +31,22 @@ validate live RTP/UDP, SCM/RTSP/SDP, Vibepollo host interoperability, adaptive F
 partial-frame recovery or bandwidth probing. Normal application/release behavior
 is unchanged.
 
-## P1a NEXT / FUTURE: explicit live SDR 4:2:0
+## P1a implemented: hardware interoperability qualification PENDING
 
-P1a is not implemented by this documentation update. Future work would add explicit
-experimental codec choice, complete runtime/presentation preflight,
-bitstream-ID verification, minimal audited SCM/RTSP/SDP/common-c changes and
-Vibepollo LE length-prefixed compatibility framing. Auto remains standard codec
-selection. Refuse/warn on missing/mismatched bitstream ID; API 0.6.0 is a separate
-compatibility axis. Validate safe standard-codec fallback/reconnect without
-replaying host-app actions, setup/encoder failure, absent/partial capabilities,
-missing/wrong DLL/export/API/driver, device loss, software policy and HDR exclusion.
-Re-run H.264/HEVC/AV1 lifecycle/audio/input tests and named-target measurements.
-No live work is implemented in P0-R or P0.5.
+The experimental explicit live SDR 8-bit 4:2:0 path is implemented. Auto stays
+on standard codecs. Restricted runtime/API/build-metadata preflight and real SDL
+IYUV resource/upload checks occur before host launch; paired HTTPS SCM and strict
+DESCRIBE/bitstream-ID checks gate negotiation. Compatibility complete frames feed
+the existing runtime and live main-thread SDL decoder. See
+[the current contract](PYROWAVE_VIBEPOLLO.md) and [owner guide](../tests/pyrowave/LIVE-OWNER-TEST.md).
+
+Build/test checks must pass on x64/native ARM64 before the artifacts are ready.
+Owner tests on RTX 4070 Ti x64 and Surface Pro 11 / Snapdragon X Plus / Adreno
+X1-85 ARM64 must still prove video updates, audio/input, resize/fullscreen,
+disconnect/reconnect and standard codec use afterward. Record logs, negotiated
+extent/FPS/bitrate, GPU and runtime/API/bitstream IDs in VALIDATION.md. Do not
+mark P1a fully complete from CI alone. Retry failures manually using a standard
+codec; no host launch/resume is automatically repeated.
 
 ## P1b LATER: transport hardening
 

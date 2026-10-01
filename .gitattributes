@@ -1,3 +1,4 @@
 scripts/pyrowave/*.patch text eol=lf
+scripts/pyrowave/common-c-p1a.patch whitespace=-blank-at-eol
 scripts/pyrowave/patches/*.patch text eol=lf
 scripts/pyrowave/*.bundle -text

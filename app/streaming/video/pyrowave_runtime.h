@@ -10,7 +10,7 @@
 #include <filesystem>
 
 namespace PyroWave {
-// Single-threaded P0 owner. Module outlives every device/decoder and API call.
+// Serialized P0/live owner. Module outlives every device/decoder and API call.
 // No global instance and no startup load. Missing DLL is a normal false result.
 class Runtime {
 public:
@@ -21,6 +21,10 @@ public:
     bool load(const std::filesystem::path& dependencyDirectory);
     bool createDecoder(int width, int height);
     bool decode(const std::vector<std::uint8_t>& container, Pixels& output);
+    bool decodeLive(const std::vector<std::uint8_t>& container, Pixels& output,
+                    std::size_t& packetCount);
+    bool frameRejected() const { return m_FrameRejected; }
+    void discardFrame();
     void resetDecoder();
     void close();
     const std::string& error() const { return m_Error; }
@@ -34,6 +38,9 @@ public:
                            Framing framing = Framing::Compatibility);
 
 private:
+    bool decodeImpl(const std::vector<std::uint8_t>& container, Pixels& output,
+                    bool live, std::size_t* packetCount);
+    bool m_FrameRejected = false;
     bool fail(const std::string& reason);
     bool check(pyrowave_result result, const char* operation);
     void* symbol(const char* name);

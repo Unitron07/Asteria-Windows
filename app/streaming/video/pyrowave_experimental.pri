@@ -1,4 +1,4 @@
-# Explicit P0 experiment. No DLL import, post-copy, startup or Session hook.
+# Explicit experiment. Restricted runtime load only when selected; no DLL import.
 pyrowave_experimental {
     !win32: error("The PyroWave P0 runtime is Windows only")
     isEmpty(PYROWAVE_ROOT): error("Set PYROWAVE_ROOT to the matching target install directory")
@@ -9,4 +9,9 @@ pyrowave_experimental {
     INCLUDEPATH += $$PYROWAVE_ROOT/include/pyrowave $$VULKAN_HEADERS
     SOURCES += $$PWD/pyrowave_frame.cpp $$PWD/pyrowave_runtime.cpp
     HEADERS += $$PWD/pyrowave_frame.h $$PWD/pyrowave_runtime.h
+    # Offline probe includes this pri too; only the actual app owns Session/Qt.
+    equals(TARGET, Asteria) {
+        SOURCES += $$PWD/pyrowave.cpp
+        HEADERS += $$PWD/pyrowave.h $$PWD/pyrowave_pixels.h
+    }
 }

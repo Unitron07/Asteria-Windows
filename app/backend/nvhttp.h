@@ -120,6 +120,9 @@ public:
     QString
     getServerInfo(NvLogLevel logLevel, bool fastFail = false);
 
+    // No HTTP fallback: optional codec capability must come from pinned HTTPS.
+    QString getAuthenticatedServerInfo();
+
     static
     void
     verifyResponseStatus(QString xml);

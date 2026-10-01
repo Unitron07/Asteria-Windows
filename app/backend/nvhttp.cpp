@@ -130,6 +130,20 @@ NvHTTP::getCurrentGame(QString serverInfo)
     }
 }
 
+QString NvHTTP::getAuthenticatedServerInfo()
+{
+    if (m_ServerCert.isNull() || httpsPort() == 0) {
+        throw GfeHttpResponseException(401, "PyroWave requires a paired host and pinned HTTPS serverinfo");
+    }
+    QString xml = openConnectionToString(m_BaseUrlHttps, "serverinfo", nullptr,
+                                         REQUEST_TIMEOUT_MS, NVLL_ERROR);
+    verifyResponseStatus(xml);
+    if (getXmlString(xml, "PairStatus") != "1") {
+        throw GfeHttpResponseException(401, "PyroWave host is not paired");
+    }
+    return xml;
+}
+
 QString
 NvHTTP::getServerInfo(NvLogLevel logLevel, bool fastFail)
 {

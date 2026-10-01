@@ -1,5 +1,34 @@
 # Validation and release evidence
 
+## M1B P1a live integration validation
+
+Implementation exists behind the explicit optional build flag. Live owner
+Vibepollo qualification is **PENDING** on RTX 4070 Ti x64 and native Surface
+Pro 11 / Snapdragon X Plus / Adreno X1-85 ARM64. P0-R/P0.5 history below is unchanged.
+CI and artifact evidence must be recorded before declaring the implementation
+ready for owner interoperability testing. The live guide is
+[LIVE-OWNER-TEST.md](../tests/pyrowave/LIVE-OWNER-TEST.md).
+
+Local native ARM64 portable Zig tests pass: existing parser (150 cases plus
+20,000 mutations), new strict SDP/capability/collision tests, and live-frame
+assembly/profile/bounds/recovery tests including a valid 3,546,016-byte frame.
+Baseline dependency/preflight, package architecture and ARM64 CRT-repair guard
+suites pass. Qt/MSVC x64/ARM64, optional loader/P0.5 tests and package production
+are CI gates; their final results belong here after the run completes.
+
+Runtime negatives retained: missing DLL, relative path, missing exports, wrong
+API and repeated cleanup. Vulkan absence/device/decoder failure is handled by
+the same runtime wrapper; unavailable hosted Vulkan is a recorded skip, while
+failures after device availability fail optional CI. Live SDL preflight and
+authenticated host behavior require the owner tests; no hosted GPU test proves
+Vibepollo interoperability, audio/input, true device loss or visual correctness.
+
+Manual failure/retry does not relaunch a host app automatically. Deferred scope:
+live records/loss metadata/critical counts, adaptive FEC, partial/sideband decode,
+bandwidth probing, 444/HDR and advanced pacing. See the
+[current implementation contract](PYROWAVE_VIBEPOLLO.md).
+
+
 This is the qualification checklist. The [baseline report](BASELINE.md) records the merged M0 import, successful x64 CI, local upstream CLI startup, and the owner's successful manual test confirmation. M0A native ARM64 is complete from the owner's recorded Surface Pro 11th Edition test below. Exact release artifact/host details and some individual hardware cases remain undocumented. Attach new results to the relevant milestone PR and link them from release notes; distinguish source inspection, builds, general user confirmation, and measured hardware tests.
 
 ## Recorded manual test

@@ -1,7 +1,6 @@
 QT += core quick network quickcontrols2 svg
 CONFIG += c++17
 
-include(streaming/video/pyrowave_experimental.pri)
 
 unix:!macx {
     TARGET = asteria
@@ -11,6 +10,7 @@ unix:!macx {
 }
 
 include(../globaldefs.pri)
+include(streaming/video/pyrowave_experimental.pri)
 
 # Precompile QML files to avoid writing qmlcache on portable versions.
 # Since this binds the app against the Qt runtime version, we will only
