@@ -67,6 +67,11 @@ int main() {
     for (std::size_t i=0;i<PyroWave::MaxPackets;++i) { word(maxPackets,1); maxPackets.push_back(42); }
     test("exact packet limit",maxPackets,true);
     auto r=records(); test("records out of index order",r,true,&sdr);
+    test("complete all-zero coefficient frame",sequence(0),true,&sdr);
+    b=sequence(1,1,1); block(b,0); test("minimum extent mapping",b,true);
+    b=sequence(1,16384,16384); block(b,0); test("maximum extent mapping",b,true);
+    const PyroWave::StreamContext chroma444{1920,1080,PyroWave::Chroma::Yuv444,true};
+    b=sequence(1,1920,1080,1); block(b,0); test("444 parser geometry only",b,true,&chroma444);
     PyroWave::Frame f; std::string error;
     require(PyroWave::parseFrame(r.data(),r.size(),r.size(),f,error,&sdr),"record offsets");
     require(f.framing==PyroWave::Framing::Records&&f.packets.size()==3&&f.packets[1].offset==8&&
@@ -81,6 +86,10 @@ int main() {
     b=r; set(b,8,(3u<<28)|(1u<<16)|1); test("short payload words",b,false);
     b=r; set(b,8,(3u<<28)|(2u<<16)|1); test("conditional zero block",b,false);
     b=r; set(b,8,(3u<<28)|(4095u<<16)|1); test("record runs off frame",b,false);
+    b=r; set(b,8,(3u<<28)|(3u<<16)|0xffffu); test("missing control words",b,false);
+    b=r; b[18]=15; test("coefficient planes run off block",b,false);
+    b=r; set(b,8,(3u<<28)|(3u<<16)); test("zero ballot omitted by codec",b,false);
+    b=r; set(b,12,3u<<8); set(b,8,(3u<<28)|(3u<<16)|16); test("partial edge ballot outside mapping",b,false);
     b=r; set(b,4,1); test("excess records",b,false);
     b=r; set(b,4,3); test("missing records",b,false);
     b=r; set(b,4,0xffffffu); test("pathological block count",b,false);

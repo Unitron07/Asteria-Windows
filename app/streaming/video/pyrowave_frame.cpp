@@ -171,7 +171,7 @@ bool scanRecords(const std::uint8_t* data, const std::vector<Packet>& spans,
                 sequence.totalBlocks = b & 0xffffffu;
                 sequence.chroma = b & (1u << 26) ? Chroma::Yuv444 : Chroma::Yuv420;
                 sequence.blockCapacity = blockCapacity(sequence);
-                if (!sequence.totalBlocks || sequence.totalBlocks > sequence.blockCapacity ||
+                if (sequence.totalBlocks > sequence.blockCapacity ||
                     sequence.totalBlocks > MaxRecords)
                     return reject(frame,error,"impossible total block count");
                 if (context && (context->width != sequence.width || context->height != sequence.height ||
