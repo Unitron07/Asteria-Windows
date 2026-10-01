@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/branding/asteria-logo.png" alt="Asteria logo" width="280">
+</p>
+
 # Asteria
 
 **M1B P1a:** optional explicit **PyroWave (Experimental)** live Vibepollo SDR

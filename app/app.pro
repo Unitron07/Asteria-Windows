@@ -547,7 +547,7 @@ unix:!macx: {
     INSTALLS += target desktop icons appstream
 }
 win32 {
-    RC_ICONS = moonlight.ico
+    RC_ICONS = asteria.ico
     QMAKE_TARGET_COMPANY = Asteria Project
     QMAKE_TARGET_DESCRIPTION = Asteria Streaming Client
     QMAKE_TARGET_PRODUCT = Asteria

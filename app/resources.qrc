@@ -12,7 +12,8 @@
         <file>res/settings.svg</file>
         <file>res/arrow_left.svg</file>
         <file>res/question_mark.svg</file>
-        <file>res/moonlight.svg</file>
+        <file alias="res/moonlight.svg">res/asteria.svg</file>
+        <file>asteria.ico</file>
         <file>res/update.svg</file>
         <file>res/baseline-help_outline-24px.svg</file>
         <file>res/baseline-error_outline-24px.svg</file>
