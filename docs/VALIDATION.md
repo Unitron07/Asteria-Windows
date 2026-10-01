@@ -107,7 +107,7 @@ qmake and PE/import evidence for x64 and native ARM64.
 
 Local environment has Git/PowerShell but no MSVC/CMake/Qt. Pinned source headers
 and all patch applicability/hashes were audited locally; build execution is
-assigned to optional CI. New CI results will be recorded here after completion.
+assigned to optional CI. [P0-R run 36795356376](https://github.com/Unitron07/Asteria-Windows/actions/runs/36795356376) records the implementation at `99631f93d69129c3b55fcdce6443186232351d3a`; [baseline run 36795356626](https://github.com/Unitron07/Asteria-Windows/actions/runs/36795356626) tests ordinary builds. Consult their completed job results and artifacts for exact checks/skip evidence.
 New RTX 4070 Ti and Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 GPU
 requalification is **pending**. Both formats must decode expected I420 output,
 match one another, reject malformed frames and recover across three lifetimes.

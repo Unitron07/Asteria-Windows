@@ -1,6 +1,6 @@
 # Source audit and feature matrix
 
-Source review: September 12, 2026. Findings below describe the inspected snapshots. Subsequent x64 builds passed and the owner confirmed the client works; those results and their limits are recorded in [BASELINE.md](BASELINE.md). Current Asteria identity and x64/ARM64 CI packaging are implemented; M0A real-device native ARM64 validation is complete and M1B source-diff groundwork and P0 offline x64/ARM64 GPU decode proof are complete; [P0.5 presentation qualification](NEXT_STEP.md) is next, with live PyroWave negotiation still unimplemented; initial M1A comparisons use Moonlight's existing statistics. This historical source audit is not a list of shipped Apollo extensions; see the [README](../README.md) for current preview scope.
+Source review: September 12, 2026. Findings below describe the inspected snapshots. Subsequent x64 builds passed and the owner confirmed the client works; those results and their limits are recorded in [BASELINE.md](BASELINE.md). Current Asteria identity and x64/ARM64 CI packaging are implemented; M0A real-device native ARM64 validation is complete and M1B source-diff groundwork and P0 offline x64/ARM64 GPU decode proof are complete; [P0-R Vibepollo compatibility and new-codec hardware requalification](NEXT_STEP.md) is next, with live PyroWave negotiation still unimplemented; initial M1A comparisons use Moonlight's existing statistics. This historical source audit is not a list of shipped Apollo extensions; see the [README](../README.md) for current preview scope.
 
 ## Comparison snapshots
 
