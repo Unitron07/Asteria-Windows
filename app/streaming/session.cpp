@@ -4,6 +4,10 @@
 #include "backend/richpresencemanager.h"
 
 #include <Limelight.h>
+#include <PyroWave.h>
+#ifdef PYROWAVE_EXPERIMENTAL
+#include "video/pyrowave_decoder.h"
+#endif
 #include "SDL_compat.h"
 #include "utils.h"
 
@@ -83,10 +87,22 @@ void Session::clStageFailed(int stage, int errorCode)
     char failingPorts[128];
     LiStringifyPortFlags(portFlags, ", ", failingPorts, sizeof(failingPorts));
     emit s_ActiveSession->stageFailed(QString::fromLocal8Bit(LiGetStageName(stage)), errorCode, QString(failingPorts));
+    if (s_ActiveSession->m_StreamConfig.supportedVideoFormats == VIDEO_FORMAT_PYROWAVE) {
+        const QString reason = errorCode <= ML_ERROR_PYROWAVE_PROFILE && errorCode >= ML_ERROR_PYROWAVE_MISMATCH ?
+            QString::fromLatin1(pyrowaveNegotiationError(errorCode)) :
+            tr("Host setup/encoder or connection failed (error %1)").arg(errorCode);
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"PyroWave attempt ended: %s; manual standard-codec retry required",qPrintable(reason));
+        // StreamSegue uses one dialog: emit last so the generic stage message
+        // cannot overwrite the exact bitstream/profile rejection and retry hint.
+        emit s_ActiveSession->displayLaunchError(tr("PyroWave: %1. Select Auto, H.264, HEVC or AV1 and reconnect. The host app was not automatically relaunched.").arg(reason));
+    }
 }
 
 void Session::clConnectionTerminated(int errorCode)
 {
+    if (s_ActiveSession->m_StreamConfig.supportedVideoFormats == VIDEO_FORMAT_PYROWAVE) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"PyroWave connection terminated: %d; release resources and retry manually (no host launch replay)",errorCode);
+    }
     unsigned int portFlags = LiGetPortFlagsFromTerminationErrorCode(errorCode);
     s_ActiveSession->m_PortTestResults = LiTestClientConnectivity(CONN_TEST_SERVER, 443, portFlags);
 
@@ -278,8 +294,9 @@ void Session::clSetAdaptiveTriggers(uint16_t controllerNumber, uint8_t eventFlag
 bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
                             StreamingPreferences::RendererSelection renderer,
                             SDL_Window* window, int videoFormat, int width, int height,
-                            int frameRate, bool enableVsync, bool enableFramePacing, bool testOnly, IVideoDecoder*& chosenDecoder)
+                            int frameRate, bool enableVsync, bool enableFramePacing, bool testOnly, IVideoDecoder*& chosenDecoder, QString* error)
 {
+    chosenDecoder = nullptr;
     DECODER_PARAMETERS params;
 
     // We should never have vsync enabled for test-mode.
@@ -301,6 +318,20 @@ bool Session::chooseDecoder(StreamingPreferences::VideoDecoderSelection vds,
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                 "V-sync %s",
                 enableVsync ? "enabled" : "disabled");
+
+    // Never hand PyroWave bytes or profile probes to FFmpeg/SLVideo.
+    if (videoFormat & VIDEO_FORMAT_MASK_PYROWAVE) {
+#ifdef PYROWAVE_EXPERIMENTAL
+        chosenDecoder = new PyroWaveVideoDecoder();
+        if (chosenDecoder->initialize(&params)) return true;
+        if (error) *error = chosenDecoder->getError();
+        delete chosenDecoder;
+        chosenDecoder = nullptr;
+#else
+        if (error) *error = "This build does not contain experimental PyroWave support";
+#endif
+        return false;
+    }
 
 #ifdef HAVE_SLVIDEO
     chosenDecoder = new SLVideoDecoder(testOnly);
@@ -512,6 +543,7 @@ Session::getDecoderAvailability(SDL_Window* window,
 bool Session::populateDecoderProperties(SDL_Window* window)
 {
     IVideoDecoder* decoder;
+    QString preflightError;
 
     // NB: We pass the real renderer selection rather than RS_PROBE_ONLY
     // here because this is operating on the real streaming window, and
@@ -524,7 +556,10 @@ bool Session::populateDecoderProperties(SDL_Window* window)
                        m_StreamConfig.width,
                        m_StreamConfig.height,
                        m_StreamConfig.fps,
-                       false, false, true, decoder)) {
+                       false, false, true, decoder, &preflightError)) {
+        if (m_SupportedVideoFormats.first() == VIDEO_FORMAT_PYROWAVE) {
+            emit displayLaunchError(tr("PyroWave preflight failed: %1. Select a standard codec and reconnect.").arg(preflightError));
+        }
         return false;
     }
 
@@ -537,7 +572,8 @@ bool Session::populateDecoderProperties(SDL_Window* window)
         m_VideoCallbacks.submitDecodeUnit = drSubmitDecodeUnit;
     }
 
-    if (Utils::getEnvironmentVariableOverride("COLOR_SPACE_OVERRIDE", &m_StreamConfig.colorSpace)) {
+    if (m_SupportedVideoFormats.first() != VIDEO_FORMAT_PYROWAVE &&
+        Utils::getEnvironmentVariableOverride("COLOR_SPACE_OVERRIDE", &m_StreamConfig.colorSpace)) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Using colorspace override: %d",
                     m_StreamConfig.colorSpace);
@@ -546,7 +582,8 @@ bool Session::populateDecoderProperties(SDL_Window* window)
         m_StreamConfig.colorSpace = decoder->getDecoderColorspace();
     }
 
-    if (Utils::getEnvironmentVariableOverride("COLOR_RANGE_OVERRIDE", &m_StreamConfig.colorRange)) {
+    if (m_SupportedVideoFormats.first() != VIDEO_FORMAT_PYROWAVE &&
+        Utils::getEnvironmentVariableOverride("COLOR_RANGE_OVERRIDE", &m_StreamConfig.colorRange)) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Using color range override: %d",
                     m_StreamConfig.colorRange);
@@ -851,6 +888,11 @@ bool Session::initialize(QQuickWindow* qtWindow)
 #endif
         break;
     }
+    case StreamingPreferences::VCC_FORCE_PYROWAVE:
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"User explicitly selected PyroWave (Experimental)");
+        m_SupportedVideoFormats.clear();
+        m_SupportedVideoFormats.append(VIDEO_FORMAT_PYROWAVE);
+        break;
     case StreamingPreferences::VCC_FORCE_H264:
         m_SupportedVideoFormats.removeByMask(~VIDEO_FORMAT_MASK_H264);
         break;
@@ -974,6 +1016,30 @@ bool Session::validateLaunch(SDL_Window* testWindow)
     if (!m_Computer->isSupportedServerVersion) {
         emit displayLaunchError(tr("The version of GeForce Experience on %1 is not supported by this build of Asteria. You must update Asteria to stream from %1.").arg(m_Computer->name));
         return false;
+    }
+
+    if (m_Preferences->videoCodecConfig == StreamingPreferences::VCC_FORCE_PYROWAVE) {
+        QString reason;
+#ifndef PYROWAVE_EXPERIMENTAL
+        reason = tr("This build has no PyroWave support");
+#else
+        if (m_Preferences->enableHdr) reason = tr("Turn HDR off for PyroWave P1a");
+        else if (m_Preferences->enableYUV444) reason = tr("Turn YUV 4:4:4 off for PyroWave P1a");
+        else if (m_Preferences->videoDecoderSelection == StreamingPreferences::VDS_FORCE_SOFTWARE)
+            reason = tr("PyroWave requires Vulkan GPU decoding");
+        else if (m_Preferences->packetSize != 0 && (m_Preferences->packetSize < 1024 || m_Preferences->packetSize > 2048))
+            reason = tr("PyroWave P1a transport packet size must be 1024..2048 bytes");
+        else if (m_Computer->serverCert.isNull()) reason = tr("Pair the host before using PyroWave");
+        else if (!(m_Computer->serverCodecModeSupport & SCM_PYROWAVE))
+            reason = tr("Host lacks SCM_PYROWAVE for SDR 8-bit 4:2:0");
+#endif
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave host cached SCM_PYROWAVE=%s (0x%x); pinned HTTPS refresh required before launch",
+                    (m_Computer->serverCodecModeSupport & SCM_PYROWAVE) ? "yes" : "no",m_Computer->serverCodecModeSupport);
+        if (!reason.isEmpty()) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"PyroWave rejected: %s",qPrintable(reason));
+            emit displayLaunchError(tr("PyroWave: %1. Select Auto or a standard codec and reconnect.").arg(reason));
+            return false;
+        }
     }
 
     if (m_Preferences->absoluteMouseMode && !m_App.isAppCollectorGame) {
@@ -1608,9 +1674,24 @@ bool Session::startConnectionAsync()
     }
 
     QString rtspSessionUrl;
+    int authenticatedCodecModes = m_Computer->serverCodecModeSupport;
 
     try {
         NvHTTP http(m_Computer);
+        if (m_StreamConfig.supportedVideoFormats == VIDEO_FORMAT_PYROWAVE) {
+            // Refresh through the paired, certificate-pinned HTTPS path. The
+            // ordinary discovery helper may fall back to HTTP and is unsuitable.
+            const auto info = http.getAuthenticatedServerInfo();
+            bool valid = false;
+            const auto modes = NvHTTP::getXmlString(info,"ServerCodecModeSupport").toUInt(&valid);
+            if (!valid || !(modes & SCM_PYROWAVE)) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"PyroWave authenticated host SCM_PYROWAVE absent; no launch sent");
+                emit displayLaunchError(tr("Authenticated host lacks PyroWave SDR 4:2:0 support. Select a standard codec and reconnect."));
+                return false;
+            }
+            authenticatedCodecModes = static_cast<int>(modes);
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave authenticated host SCM_PYROWAVE=yes (0x%x)",modes);
+        }
         http.startApp(m_Computer->currentGameId != 0 ? "resume" : "launch",
                       m_Computer->isNvidiaServerSoftware,
                       m_App.id, &m_StreamConfig,
@@ -1633,7 +1714,7 @@ bool Session::startConnectionAsync()
     SERVER_INFORMATION hostInfo;
     hostInfo.address = hostnameStr.data();
     hostInfo.serverInfoAppVersion = siAppVersion.data();
-    hostInfo.serverCodecModeSupport = m_Computer->serverCodecModeSupport;
+    hostInfo.serverCodecModeSupport = authenticatedCodecModes;
 
     // Older GFE versions didn't have this field
     QByteArray siGfeVersion;
@@ -1701,6 +1782,12 @@ bool Session::startConnectionAsync()
                                                                          m_StreamConfig.height,
                                                                          m_StreamConfig.fps,
                                                                          false);
+    }
+
+    if (m_StreamConfig.supportedVideoFormats == VIDEO_FORMAT_PYROWAVE &&
+        (m_StreamConfig.packetSize < 1024 || m_StreamConfig.packetSize > 2048)) {
+        emit displayLaunchError(tr("PyroWave P1a requires a transport packet size from 1024 to 2048 bytes. Select a standard codec or reset the custom packet size."));
+        return false;
     }
 
     int err = LiStartConnection(&hostInfo, &m_StreamConfig, &k_ConnCallbacks,
@@ -1964,6 +2051,16 @@ void Session::exec()
     // because we want to suspend all Qt processing until the stream is over.
     SDL_Event event;
     for (;;) {
+        // A failed SDL_PushEvent() must not strand a failed decoder. Check the
+        // experimental decoder independently of wakeups, including after timeout.
+        if (m_ActiveVideoFormat == VIDEO_FORMAT_PYROWAVE && m_VideoDecoder != nullptr) {
+            const QString error = m_VideoDecoder->getError();
+            if (!error.isEmpty()) {
+                m_UnexpectedTermination = true;
+                emit displayLaunchError(tr("PyroWave stream failed: %1. Select a standard codec and reconnect.").arg(error));
+                goto DispatchDeferredCleanup;
+            }
+        }
 #if SDL_VERSION_ATLEAST(2, 0, 18) && !defined(STEAM_LINK)
         // SDL 2.0.18 has a proper wait event implementation that uses platform
         // support to block on events rather than polling on Windows, macOS, X11,
@@ -2208,6 +2305,7 @@ void Session::exec()
 
                 // Choose a new decoder (hopefully the same one, but possibly
                 // not if a GPU was removed or something).
+                QString decoderError;
                 if (!chooseDecoder(m_Preferences->videoDecoderSelection,
                                    m_Preferences->rendererSelection,
                                    m_Window, m_ActiveVideoFormat, m_ActiveVideoWidth,
@@ -2215,11 +2313,17 @@ void Session::exec()
                                    enableVsync,
                                    enableVsync && m_Preferences->framePacing,
                                    false,
-                                   s_ActiveSession->m_VideoDecoder)) {
+                                   s_ActiveSession->m_VideoDecoder, &decoderError)) {
                     SDL_UnlockMutex(m_DecoderLock);
                     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                                  "Failed to recreate decoder after reset");
-                    emit displayLaunchError(tr("Unable to initialize video decoder. Please check your streaming settings and try again."));
+                    if (m_ActiveVideoFormat == VIDEO_FORMAT_PYROWAVE) {
+                        m_UnexpectedTermination = true;
+                        emit displayLaunchError(tr("PyroWave decoder setup failed: %1. Select a standard codec and reconnect.").arg(decoderError));
+                    }
+                    else {
+                        emit displayLaunchError(tr("Unable to initialize video decoder. Please check your streaming settings and try again."));
+                    }
                     goto DispatchDeferredCleanup;
                 }
 

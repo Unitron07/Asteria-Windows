@@ -32,7 +32,8 @@ public:
         VCC_FORCE_H264,
         VCC_FORCE_HEVC,
         VCC_FORCE_HEVC_HDR_DEPRECATED, // Kept for backwards compatibility
-        VCC_FORCE_AV1
+        VCC_FORCE_AV1,
+        VCC_FORCE_PYROWAVE // Append: existing persisted codec values must not change
     };
     Q_ENUM(VideoCodecConfig)
 
@@ -158,6 +159,14 @@ public:
     Q_PROPERTY(CaptureSysKeysMode captureSysKeysMode MEMBER captureSysKeysMode NOTIFY captureSysKeysModeChanged)
     Q_PROPERTY(Language language MEMBER language NOTIFY languageChanged);
 
+    Q_PROPERTY(bool pyrowaveAvailable READ pyrowaveAvailable CONSTANT)
+    bool pyrowaveAvailable() const {
+#ifdef PYROWAVE_EXPERIMENTAL
+        return true;
+#else
+        return false;
+#endif
+    }
     Q_INVOKABLE bool retranslate();
 
     // Directly accessible members for preferences

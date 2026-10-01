@@ -65,6 +65,7 @@ typedef struct _WINDOW_STATE_CHANGE_INFO {
 class IVideoDecoder {
 public:
     virtual ~IVideoDecoder() {}
+    virtual QString getError() { return {}; }
     virtual bool initialize(PDECODER_PARAMETERS params) = 0;
     virtual bool isHardwareAccelerated() = 0;
     virtual bool isAlwaysFullScreen() = 0;

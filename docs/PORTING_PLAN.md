@@ -1,6 +1,23 @@
 # Porting plan
 
-Updated after owner validation: Asteria identity and x64/ARM64 CI packaging are implemented, and M0A native Windows ARM64 is complete on the recorded Surface Pro 11th Edition. M1A starts with Moonlight's existing performance statistics. M1B historical P0 proof used the old codec; P0-R is complete with Vibepollo-compatible x64/ARM64 real-hardware qualification; P0.5 offline SDL presentation qualification is complete on both named targets; P1a is the next future milestone. [v0.1.0-preview.1](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0-preview.1) is released for both targets. Completed items are checked below; baseline evidence lives in [BASELINE.md](BASELINE.md), and PyroWave hardware evidence in [VALIDATION.md](VALIDATION.md#m1b-p0-offline-pyrowave-validation).
+## M1B P1a implementation / live qualification pending
+
+P1a's explicit experimental live SDR 8-bit 4:2:0 implementation is present;
+live Vibepollo qualification is **PENDING**. Baseline and optional x64/native
+ARM64 CI pass; the implementation is ready for owner testing on the named RTX 4070 Ti
+and Snapdragon/Adreno targets. See [VALIDATION.md](VALIDATION.md) and
+[the owner guide](../tests/pyrowave/LIVE-OWNER-TEST.md). Auto remains standard
+codecs; failures require manual retry without host launch/resume replay.
+
+P1b remains later: live record framing, record/loss/critical-count metadata,
+adaptive FEC, partial/sideband recovery. Bandwidth probing, bitrate usability,
+444/HDR and advanced pacing are also deferred. P0/P0-R/P0.5 history is preserved.
+
+The earlier milestone descriptions below retain the P0/P0-R/P0.5 history;
+future P1a statements there are superseded by the implementation above.
+
+
+Updated after owner validation: Asteria identity and x64/ARM64 CI packaging are implemented, and M0A native Windows ARM64 is complete on the recorded Surface Pro 11th Edition. M1A starts with Moonlight's existing performance statistics. M1B historical P0 proof used the old codec; P0-R is complete with Vibepollo-compatible x64/ARM64 real-hardware qualification; P0.5 offline SDL presentation qualification is complete on both named targets; P1a is implemented experimentally, with owner live interoperability qualification pending. [v0.1.0-preview.1](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0-preview.1) is released for both targets. Completed items are checked below; baseline evidence lives in [BASELINE.md](BASELINE.md), and PyroWave hardware evidence in [VALIDATION.md](VALIDATION.md#m1b-p0-offline-pyrowave-validation).
 
 ## Review outcome
 
@@ -81,7 +98,7 @@ The goal is not to blindly copy Artemis Android decoder tweaks. Artemis Android 
 
 ## M1B — Experimental PyroWave
 
-**Status:** historical P0 groundwork merged in [PR #16](https://github.com/Unitron07/Asteria-Windows/pull/16). Vibepollo-compatible P0-R merged in [PR #19](https://github.com/Unitron07/Asteria-Windows/pull/19) and is **complete on both hardware targets**. P0.5 merged in [PR #20](https://github.com/Unitron07/Asteria-Windows/pull/20), passed both-target optional CI and is **complete on RTX 4070 Ti x64 and native Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 ARM64** following owner visual qualification. P1a is the next future milestone. PyroWave stays experimental and off by default. Normal releases do not ship active PyroWave streaming support. This optional milestone is independent of M2–M4 and was not required for v0.1.0-preview.1. See [validation](VALIDATION.md#m1b-p05-offline-sdl-qualification) and [next step](NEXT_STEP.md).
+**Status:** historical P0 groundwork merged in [PR #16](https://github.com/Unitron07/Asteria-Windows/pull/16). Vibepollo-compatible P0-R merged in [PR #19](https://github.com/Unitron07/Asteria-Windows/pull/19) and is **complete on both hardware targets**. P0.5 merged in [PR #20](https://github.com/Unitron07/Asteria-Windows/pull/20), passed both-target optional CI and is **complete on RTX 4070 Ti x64 and native Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 ARM64** following owner visual qualification. P1a is implemented experimentally, with owner live interoperability qualification pending. PyroWave stays experimental and off by default. Normal releases do not ship active PyroWave streaming support. This optional milestone is independent of M2–M4 and was not required for v0.1.0-preview.1. See [validation](VALIDATION.md#m1b-p05-offline-sdl-qualification) and [next step](NEXT_STEP.md).
 
 ### Historical P0 complete: older f6fb84 codec / private PYRW validation
 

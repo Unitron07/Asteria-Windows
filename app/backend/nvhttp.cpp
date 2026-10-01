@@ -4,6 +4,8 @@
 #include <QDebug>
 #include <QUuid>
 #include <QtNetwork/QNetworkReply>
+#include <QtNetwork/QSslConfiguration>
+#include <memory>
 #include <QEventLoop>
 #include <QTimer>
 #include <QXmlStreamReader>
@@ -128,6 +130,26 @@ NvHTTP::getCurrentGame(QString serverInfo)
     {
         return 0;
     }
+}
+
+QString NvHTTP::getAuthenticatedServerInfo()
+{
+    if (m_ServerCert.isNull() || httpsPort() == 0) {
+        throw GfeHttpResponseException(401, "PyroWave requires a paired host and pinned HTTPS serverinfo");
+    }
+    std::unique_ptr<QNetworkReply> reply(openConnection(m_BaseUrlHttps, "serverinfo", nullptr,
+                                                       REQUEST_TIMEOUT_MS, NVLL_ERROR));
+    // Also check successful TLS handshakes: a CA-trusted replacement certificate
+    // need not produce sslErrors, so that callback alone does not prove the pin.
+    if (reply->sslConfiguration().peerCertificate() != m_ServerCert) {
+        throw GfeHttpResponseException(401, "PyroWave host certificate does not match the paired certificate");
+    }
+    QString xml = QString::fromUtf8(reply->readAll());
+    verifyResponseStatus(xml);
+    if (getXmlString(xml, "PairStatus") != "1") {
+        throw GfeHttpResponseException(401, "PyroWave host is not paired");
+    }
+    return xml;
 }
 
 QString

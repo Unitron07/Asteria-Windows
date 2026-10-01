@@ -1,5 +1,72 @@
 # P0-R Vibepollo compatibility contract
 
+## M1B P1a implementation / live qualification pending
+
+The explicit **PyroWave (Experimental)** live path is implemented behind
+`CONFIG+=pyrowave_experimental`. Live owner qualification remains **PENDING**;
+build/test evidence is recorded in [VALIDATION.md](VALIDATION.md). The implementation
+is **COMPLETE / READY FOR HARDWARE INTEROPERABILITY TEST**: both optional client
+builds and baseline CI pass as recorded there. P0-R and P0.5 qualification history is unchanged.
+
+The contract is Vibepollo at `8a8c4b03a280ab9f567beb380110abb80f5220b8`, codec
+`186f0393b77f7755953b5ecde994bb1cec2e4155`, bitstream ID `186f0393`, C API 0.6.0.
+Only SDR 8-bit 4:2:0 is advertised: `SCM_PYROWAVE=0x00800000`, client format
+`0x010000`, exact DESCRIBE `a=rtpmap:99 PYROWAVE/90000` and exactly one valid,
+matching `a=x-ss-pyrowave.bitstream:186f0393`; ANNOUNCE uses `bitStreamFormat=3`.
+No record-feature or adaptive-FEC attribute is sent, preserving compatibility framing.
+
+Session tests restricted runtime loading, required exports/API, packaged build
+metadata/DLL SHA-256, Vulkan device/decoder creation and a real hidden SDL IYUV
+upload/presentation before launch. Host capability is rechecked using paired,
+certificate-pinned HTTPS without HTTP fallback before sending launch/resume.
+PyroWave has its own `IVideoDecoder`, never FFmpeg: complete common-c decode unit
+→ LE compatibility envelope/codec-record validation → individual codec packets
+→ full readiness → CPU I420 → main-thread SDL presentation. Audio/input and
+ordinary Session cleanup remain on existing Moonlight paths.
+
+Auto and standard codec candidate ordering are unchanged. HDR, 4:4:4 and forced
+software decode reject PyroWave attempts. Missing/mismatched IDs abort DESCRIBE.
+Malformed independent frames clear decoder state and can recover on the next frame;
+runtime/presentation failure ends the attempt. Retry is manual: choose a standard
+codec and reconnect. No hot switch or automatic host launch/resume replay occurs.
+
+The common-c gitlink remains `f900dd4767759c7b9d0e93bcea666b55c69ea62f`.
+`scripts/pyrowave/common-c-p1a.patch` is a maintained, separately reviewable delta
+to Limelight constants, strict SDP validation, ANNOUNCE and opaque-picture
+validation. qmake verifies the pin and applies it idempotently; the explicit
+PowerShell helper does the same for CMake tests. The submodule is not flattened.
+Reserved host HDR/444 bits are consumed by Session's SCM mapping with zero client
+formats; standard HDR/444 masks are unchanged. SCM and VIDEO_FORMAT namespaces
+are never interchanged.
+
+Live bounds: even 128..4096 dimensions, at most 3840×2160 pixels; 8 MiB envelopes,
+65,536 codec packets, at most 4,000 transport fragments and 1024..2048-byte transport
+packet sizes. The byte bound covers Vibepollo's 4,000-packet complete-frame budget
+at the largest permitted MTU, including compatibility overhead. Codec packet
+count is independent of RTP count. Output is at most 12,441,600 CPU bytes/frame;
+one replaceable pending image bounds the render queue. Offline limits remain
+850,000 bytes / 1,024 packets. Only 1080p has prior offline hardware qualification.
+
+Presentation stays BT.709 limited, aspect fit and linear scaling. Source chroma
+is CENTER; SDL2-compat metadata uses LEFT. P0.5 found no visible issue on the
+named targets, but exact phase remains formally unqualified. Session V-sync is
+retained; advanced pacing/latency work is deferred. The existing statistics
+overlay receives VIDEO_STATS-derived rates, bytes, drops, timing and RTT.
+
+Optional CI builds separate x64 and native ARM64 experimental portable packages,
+with runtime provenance, matching PE types, import/CRT closure, source notices,
+an owner guide and log collection. Ordinary packages contain no PyroWave DLL,
+no startup Vulkan/codec imports and no PyroWave UI option. See
+[the live owner guide](../tests/pyrowave/LIVE-OWNER-TEST.md) for launch/test steps.
+
+Deferred P1b/later: live records, record-start/lost-buffer metadata, critical
+packet handling, adaptive FEC, partial recovery, sideband readiness, bandwidth
+probing, bitrate usability tuning, 4:4:4, HDR and advanced pacing/latency work.
+
+The earlier milestone descriptions below retain the P0/P0-R/P0.5 history;
+future P1a statements there are superseded by the implementation above.
+
+
 Nonary/Vibepollo is Asteria's primary PyroWave host target. The authoritative
 [host protocol](https://github.com/Nonary/Vibepollo/blob/8a8c4b03a280ab9f567beb380110abb80f5220b8/docs/pyrowave-protocol.md)
 and [vendored codec/patches](https://github.com/Nonary/Vibepollo/tree/8a8c4b03a280ab9f567beb380110abb80f5220b8/third-party/pyrowave)
@@ -20,14 +87,14 @@ The joemossjr16/pyrollo comparisons and old `PYRW` proof remain historical evide
   [dependencies.json](../scripts/pyrowave/dependencies.json).
 
 The bitstream has no version field. API 0.6.0 alone does not establish codec
-compatibility. Future P1a must read `a=x-ss-pyrowave.bitstream:...`, compare it
-with the local build ID, and refuse/warn on a mismatch. Runtime load checks the
+compatibility. P1a reads `a=x-ss-pyrowave.bitstream:...` and compares it
+with the local build ID and refuses a mismatch. Runtime load checks the
 API and exports; it cannot discover a DLL's source commit. Deployments must bind
 the DLL to the build's source/patch/inventory hashes.
 
-Current scope remains **1920x1080, 8-bit SDR 4:2:0**, offline only. No Session
+The historical P0-R scope was **1920x1080, 8-bit SDR 4:2:0**, offline only. No Session
 hooks, host advertisement, RTSP negotiation, UI choice, HDR path, bandwidth probe,
-release packaging or frame-pacing change is included. H.264/HEVC/AV1 retain their
+release packaging or frame-pacing change was included. H.264/HEVC/AV1 retain their
 existing behavior. Complete local roundtrip does not prove network interoperability.
 
 ## Patch decisions

@@ -1,4 +1,5 @@
 # Support debug and release builds from command line for CI
+include(moonlight-common-c/pyrowave_patch.pri)
 CONFIG += debug_and_release
 
 # Ensure symbols are always generated

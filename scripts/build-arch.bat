@@ -163,7 +163,7 @@ set LDFLAGS=/LTCG
 
 echo Configuring the project
 pushd %BUILD_FOLDER%
-%QMAKE_CMD% %SOURCE_ROOT%\moonlight-qt.pro
+%QMAKE_CMD% %SOURCE_ROOT%\moonlight-qt.pro %ASTERIA_EXPERIMENTAL_QMAKE_ARGS%
 if !ERRORLEVEL! NEQ 0 goto Error
 popd
 

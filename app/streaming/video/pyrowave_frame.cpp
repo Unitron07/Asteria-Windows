@@ -68,10 +68,10 @@ bool reject(Frame& frame, std::string& error, const char* reason) {
     frame.clear(); error = reason; return false;
 }
 bool envelope(const std::uint8_t* data, std::size_t size, std::size_t declared,
-              Frame& frame, std::string& error) {
+              Frame& frame, std::string& error, Limits limits = OfflineLimits) {
     frame.clear(); error.clear();
     if (size != declared) return reject(frame,error,"reassembled length mismatch");
-    if (size > MaxFrameBytes) return reject(frame,error,"frame exceeds P0 safety limit");
+    if (size > limits.frameBytes) return reject(frame,error,"frame exceeds safety limit");
     if (!data || size < 4) return reject(frame,error,"truncated framing word");
     return true;
 }
@@ -225,11 +225,12 @@ bool validateRecords(const std::uint8_t* data, const std::vector<Packet>& spans,
 }
 }
 
-bool parseCompatibilityFrame(const std::uint8_t* data, std::size_t size,
-                             std::size_t declaredSize, Frame& frame, std::string& error) {
-    if (!envelope(data,size,declaredSize,frame,error)) return false;
+static bool parseCompatibility(const std::uint8_t* data, std::size_t size,
+                               std::size_t declaredSize, Frame& frame,
+                               std::string& error, Limits limits) {
+    if (!envelope(data,size,declaredSize,frame,error,limits)) return false;
     const auto count = le32(data);
-    if (!count || count > MaxPackets) return reject(frame,error,"packet count outside P0 safety limit");
+    if (!count || count > limits.packets) return reject(frame,error,"packet count outside safety limit");
     if (count > (size - 4) / 5) return reject(frame,error,"packet count cannot fit in frame");
     std::size_t cursor = 4, payload = 0;
     for (std::size_t i = 0; i < count; ++i) {
@@ -249,6 +250,30 @@ bool parseCompatibilityFrame(const std::uint8_t* data, std::size_t size,
         }
         frame.payloadBytes = payload;
     } catch (const std::bad_alloc&) { return reject(frame,error,"packet metadata allocation failed"); }
+    return true;
+}
+
+bool parseCompatibilityFrame(const std::uint8_t* data, std::size_t size,
+                             std::size_t declaredSize, Frame& frame, std::string& error) {
+    return parseCompatibility(data,size,declaredSize,frame,error,OfflineLimits);
+}
+
+bool parseLiveCompatibilityFrame(const std::uint8_t* data, std::size_t size,
+                                 std::size_t declaredSize, Frame& frame,
+                                 std::string& error, const StreamContext& context) {
+    if (!parseCompatibility(data,size,declaredSize,frame,error,LiveLimits)) return false;
+    if (context.chroma != Chroma::Yuv420)
+        return reject(frame,error,"live P1a requires SDR 8-bit 4:2:0");
+    const StreamContext live{context.width,context.height,Chroma::Yuv420,true};
+    try {
+        if (!validateRecords(data,frame.packets,frame,error,&live)) return false;
+        for (const auto& record : frame.records)
+            if (record.kind == RecordKind::Padding)
+                return reject(frame,error,"padding records are not compatibility codec packets");
+        // Sequence color bit 30: 0 full, 1 limited. P1a is limited only.
+        if (frame.packets.empty() || !(le32(data + frame.packets[0].offset + 4) & (1u << 30)))
+            return reject(frame,error,"live P1a requires BT.709 limited range");
+    } catch (const std::bad_alloc&) { return reject(frame,error,"record metadata allocation failed"); }
     return true;
 }
 

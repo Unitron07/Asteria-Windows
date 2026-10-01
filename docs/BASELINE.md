@@ -1,5 +1,11 @@
 # M0 baseline report and provenance
 
+Current milestone: experimental P1a live SDR 4:2:0 implementation is ready for
+owner Vibepollo testing; live qualification is **PENDING**. See
+[current results](VALIDATION.md#m1b-p1a-live-integration-validation) and
+[NEXT_STEP.md](NEXT_STEP.md). The M0/P0-era observations below retain their
+historical scope and do not qualify this new live path.
+
 M0 baseline integration is **merged and accepted as the starting point for further development**. Both Windows x64 CI builds passed and the project owner confirmed that the tested client works. Detailed hardware and interoperability qualification is not yet fully recorded. Asteria identity and x64/ARM64 CI packaging are implemented; M0A native ARM64 is complete from the owner's real-device validation below, and M1B P0-R Vibepollo-compatible GPU decode is hardware-qualified on x64 and native ARM64. [M1B P0.5 offline SDL visual qualification](VALIDATION.md#m1b-p05-offline-sdl-qualification) is complete on both named targets; [P1a live SDR 4:2:0 integration](NEXT_STEP.md) is the next future milestone, with existing Moonlight statistics as the initial M1A measurement source. The separate [current PyroWave validation record](VALIDATION.md#m1b-p0-r-vibepollo-validation) does not expand the earlier Apollo AV1 baseline or qualify live PyroWave streaming. Historical M0 observations below retain their original scope.
 
 ## Imported history

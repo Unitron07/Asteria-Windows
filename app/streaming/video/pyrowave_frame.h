@@ -13,6 +13,12 @@ constexpr std::size_t MaxRecords = MaxFrameBytes / 8;
 constexpr char BitstreamId[] = "186f0393";
 constexpr char CodecCommit[] = "186f0393b77f7755953b5ecde994bb1cec2e4155";
 
+// Live compatibility transport: 4000 payloads at up to 2048-byte negotiated MTU
+// fit below 8 MiB. Codec packets are not transport packets; allow up to 65536.
+struct Limits { std::size_t frameBytes, packets; };
+constexpr Limits OfflineLimits{MaxFrameBytes, MaxPackets};
+constexpr Limits LiveLimits{8 * 1024 * 1024, 65536};
+
 enum class Framing { Compatibility, Records, LegacyOffline };
 enum class RecordKind { Sequence, Block, Padding };
 enum class Chroma { Yuv420, Yuv444 };
@@ -75,6 +81,11 @@ bool parseCompatibilityFrame(const std::uint8_t* data, std::size_t size,
 bool parseRecordFrame(const std::uint8_t* data, std::size_t size,
                       std::size_t declaredSize, Frame& frame, std::string& error,
                       const StreamContext* context = nullptr);
+// P1a only: compatibility envelope plus complete codec-record validation.
+// Rejects record framing, extent/chroma changes, HDR and full-range metadata.
+bool parseLiveCompatibilityFrame(const std::uint8_t* data, std::size_t size,
+                                 std::size_t declaredSize, Frame& frame,
+                                 std::string& error, const StreamContext& context);
 // Historical regression fixtures only. Never selected by parseFrame detection.
 bool parseLegacyOfflineFrame(const std::uint8_t* data, std::size_t size,
                              std::size_t declaredSize, Frame& frame, std::string& error);

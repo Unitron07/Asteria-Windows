@@ -13,8 +13,8 @@ namespace PyroWave {
 Runtime::~Runtime() { close(); }
 bool Runtime::fail(const std::string& reason) {
     m_Error = reason;
-    std::cerr << "PyroWave P0: " << reason << '\n';
-    OutputDebugStringA(("PyroWave P0: " + reason + "\n").c_str());
+    std::cerr << "PyroWave: " << reason << '\n';
+    OutputDebugStringA(("PyroWave: " + reason + "\n").c_str());
     return false;
 }
 bool Runtime::check(pyrowave_result result, const char* operation) {
@@ -62,6 +62,9 @@ void Runtime::resetDecoder() {
     if (m_Decoder) m_Api.destroyDecoder(m_Decoder);
     m_Decoder = nullptr; m_Width = m_Height = 0;
 }
+void Runtime::discardFrame() {
+    if (m_Decoder) m_Api.clear(m_Decoder);
+}
 void Runtime::close() {
     resetDecoder();
     if (m_Device) m_Api.destroyDevice(m_Device);
@@ -76,8 +79,7 @@ bool Runtime::createDecoder(int width, int height) {
     resetDecoder();
     m_Error.clear();
     if (!m_Module) return fail("runtime is not loaded");
-    // Fixed P0 extent. Broader stream dimensions/color contracts are a later gate.
-    if (width != 1920 || height != 1080) return fail("P0 decoder accepts only 1920x1080 SDR 420");
+    if (!validLiveExtent(width,height)) return fail("unsupported SDR 420 extent (even 128..4096, at most 3840x2160 pixels)");
     // volk at this pin calls LoadLibraryA("vulkan-1.dll"). Preload only the system
     // loader so that indirect call cannot select a loader from CWD or PATH.
     if (!m_Vulkan) {
@@ -108,6 +110,16 @@ bool Runtime::createDecoder(int width, int height) {
     return true;
 }
 bool Runtime::decode(const std::vector<std::uint8_t>& container, Pixels& output) {
+    return decodeImpl(container,output,false,nullptr);
+}
+bool Runtime::decodeLive(const std::vector<std::uint8_t>& container, Pixels& output,
+                         std::size_t& packetCount) {
+    packetCount = 0;
+    return decodeImpl(container,output,true,&packetCount);
+}
+bool Runtime::decodeImpl(const std::vector<std::uint8_t>& container, Pixels& output,
+                         bool live, std::size_t* packetCount) {
+    m_FrameRejected = false;
     output = {};
     m_Error.clear();
     if (!m_Decoder) return fail("decoder is not created");
@@ -117,10 +129,18 @@ bool Runtime::decode(const std::vector<std::uint8_t>& container, Pixels& output)
     std::unique_ptr<void, decltype(clear)> cleanup(this, clear);
     Frame frame; std::string error;
     const StreamContext context{std::uint32_t(m_Width),std::uint32_t(m_Height),Chroma::Yuv420,true};
-    if (!parseFrame(container.data(),container.size(),container.size(),frame,error,&context)) return fail(error);
+    const bool parsed = live ?
+        parseLiveCompatibilityFrame(container.data(),container.size(),container.size(),frame,error,context) :
+        parseFrame(container.data(),container.size(),container.size(),frame,error,&context);
+    if (!parsed) {
+        m_FrameRejected = true;
+        m_Error = error; // Live caller rate-limits malformed-frame diagnostics.
+        return live ? false : fail(error);
+    }
+    if (packetCount) *packetCount = frame.packets.size();
     for (const auto& p : frame.packets)
         if (!check(m_Api.push(m_Decoder,container.data()+p.offset,p.size),"packet push")) return false;
-    if (!m_Api.ready(m_Decoder,false)) return fail("complete offline frame is not decode-ready");
+    if (!m_Api.ready(m_Decoder,false)) return fail("complete frame is not decode-ready");
     Pixels pixels; pixels.width=m_Width; pixels.height=m_Height;
     pyrowave_cpu_buffer buffer{};
     buffer.width=m_Width; buffer.height=m_Height; buffer.format=PYROWAVE_CPU_BUFFER_FORMAT_YUV420P;
@@ -128,7 +148,7 @@ bool Runtime::decode(const std::vector<std::uint8_t>& container, Pixels& output)
         for (int p=0;p<3;++p) {
             const std::size_t w=p ? m_Width/2 : m_Width;
             const std::size_t h=p ? m_Height/2 : m_Height;
-            // Fixed dimensions validated before device/allocation; <= 3,110,400 bytes total.
+            // Bounded dimensions validated before device/allocation; <= 12,441,600 bytes total.
             pixels.planes[p].resize(w*h);
             buffer.data[p]=pixels.planes[p].data();
             buffer.row_stride_in_bytes[p]=w; buffer.plane_size_in_bytes[p]=w*h;
