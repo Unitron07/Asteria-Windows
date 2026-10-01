@@ -166,6 +166,44 @@ lifecycles, reset-event recovery, synthetic resource recreation, SHA-256/log
 evidence and optional 60 FPS observation. See [manual commands and expected
 visuals](../tests/pyrowave/README.md#p05-offline-sdl-presentation).
 
+### Pre-PR implementation evidence
+
+Tested code commit: `3ef29a3e44d98641dde73d5b36623d263e967ec0`.
+[Optional run 36802307090](https://github.com/Unitron07/Asteria-Windows/actions/runs/36802307090)
+**passed on x64 and native ARM64**: three parser/pattern CTests, seven full probe
+CTests, exact dependency build, CMake and Qt/qmake SDL harness builds, loader
+load/reload and PE/import checks. Both runners completed ten raw SDL lifecycles
+with Direct3D11, SDL 2.32.70, IYUV support, reset/resource recreation and shutdown.
+Both hosted codec roundtrip/presentation attempts explicitly skipped unavailable
+Vulkan devices (`-5`, exit 77); these do not qualify GPU decode or visual output.
+ARM64 retained the documented portable-math retry after C1189/C2665.
+
+| P0.5 artifact (downloaded and hash-verified) | ZIP SHA-256 |
+| --- | --- |
+| [x64](https://github.com/Unitron07/Asteria-Windows/actions/runs/36802307090/artifacts/11135874197) | `1610bb6e441d46116e5ce962bf6e7b77c63d0d3db4dc0e103643e46f81caace8` |
+| [ARM64](https://github.com/Unitron07/Asteria-Windows/actions/runs/36802307090/artifacts/11136097994) | `999527438faa2b38e5a4ffe8e7954b4367c37d50019c429382c03ef9feb083b0` |
+
+The staged ARM64 executable, SDL2/SDL3 and codec DLLs were independently checked
+as PE `0xAA64`. [Baseline run 36802307336](https://github.com/Unitron07/Asteria-Windows/actions/runs/36802307336)
+**passed all four unchanged upstream/candidate x64/ARM64 jobs**. Both candidate
+portable ZIPs were downloaded, hashes checked and contents inspected: x64 has
+335 entries / 69 native PE files; ARM64 has 334 entries / 68 native PE files;
+**neither contains PyroWave content**. Local preflight, package-architecture and
+ARM64 packaging-repair tests pass. Diff/scope checks confirm no Session/common-c,
+normal app/build/packaging or baseline workflow change. The final evidence update
+changes documentation only; the tested compiled code above is unchanged.
+
+Additional automatic **hidden API checks** ran locally on native Windows x64
+(`Windows NT 10.0.26300.0`, OS/process architecture X64) and the RTX 4070 Ti,
+with the same raw Vulkan identifiers recorded for P0-R. All load/roundtrip modes,
+raw/compatibility/record presentation entries and ten full codec/SDL lifecycles
+pass. Every pattern decodes identically in both containers; saved I420 extents
+and SHA-256 match the log. SDL reports Direct3D11, flags 10, IYUV support and
+1920x1080 output. A ten-second bars loop records 600 intervals, mean 16.669404 ms,
+min/max 9.691900/25.920200 ms, zero counted missed intervals. These are submission
+observations, **not visual inspection, refresh/latency or true device-loss evidence**.
+Dense geometry checks are localized to preserve the existing packet/frame caps.
+
 Implementation is under review; record code/CI completion once merged. **Owner
 visual qualification is pending on RTX 4070 Ti x64 and native Adreno X1-85 ARM64.**
 Hosted CTests/builds and SDL submissions cannot establish visual correctness,

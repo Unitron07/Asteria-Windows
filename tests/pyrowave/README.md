@@ -217,7 +217,11 @@ then the texture is recreated and the retained CPU frame reuploaded. Full R
 recreation replaces renderer/decoder/runtime too. [SDL reset events](https://wiki.libsdl.org/SDL2/SDL_EventType)
 do not provide a portable real GPU loss injector. Synthetic calls exercise the
 same recovery function; **true device loss remains manual/unproven**, and a
-failed recovery exits nonzero. No fake device-loss or leak guarantee is inferred.
+failed recovery exits nonzero. The pinned compatibility layer translates target
+and device reset events, but drops SDL3's separate `SDL_EVENT_RENDER_DEVICE_LOST`
+event, which has no SDL2 equivalent. Checked render/upload failures still exit
+nonzero; the SDL2 API cannot provide complete fatal-loss observation, especially
+through its void present call. No device-loss or leak guarantee is inferred.
 
 The optional loop requests 60 FPS using a monotonic deadline, measures submission
 intervals, duration, mean/min/max and nominal missed intervals (10% jitter

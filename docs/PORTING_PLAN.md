@@ -81,7 +81,7 @@ The goal is not to blindly copy Artemis Android decoder tweaks. Artemis Android 
 
 ## M1B — Experimental PyroWave
 
-**Status:** source-diff groundwork and **P0 offline dependency/runtime/parser/decode proof are complete**, merged in [PR #16](https://github.com/Unitron07/Asteria-Windows/pull/16). PyroWave remains experimental and off by default. Normal Asteria releases do not ship active PyroWave streaming support. This optional milestone is independent of M2–M4 and was not required for v0.1.0-preview.1. See the [spike evidence](M1B_PYROWAVE_SPIKE.md) and [next step](NEXT_STEP.md).
+**Status:** historical P0 groundwork merged in [PR #16](https://github.com/Unitron07/Asteria-Windows/pull/16). Vibepollo-compatible P0-R merged in [PR #19](https://github.com/Unitron07/Asteria-Windows/pull/19) and is **complete on both hardware targets**. P0.5 offline SDL tooling is implemented and passes both-target CI; code completion follows merge and owner visual qualification remains pending. PyroWave stays experimental and off by default. Normal releases do not ship active PyroWave streaming support. This optional milestone is independent of M2–M4 and was not required for v0.1.0-preview.1. See [validation](VALIDATION.md#m1b-p05-offline-sdl-qualification) and [next step](NEXT_STEP.md).
 
 ### Historical P0 complete: older f6fb84 codec / private PYRW validation
 
