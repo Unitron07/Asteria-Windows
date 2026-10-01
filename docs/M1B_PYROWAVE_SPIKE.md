@@ -14,9 +14,12 @@ packaging or frame pacing changes. The target stays offline 1920x1080 8-bit SDR
 4:2:0. API version and bitstream ID are independent compatibility axes.
 
 The old `f6fb84...` x64 RTX 4070 Ti and ARM64 Surface Pro 11 / Snapdragon X Plus /
-Adreno X1-85 GPU results below remain historical. Requalification on both real
-hardware targets with the new commit and both framings is required before P0.5.
-New CI evidence belongs in VALIDATION.md; hosted build success is not GPU qualification.
+Adreno X1-85 GPU results below remain historical. **P0-R is complete** on both
+real hardware targets with the new commit, bitstream ID `186f0393`, API 0.6.0,
+both framings, three decoder lifetimes, malformed rejection/recovery and expected
+I420 output; see [the current hardware record](VALIDATION.md#m1b-p0-r-vibepollo-validation).
+P0.5's offline SDL harness is implemented; owner visual qualification is pending
+on both targets. Hosted build/submission success cannot qualify display output.
 
 ## Historical PR #14 / PR #16 record (superseded codec and host framing)
 

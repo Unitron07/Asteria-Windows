@@ -1,37 +1,32 @@
-# Next step: M1B P0-R / Vibepollo requalification
+# Next step: M1B P0.5 offline SDL presentation
 
-The immediate gate is compatibility realignment with Nonary/Vibepollo. The active
-codec is Themaister/pyrowave `186f0393b77f7755953b5ecde994bb1cec2e4155`, bitstream
-ID `186f0393`, API 0.6.0. See [the current protocol/patch contract](PYROWAVE_VIBEPOLLO.md),
-[historical evidence](M1B_PYROWAVE_SPIKE.md), and [validation](VALIDATION.md).
-Old x64 RTX 4070 Ti and native ARM64 Surface Pro 11 / Snapdragon X Plus / Adreno
-X1-85 GPU results used `f6fb84...`; the new codec is not requalified by them.
+**P0-R is COMPLETE** on Windows x64 RTX 4070 Ti and native Windows ARM64
+Surface Pro 11th Edition / Snapdragon X Plus / Adreno X1-85. The exact codec is
+`186f0393b77f7755953b5ecde994bb1cec2e4155`, bitstream ID `186f0393`, API 0.6.0.
+Both compatibility and record framing pass expected I420 output through three
+decoder lifetimes, load/reload and malformed rejection/recovery. See the
+[current hardware record](VALIDATION.md#m1b-p0-r-vibepollo-validation) and
+[Vibepollo contract](PYROWAVE_VIBEPOLLO.md). Old `f6fb84...` evidence stays historical.
 
-## P0-R: compatibility realignment
+## P0.5 ACTIVE: offline presentation/color qualification
 
-1. Build the exact upstream pin on x64 and ARM64 with recorded source/patch hashes.
-   Apply Vibepollo's decoder short-block safety patch; retain the encoder-only
-   pool/sizing patches with their provenance for future fixture work.
-2. Run GPU-free LE compatibility and sequence/block/padding complete-frame parser
-   tests, malformed input/mutation cases, loader API/export/load/reload tests,
-   qmake experimental compile/link and PE/import checks on both architectures.
-3. Rerun the deterministic 1920x1080 8-bit SDR 4:2:0 proof in both formats through
-   three decoder lifetimes on RTX 4070 Ti and native Adreno hardware. Record
-   runtime/fixture/output hashes, OS/driver, adapter and rejection/recovery logs.
-   Unavailable Vulkan in hosted CI is a skip, not hardware qualification.
+The standalone SDL harness is implemented; code/CI completion is recorded once
+merged. **Owner visual qualification on both targets remains pending.**
 
-No live Session negotiation, advertisement, UI setting, normal packaging or
-frame-pacing change. `PYRW` is historical offline framing only. Both local
-roundtrips prove codec/framing behavior, not network interoperability.
+1. Download the optional x64/native ARM64 artifacts and run raw I420, compatibility
+   and record modes using [exact commands and visual expectations](../tests/pyrowave/README.md#p05-offline-sdl-presentation).
+2. Inspect range, BT.709 bars, centered-chroma boundaries and geometry at native
+   resolution. Compare raw versus codec; test nearest/linear, smaller/larger/square
+   windows, repeated resize, maximize/restore and fullscreen. Save evidence logs.
+3. Run ten recreation cycles and a 60 FPS observation. Record backend, adapter,
+   dimensions and hashes. Synthetic reset/resource tests exercise recovery code;
+   true device-loss hardware behavior remains manual/unproven. Do not infer leak
+   freedom or production latency from this probe.
 
-## P0.5: presentation after new-codec hardware qualification
-
-Use the Vibepollo-compatible build for SDL IYUV upload/window presentation; SDR
-BT.709 color, limited/full range and chroma-siting/scaling patterns; resize,
-decoder/device recreation and device-loss recovery; and runtime deployment/import
-closure/clean-machine policy. Qualify 4:4:4 presentation separately after 4:2:0,
-including the retained encoder sizing fix for new fixtures. Stay offline and
-exclude PyroWave HDR. Existing frame pacing and release contents remain intact.
+Use SDR 8-bit limited-range 4:2:0 only. Separate 4:4:4 qualification follows;
+HDR is excluded. The existing pinned SDL2 API/runtime dependencies are reused.
+Normal Session/common-c, codec settings, release packaging and frame pacing stay
+unchanged. Local roundtrip and window submission do not prove live interoperability.
 
 ## P1a: explicit live SDR 4:2:0
 
@@ -43,7 +38,7 @@ compatibility axis. Validate safe standard-codec fallback/reconnect without
 replaying host-app actions, setup/encoder failure, absent/partial capabilities,
 missing/wrong DLL/export/API/driver, device loss, software policy and HDR exclusion.
 Re-run H.264/HEVC/AV1 lifecycle/audio/input tests and named-target measurements.
-No live work is implemented in P0-R.
+No live work is implemented in P0-R or P0.5.
 
 ## P1b: transport hardening
 

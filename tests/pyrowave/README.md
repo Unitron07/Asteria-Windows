@@ -1,4 +1,4 @@
-# Offline P0-R: Vibepollo compatibility proof
+# Offline P0-R proof and P0.5 SDL presentation
 
 This standalone parser/Windows runtime harness does not connect to a host.
 Normal Asteria builds and release packages stay unchanged; Qt/qmake remains the
@@ -8,8 +8,12 @@ application toolchain. Experimental app compilation needs
 Active codec: Themaister/pyrowave `186f0393b77f7755953b5ecde994bb1cec2e4155`;
 bitstream ID `186f0393`; C API 0.6.0. See [the current contract](../../docs/PYROWAVE_VIBEPOLLO.md)
 and [source/patch lock](../../scripts/pyrowave/dependencies.json).
-The old `f6fb84...` RTX 4070 Ti/Adreno results are historical. New hardware GPU
-qualification on both targets is required before P0.5 presentation.
+**P0-R is COMPLETE** on RTX 4070 Ti x64 and native Surface Pro 11 / Snapdragon
+X Plus / Adreno X1-85 ARM64 with this codec/ID/API, both framing modes, three
+decoder lifetimes, expected I420 planes and malformed rejection/recovery. See
+[the owner hardware record](../../docs/VALIDATION.md#m1b-p0-r-vibepollo-validation).
+Old `f6fb84...` evidence remains historical. P0.5 tooling is implemented; code/CI
+completion follows merge and owner x64/ARM64 visual qualification is pending.
 
 ## Dependencies and GPU-free parser tests
 
@@ -88,8 +92,8 @@ Get-ChildItem .\roundtrip-output -File | Get-FileHash -Algorithm SHA256
 The CLI resolves paths to absolute paths. Save all logs, runtime/output hashes,
 Windows build and display-driver version. Confirm native ARM64 process execution.
 Unavailable Vulkan is exit 77 in CI, not a pass on hardware. Other decode failures
-remain failures. ARM64 is not requalified until the new-codec GPU rerun succeeds
-on Surface Pro 11 / Snapdragon X Plus / Adreno X1-85; x64 needs its RTX 4070 Ti rerun.
+remain failures. The owner has completed these new-codec P0-R commands on both
+targets. The next owner gate is P0.5 visual presentation below.
 
 ## qmake compile/link
 
@@ -102,3 +106,164 @@ Use separate target Qt/MSVC prompts/build directories. The optional CI invokes
 `scripts/test-pyrowave-qmake.ps1` and records qmake/import evidence without changing
 normal app packaging. Parser policy remains 850,000 total frame bytes and 1,024
 compatibility packets; live MTU/FEC/overhead limits require a future review.
+
+## P0.5 offline SDL presentation
+
+The harness is isolated from Session and the normal application build. Initial
+contract: **1920x1080 SDR, 8-bit I420, BT.709 limited range, centered 4:2:0**.
+4:4:4 and HDR are excluded. P0-R is hardware-qualified; P0.5 owner visual
+qualification on x64 RTX 4070 Ti and native ARM64 Adreno X1-85 is **pending**.
+Implementation/code CI completion is recorded after merge, not visual completion.
+
+Optional CI artifacts include `presentation-x64/` or `presentation-arm64/` with
+the executable, matching SDL2.dll/SDL3.dll, `runtime/bin/`, source notices and
+`RUN-ME.txt`. Use the matching native architecture with the MSVC runtime installed,
+as for the existing P0-R probe. Codec modes additionally need the native Vulkan
+loader and a supported driver. Run from that presentation directory:
+
+```powershell
+.\pyrowave-offline-proof.exe --present-raw-i420 - .\evidence-raw
+.\pyrowave-offline-proof.exe --present-compatibility .\runtime\bin .\evidence-compat
+.\pyrowave-offline-proof.exe --present-records .\runtime\bin .\evidence-records
+.\pyrowave-offline-proof.exe --present-recreate-test .\runtime\bin .\evidence-recreate
+.\pyrowave-offline-proof.exe --present-loop .\runtime\bin .\evidence-loop --seconds 30
+```
+
+Inspection windows stay open until Esc. Loop defaults to ten seconds. Options
+`--pattern 1..5` and `--seconds 1..3600` select initial pattern and duration.
+Raw mode accepts `-` without loading PyroWave/Vulkan; toggling to a codec source
+with T requires a real DLL directory (supply `./runtime/bin` even in raw mode if
+you want this comparison). Encoded modes always decode the *same encoded packet
+stream* in compatibility and record containers and require byte-identical I420.
+They report MAE/max sample error versus raw; sharp-edge compression differences
+are observations, not the old gray-ramp <=8 gate. Both formats are offline fixtures.
+
+| Key | Action |
+| --- | --- |
+| 1 / 2 / 3 / 4 / 5 | Range / BT.709 bars / chroma / geometry / gradient |
+| T | Cycle raw I420 / compatibility / records for the selected pattern |
+| F | Desktop fullscreen toggle |
+| R | Destroy/recreate renderer+texture, unload/reload runtime and recreate decoder |
+| S | Explicit nearest/linear SDL texture scaling; initial nearest |
+| N | Request native 1920x1080 window |
+| W | Request 960x540, 2560x1440, then 1000x1000 window |
+| Esc | Clean shutdown |
+
+Resize with the mouse, maximize/restore repeatedly and toggle fullscreen. Windows
+may constrain requested window dimensions to the desktop; inspect logged window
+and output pixels. Source-to-output fit always preserves aspect ratio and adds
+black bars; a minimized zero-size output is skipped. Mixed DPI can make window
+coordinates differ from output pixels. Native nearest inspection needs a
+**1920x1080 renderer output**, not merely a requested window size.
+
+### Expected visual results and color controls
+
+- Range: vertical strips contain Y **0,8,15,16,17,32,64,128,192,234,235,236,247,255**,
+  U/V 128. Under limited-range conversion, <=16 clip black and >=235 clip white;
+  17 and 234 are near the endpoints. Out-of-range strips are clipping references,
+  not full-range content. Compare direct raw against codec output.
+- Bars, left to right: **white, yellow, cyan, green, magenta, red, blue, black**.
+  Rounded BT.709 limited Y/U/V triplets are `(235,128,128)`, `(219,16,138)`,
+  `(188,154,16)`, `(173,42,26)`, `(78,214,230)`, `(63,102,240)`, `(32,240,118)`,
+  `(16,128,128)`. Look for U/V swaps, wrong hue, range washout or clipping.
+- Chroma: upper broad contrasting regions change on even 2x2 luma boundaries,
+  with a bright even-coordinate grid. Lower areas alternate one and two chroma
+  samples (2x2/4x4 luma quads). Each sample is authored at the center of its 2x2
+  quad. At native nearest, inspect symmetric boundaries relative to the grid;
+  compare raw/codec and both formats. Linear filtering should soften transitions.
+  Visual evidence may reveal offsets; this test does not measure fractional
+  chroma phase or prove a backend preserves exact sample-center coordinates.
+- Geometry: top 1px and bottom 2px checkerboards, 120px grid, center crosshair,
+  border/corners and a centered 400x400 square. Square stays square, all corners
+  remain visible and square windows add bars. Fractional scaling can alias fine
+  checks; nearest has sharp steps, linear smooths. Codec ringing is distinguishable
+  by comparing raw. Gradient uses Y 16..235 with neutral chroma.
+
+The existing verified v15 archive supplies **SDL2 API 2.32.70 through sdl2-compat**,
+backed by **SDL3 3.4.16** (ARM64 inventory in DEPENDENCIES_WINDOWS.md). No new major
+dependency is introduced. Probe reports compiled/runtime SDL2 version and revision,
+renderer name/flags, advertised IYUV support and actual texture, source/window/output
+dimensions and scaling. Backend advertisement can omit IYUV even when SDL emulates
+it; successful texture creation/query/upload is reported separately.
+
+`SDL_SetYUVConversionMode(SDL_YUV_CONVERSION_BT709)` is set **before every texture
+creation**. The [pinned compatibility source](https://github.com/libsdl-org/sdl2-compat/blob/a53b6ad90ecd2d0ccfe01d5cfd2059793acf8c12/src/sdl2_compat.c)
+maps this to `SDL_COLORSPACE_BT709_LIMITED` in `GetColorspaceForFormatAndSize` and
+sets the SDL3 texture colorspace property in `SDL_CreateTexture`. This matches
+the explicit conversion used by Asteria's existing SDL renderer. The SDL2 API has
+no independent chroma-siting control. The [pinned SDL3 colorspace definition](https://github.com/libsdl-org/SDL/blob/fa2c02bb6e21974a89ea9824bc53c9932abe5f9c/include/SDL3/SDL_pixels.h)
+defines `SDL_COLORSPACE_BT709_LIMITED` with **LEFT chroma-location metadata**, while
+Vibepollo's source pattern is **CENTER**. This is a concrete metadata mismatch;
+the probe logs it and does not compensate or claim centered alignment is preserved.
+Backend sampling may expose an offset, which should be recorded as a qualification
+failure requiring a later presentation-path decision. Display/driver color
+management and actual backend sampling still require owner inspection. Full-range BT.709 and HDR are
+not qualified. See [SDL conversion API](https://wiki.libsdl.org/SDL2/SDL_SetYUVConversionMode).
+
+### Lifecycle, reset, timing and evidence limits
+
+`--present-recreate-test` runs **ten** cycles across all five patterns and both
+codec formats: window/renderer/texture create, runtime load/device/decoder create,
+encode/decode/upload/present, synthetic target/device-reset recovery and full
+renderer+decoder+runtime recreation, destruction and SDL shutdown/reinit. It
+exercises API lifetime/recovery without proving leak freedom. `--present-smoke`
+uses raw patterns for hosted window/lifecycle checks. `--hidden` hides only these
+test windows; `--software` explicitly requests software rendering for diagnostics,
+and must not be recorded as GPU renderer qualification.
+
+Actual `SDL_RENDER_DEVICE_RESET` and `SDL_RENDER_TARGETS_RESET` events are logged,
+then the texture is recreated and the retained CPU frame reuploaded. Full R
+recreation replaces renderer/decoder/runtime too. [SDL reset events](https://wiki.libsdl.org/SDL2/SDL_EventType)
+do not provide a portable real GPU loss injector. Synthetic calls exercise the
+same recovery function; **true device loss remains manual/unproven**, and a
+failed recovery exits nonzero. No fake device-loss or leak guarantee is inferred.
+
+The optional loop requests 60 FPS using a monotonic deadline, measures submission
+intervals, duration, mean/min/max and nominal missed intervals (10% jitter
+tolerance). Interactive decode/recreation stalls count. Catch-up bursts are
+avoided. This observes catastrophic pacing only; SDL2 `SDL_RenderPresent` has
+no return value and timing does not measure visible refresh, production latency
+or end-to-end pacing. Normal Asteria pacing is untouched.
+
+Evidence directories contain `presentation.txt` (mode/pattern, runtime directory,
+expected codec/bitstream/API, Vulkan adapter when used, SDL/backend/dimensions,
+scaling, reset results, sample error, timing and qualification limits) plus selected
+I420 files and their **SHA-256 of concatenated Y/U/V bytes** in the log. Revisited
+pattern files are replaced; logs retain visits. Save console stderr as well for
+runtime failures. Runtime binary/source hashes come from the accompanying CI
+inventory; SDL/API cannot recover a DLL's source commit. Add Windows build,
+display-driver version, native process confirmation, observations and optional
+manual screenshots/photos. Screenshots are not captured automatically.
+
+Exit 0 proves successful checked upload/render calls and completion; visual output
+is always marked pending for owner review. Exit 77 explicitly reports unavailable
+SDL window/renderer/Vulkan before first submission; losing availability afterward
+or failing upload/decode/recovery is a failure. Hosted CI cannot visually qualify
+color/range/chroma, scaling or true hardware loss. Log the renderer separately
+for RTX 4070 Ti x64 and Adreno X1-85 ARM64 before completing P0.5.
+
+### Building the presentation probe
+
+Use a fresh target checkout and the existing verified baseline dependency helper:
+
+```powershell
+./scripts/setup-baseline-deps.ps1 -Architecture x64
+$deps = (Resolve-Path build/pyrowave/x64).Path
+$sdl = (Resolve-Path libs/windows).Path
+cmake -S tests/pyrowave -B build/probe-x64 -A x64 -DPYROWAVE_EXPERIMENTAL=ON -DPYROWAVE_SDL_PRESENTATION=ON "-DSDL_ROOT=$sdl" -DSDL_ARCH=x64 "-DPYROWAVE_ROOT=$deps/install" "-DVULKAN_HEADERS=$deps/source/Granite/third_party/khronos/vulkan-headers/include"
+cmake --build build/probe-x64 --config Release
+ctest --test-dir build/probe-x64 -C Release --output-on-failure
+```
+
+For ARM64 use `-Architecture arm64`, `-A ARM64`, `-DSDL_ARCH=arm64`, the ARM64 probe
+directory and matching dependency root. Use patched ARM64 root if required.
+Parser-only CMake also runs headless deterministic patterns, pixel sizes,
+aspect-fit, reset policy and timing tests without SDL/GPU. Optional CI builds and
+runs both native targets, retains P0-R regressions, attempts hidden raw lifecycles
+and codec presentation, and stages experimental binaries only. Unavailable
+presentation is explicitly recorded, while visual qualification stays pending.
+
+qmake presentation opt-in adds `CONFIG+=pyrowave_sdl SDL_ROOT=... SDL_ARCH=x64`
+(or arm64) to the existing offline command. The CI helper validates both target
+qmake builds. SDL2.dll and SDL3.dll must be beside that executable. Application
+qmake files, Session/common-c, H.264/HEVC/AV1 and normal packaging are unchanged.

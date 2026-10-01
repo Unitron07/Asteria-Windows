@@ -139,7 +139,19 @@ bool Runtime::decode(const std::vector<std::uint8_t>& container, Pixels& output)
     return true;
 }
 bool Runtime::generateProofFrame(std::vector<std::uint8_t>& container, Framing framing) {
+    Pixels pixels;
+    pixels.width=1920; pixels.height=1080;
+    for (int p=0;p<3;++p) {
+        const std::size_t w=p ? 960 : 1920, h=p ? 540 : 1080;
+        pixels.planes[p].resize(w*h);
+        for (std::size_t y=0;y<h;++y) for (std::size_t x=0;x<w;++x)
+            pixels.planes[p][y*w+x]=p ? 128 : std::uint8_t(16+219*x/(w-1));
+    }
+    return encodeProofPixels(pixels,container,framing);
+}
+bool Runtime::encodeProofPixels(const Pixels& pixels, std::vector<std::uint8_t>& container, Framing framing) {
     container.clear();
+    if (!validProofPixels(pixels)) return fail("proof encoder requires tightly packed 1920x1080 I420 planes");
     if (framing == Framing::LegacyOffline) return fail("new fixtures must use Vibepollo framing");
     if (!m_Device || !m_Decoder) return fail("create P0 decoder/device before generating fixture");
 #define ENCODER(name) auto name = reinterpret_cast<decltype(&pyrowave_encoder_##name)>(symbol("pyrowave_encoder_" #name)); if (!name) return false
@@ -157,16 +169,12 @@ bool Runtime::generateProofFrame(std::vector<std::uint8_t>& container, Framing f
     const auto destroyEncoder = [destroy](pyrowave_encoder_opaque* e) { destroy(e); };
     std::unique_ptr<pyrowave_encoder_opaque,decltype(destroyEncoder)> cleanup(encoder,destroyEncoder);
     try {
-        std::vector<std::uint8_t> planes[3];
         pyrowave_cpu_buffer b{};
         b.width=m_Width; b.height=m_Height; b.format=PYROWAVE_CPU_BUFFER_FORMAT_YUV420P;
         for (int p=0;p<3;++p) {
             const std::size_t w=p ? m_Width/2 : m_Width, h=p ? m_Height/2 : m_Height;
-            planes[p].resize(w*h);
-            // Deterministic limited-range gray luma ramp; neutral chroma.
-            for (std::size_t y=0;y<h;++y) for (std::size_t x=0;x<w;++x)
-                planes[p][y*w+x]=p ? 128 : std::uint8_t(16+219*x/(w-1));
-            b.data[p]=planes[p].data(); b.row_stride_in_bytes[p]=w; b.plane_size_in_bytes[p]=w*h;
+            b.data[p]=const_cast<std::uint8_t*>(pixels.planes[p].data());
+            b.row_stride_in_bytes[p]=w; b.plane_size_in_bytes[p]=w*h;
         }
         // Leave space for compatibility packet-length overhead below the safety cap.
         const pyrowave_rate_control rate{800000};

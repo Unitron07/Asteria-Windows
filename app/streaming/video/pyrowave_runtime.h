@@ -4,17 +4,12 @@
 #endif
 
 #include "pyrowave_frame.h"
+#include "pyrowave_pixels.h"
 #include <vulkan/vulkan_core.h>
 #include <pyrowave.h>
 #include <filesystem>
 
 namespace PyroWave {
-struct Pixels {
-    int width = 0;
-    int height = 0;
-    std::vector<std::uint8_t> planes[3]; // tightly packed SDL IYUV-compatible Y, U, V
-};
-
 // Single-threaded P0 owner. Module outlives every device/decoder and API call.
 // No global instance and no startup load. Missing DLL is a normal false result.
 class Runtime {
@@ -35,6 +30,8 @@ public:
     // with this exact loaded codec. Does not accept host or Session inputs.
     bool generateProofFrame(std::vector<std::uint8_t>& container,
                             Framing framing = Framing::Compatibility);
+    bool encodeProofPixels(const Pixels& pixels, std::vector<std::uint8_t>& container,
+                           Framing framing = Framing::Compatibility);
 
 private:
     bool fail(const std::string& reason);

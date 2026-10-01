@@ -1,6 +1,6 @@
 # Porting plan
 
-Updated after owner validation: Asteria identity and x64/ARM64 CI packaging are implemented, and M0A native Windows ARM64 is complete on the recorded Surface Pro 11th Edition. M1A starts with Moonlight's existing performance statistics. M1B historical P0 proof used the old codec; P0-R now realigns with Vibepollo and requires new-codec x64/ARM64 GPU requalification before P0.5 presentation. [v0.1.0-preview.1](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0-preview.1) is released for both targets. Completed items are checked below; baseline evidence lives in [BASELINE.md](BASELINE.md), and PyroWave hardware evidence in [VALIDATION.md](VALIDATION.md#m1b-p0-offline-pyrowave-validation).
+Updated after owner validation: Asteria identity and x64/ARM64 CI packaging are implemented, and M0A native Windows ARM64 is complete on the recorded Surface Pro 11th Edition. M1A starts with Moonlight's existing performance statistics. M1B historical P0 proof used the old codec; P0-R is complete with Vibepollo-compatible x64/ARM64 real-hardware qualification; P0.5 offline SDL tooling is implemented and awaits owner visual qualification. [v0.1.0-preview.1](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0-preview.1) is released for both targets. Completed items are checked below; baseline evidence lives in [BASELINE.md](BASELINE.md), and PyroWave hardware evidence in [VALIDATION.md](VALIDATION.md#m1b-p0-offline-pyrowave-validation).
 
 ## Review outcome
 
@@ -10,7 +10,7 @@ The original choice to reuse Moonlight's Windows streaming stack is sound. The r
 
 ## Scope and dependency order
 
-M0 is merged and M0A native ARM64 is complete based on owner-verified process architecture and Apollo AV1 streaming on real hardware. M1 identity is implemented; its profiles/session work, M1A performance work, and M2–M4 remain planned. M1B has historical source-diff/P0 evidence; P0-R Vibepollo compatibility and hardware requalification precede P0.5 presentation and P1a/P1b live work. Apply M5 qualification to the initial preview's inherited streaming and identity scope; later feature milestones are not prerequisites for that preview. Clipboard (M3) depends on capability work in M2. Performance changes must follow measurements, and a cross-build alone does not complete M0A. M6 Asteria VR follows the core streaming and performance baselines as a separate later feature; it does not depend on M1B PyroWave or the M2–M4 Apollo extensions.
+M0 is merged and M0A native ARM64 is complete based on owner-verified process architecture and Apollo AV1 streaming on real hardware. M1 identity is implemented; its profiles/session work, M1A performance work, and M2–M4 remain planned. M1B has historical source-diff/P0 evidence; P0-R Vibepollo compatibility and hardware requalification are complete. P0.5 offline SDL visual qualification is active before P1a/P1b live work. Apply M5 qualification to the initial preview's inherited streaming and identity scope; later feature milestones are not prerequisites for that preview. Clipboard (M3) depends on capability work in M2. Performance changes must follow measurements, and a cross-build alone does not complete M0A. M6 Asteria VR follows the core streaming and performance baselines as a separate later feature; it does not depend on M1B PyroWave or the M2–M4 Apollo extensions.
 
 Primary targets: **Windows 11 x64 and native ARM64**, both included in v0.1.0-preview.1. Native ARM64 means the client and its process-loaded runtime DLLs run as ARM64, without x64 emulation; cross-compiling on an x64 build host is acceptable. Windows 10 x64 remains a separate compatibility target pending runtime documentation and real-machine tests. Record exact minimum OS builds before publishing qualified binaries. M0A completion is specific to the recorded device and workload, not a broad ARM64 support matrix.
 
@@ -93,18 +93,23 @@ The goal is not to blindly copy Artemis Android decoder tweaks. Artemis Android 
 
 Both hardware proofs passed three decoder lifetimes and malformed-frame rejection/recovery into known I420 CPU buffers. They do not qualify SDL presentation or live end-to-end streaming.
 
-### P0-R next: Vibepollo compatibility and hardware requalification
+### P0-R COMPLETE: Vibepollo compatibility and hardware requalification
 
 - [x] Realign active upstream codec to `186f0393b77f7755953b5ecde994bb1cec2e4155`, bitstream ID `186f0393`, preserving API 0.6.0 and architecture isolation.
 - [x] Add LE compatibility and complete record-framing parsers; keep PYRW as an explicit historical fixture helper.
 - [x] Apply decoder short-block safety patch with exact provenance/hashes; retain encoder-only pool/4:4:4 sizing patches.
 - [x] Complete x64/native ARM64 dependency/parser/loader/qmake/PE CI for the new codec; see run 36795604865 in VALIDATION.md. Hosted GPU attempts were unavailable skips.
-- [ ] Rerun both framing modes on RTX 4070 Ti and native Surface Pro 11 / Snapdragon X Plus / Adreno X1-85; old GPU results are historical.
+- [x] Both framing modes pass on RTX 4070 Ti x64 and native Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 ARM64 at the new codec/bitstream ID and API 0.6.0: three decoder lifetimes, malformed rejection/recovery, expected I420 planes. Old GPU results remain historical.
 
 See [the current Vibepollo contract](PYROWAVE_VIBEPOLLO.md). No live negotiation,
 advertisement, UI setting, packaging or frame-pacing change is made here.
 
-### P0.5: presentation after P0-R hardware requalification
+### P0.5 ACTIVE: offline SDL presentation qualification
+
+The standalone raw/codec pattern harness is implemented, with ten lifecycle
+cycles, reset handling, aspect fit, scaling controls, timing and evidence.
+Code/CI completion is recorded once merged; **hardware visual qualification is
+pending** on both targets. Synthetic recreation does not prove real device loss.
 
 - [ ] Exercise real SDL IYUV presentation on x64 and ARM64; verify SDR color/range/chroma siting with visible test patterns and record pacing behavior.
 - [ ] Test resize, decoder/device recreation, repeated runtime lifetimes, and device-loss/recovery behavior.
