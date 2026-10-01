@@ -1,4 +1,6 @@
-
+<p align="center">
+  <img src="assets/branding/asteria-logo-readme.png" alt="Asteria logo" width="280">
+</p>
 
 # Asteria
 
