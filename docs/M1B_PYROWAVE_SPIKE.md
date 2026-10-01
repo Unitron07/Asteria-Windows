@@ -1,10 +1,36 @@
+# M1B P0-R: Vibepollo compatibility realignment
+
+The active offline target is Nonary/Vibepollo with Themaister/pyrowave
+`186f0393b77f7755953b5ecde994bb1cec2e4155`, bitstream ID `186f0393`, C API 0.6.0.
+P0-R adds LE length-prefixed compatibility and complete record-framing parsers,
+uses the client decoder safety patch, and retains strict loading/architecture
+isolation. `PYRW` is now an explicitly named legacy fixture helper only.
+See [the authoritative current contract and patch audit](PYROWAVE_VIBEPOLLO.md),
+[validation](VALIDATION.md), and [next milestones](NEXT_STEP.md).
+
+Live streaming does not negotiate or advertise PyroWave. No user setting, HDR,
+partial recovery, bandwidth probing, standard-codec behavior, normal release
+packaging or frame pacing changes. The target stays offline 1920x1080 8-bit SDR
+4:2:0. API version and bitstream ID are independent compatibility axes.
+
+The old `f6fb84...` x64 RTX 4070 Ti and ARM64 Surface Pro 11 / Snapdragon X Plus /
+Adreno X1-85 GPU results below remain historical. Requalification on both real
+hardware targets with the new commit and both framings is required before P0.5.
+New CI evidence belongs in VALIDATION.md; hosted build success is not GPU qualification.
+
+## Historical PR #14 / PR #16 record (superseded codec and host framing)
+
+All source tables, old host contracts, bundle fallback behavior, hashes, commands
+and P0.5/P1 plans below describe the previous proof. They must not be used as the
+current host wire format, active dependency pipeline or live integration plan.
+
 # M1B PyroWave status, source diff, and validation
 
 **Current status: source-diff groundwork and P0 offline dependency/runtime/parser/decode proof are complete.** [PR #16](https://github.com/Unitron07/Asteria-Windows/pull/16) is merged; its final P0 head was `a02902fb58ac66ae4820373dd3978d3087de7d24`. Offline GPU decode is validated on Windows x64 RTX 4070 Ti and native Windows ARM64 Surface Pro 11th Edition / Snapdragon X Plus / Adreno X1-85. PyroWave remains experimental and off by default; live host negotiation is not implemented, and normal releases do not ship active PyroWave streaming support.
 
 **Next: P0.5 presentation qualification, then a separate P1 live opt-in change.** Real SDL presentation, SDR display color/range/chroma, pacing, device-loss/recovery, 4:4:4, runtime deployment policy, and production latency/performance remain unqualified. HDR is excluded. No Apollo/Vibepollo end-to-end PyroWave stream has been validated. See [NEXT_STEP.md](NEXT_STEP.md) and the [validation record](VALIDATION.md#m1b-p0-offline-pyrowave-validation).
 
-The PR #14 source-diff findings below remain the design basis. Their comparison boundary is historical; P0 build/runtime results later in this document supersede the initial build concerns. No Session, capability, RTSP/SDP, preference, bitrate, pacing, or normal preview-package behavior changed. M0A remains complete; use Moonlight's existing statistics for M1A.
+The PR #14 source-diff findings below are historical source-diff evidence only; the Vibepollo contract supersedes their host/framing assumptions. Their comparison boundary is historical; P0 build/runtime results later in this document supersede the initial build concerns. No Session, capability, RTSP/SDP, preference, bitrate, pacing, or normal preview-package behavior changed. M0A remains complete; use Moonlight's existing statistics for M1A.
 
 ## Exact comparison boundary
 

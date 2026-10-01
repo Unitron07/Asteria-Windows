@@ -97,7 +97,46 @@ Windows 10 x64 still needs its own declared minimum OS/runtime and hardware qual
 
 The release includes `SHA256SUMS.txt`, symbols, recursive corresponding-source snapshots, and architecture/build evidence for each target. The owner confirmed the completed x64 and ARM64 CI builds work. The previously recorded Surface Pro 11th Edition native-process and repeated Apollo AV1 comparison remains evidence for that setup; exact artifact hashes and several host/client details for that earlier comparison were not recorded. No clean-machine or full functional-matrix result was supplied, so this preview does not claim broad qualification. The executable's inherited 6.1.0 metadata and bundled development-baseline provenance notice refer to the Moonlight-based build; `v0.1.0-preview.1` is Asteria's public preview version. No installer was shipped.
 
+## M1B P0-R Vibepollo validation
+
+Active codec `186f0393b77f7755953b5ecde994bb1cec2e4155`, built bitstream ID
+`186f0393`, C API 0.6.0; see [current contract](PYROWAVE_VIBEPOLLO.md).
+The dependency helper checks exact source/API/patched provenance. Optional CI
+covers both complete-frame parsers, explicit legacy fixtures, loader, dependency,
+qmake and PE/import evidence for x64 and native ARM64.
+
+Local environment has Git/PowerShell but no MSVC/CMake/Qt. Pinned source headers
+and all patch applicability/hashes were audited locally; build execution is
+assigned to optional CI. The implementation at
+`f01d7c34cbb9538405d08f8a8cbf8e5ad0d90a2a` passed
+[P0-R run 36795604865](https://github.com/Unitron07/Asteria-Windows/actions/runs/36795604865)
+on **x64 and native ARM64**: exact dependency/API/patch verification, both framing
+parsers and legacy regressions, six runtime/compatibility CTests, restricted
+load/reload, qmake compile/link and PE/startup-import checks. ARM64 reproduced
+the known Granite C1189/C2665 failures and passed with the existing portable-math
+patch. Both GPU attempts recorded device-unavailable exit 77; neither is hardware
+qualification. Local baseline preflight/package-architecture/ARM64 packaging-repair
+tests also passed.
+
+| New-codec offline artifact | ZIP SHA-256 |
+| --- | --- |
+| [x64](https://github.com/Unitron07/Asteria-Windows/actions/runs/36795604865/artifacts/11132973864) | `3f2e0c1f9bfe167f0ff3f28a2495a72d7433c022af7e544c2b54051a1f0689b2` |
+| [ARM64](https://github.com/Unitron07/Asteria-Windows/actions/runs/36795604865/artifacts/11133762570) | `2687e7d04a5ab73d9874b86895d33642993c5c59f1bf81bd377c150a661fd2af` |
+
+[Baseline run 36795605261](https://github.com/Unitron07/Asteria-Windows/actions/runs/36795605261)
+**passed all four ordinary upstream/Asteria x64/ARM64 builds** at the same implementation.
+The following documentation-only evidence update does not alter tested code.
+
+New RTX 4070 Ti and Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 GPU
+requalification is **pending**. Both formats must decode expected I420 output,
+match one another, reject malformed frames and recover across three lifetimes.
+Hardware records require OS/driver/adapter and runtime/fixture/output hashes.
+Hosted Vulkan exit 77 is an explicit unavailable skip. No network, SDL, color,
+4:4:4 or HDR qualification is claimed. P0.5 follows real-hardware requalification.
+
 ## M1B P0 offline PyroWave validation
+
+**Historical: this section records the superseded f6fb84eb0d8538f43f6f54e58d2040d101c8676c codec and private PYRW wrapper. It does not qualify P0-R.**
 
 **Complete: offline dependency/runtime/parser/decode proof.** The source-diff
 groundwork from PR #14 and the P0 implementation merged in
@@ -148,7 +187,7 @@ Adreno hardware, not merely an ARM64 build or loader probe. ARM64 OS build,
 Windows display-driver version, artifact hash, and generated output hashes
 were not supplied; no values are inferred from the x64 record.
 
-The original codec fork returned 404. The helper prefers
+At the historical P0 revision the original codec fork returned 404. That helper preferred
 [the original source](https://github.com/joemossjr16/pyrowave) at exact commit
 `f6fb84eb0d8538f43f6f54e58d2040d101c8676c`, then uses the verified Git bundle
 with SHA-256
@@ -166,7 +205,7 @@ display color/range/chroma correctness, pacing, 4:4:4, device-loss/recovery,
 production latency/performance comparison, and final runtime shipping/package
 policy are not yet qualified. HDR is excluded. Live RTSP/SDP negotiation is
 not implemented, and no Apollo/Vibepollo end-to-end PyroWave stream is validated.
-The next gate is [P0.5 presentation qualification](NEXT_STEP.md), then a
+The current next gate is [P0-R hardware requalification](NEXT_STEP.md) with the new Vibepollo pin, then P0.5 and a
 separate P1 live opt-in integration with safe standard-codec fallback and
 H.264/HEVC/AV1 regressions.
 

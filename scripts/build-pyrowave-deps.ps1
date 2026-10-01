@@ -25,7 +25,7 @@ function Assert-Revision([string]$Path, [string]$Commit) {
     $actual = Get-Git $Path @('rev-parse','HEAD')
     if ($actual.Trim() -cne $Commit) { throw "Revision mismatch in ${Path}: $actual != $Commit" }
 }
-function Fetch-Pinned([string]$Path, $Pin, [switch]$Codec) {
+function Fetch-Pinned([string]$Path, $Pin) {
     if (Test-Path (Join-Path $Path '.git')) {
         Assert-Revision $Path $Pin.commit
         if (Get-Git $Path @('status','--porcelain','--untracked-files=no')) {
@@ -39,15 +39,7 @@ function Fetch-Pinned([string]$Path, $Pin, [switch]$Codec) {
     & git -C $Path fetch --depth 1 origin $Pin.commit | Out-Host
     $origin = $Pin.url
     if ($LASTEXITCODE -ne 0) {
-        if (!$Codec) { throw "Cannot fetch pinned dependency: $($Pin.url)" }
-        $bundle = Join-Path $PSScriptRoot "pyrowave/$($lock.sourceBundle.file)"
-        if (!(Test-Path -LiteralPath $bundle) -or
-            (Get-FileHash -LiteralPath $bundle -Algorithm SHA256).Hash.ToLowerInvariant() -cne $lock.sourceBundle.sha256) {
-            throw 'Pinned codec unavailable and recovery bundle missing/hash mismatch'
-        }
-        Invoke-Native git @('-C',$Path,'bundle','verify',$bundle)
-        Invoke-Native git @('-C',$Path,'fetch',$bundle,'HEAD')
-        $origin = "verified bundle SHA256=$($lock.sourceBundle.sha256)"
+        throw "Cannot fetch exact pinned dependency $($Pin.commit) from $($Pin.url); no HEAD or historical bundle substitution"
     }
     Invoke-Native git @('-C',$Path,'checkout','--detach',$Pin.commit)
     Assert-Revision $Path $Pin.commit
@@ -66,7 +58,15 @@ foreach ($arch in $Architecture) {
     Start-Transcript -Path (Join-Path $evidence 'dependency.log') -Force | Out-Null
     $phase = 'fetch'
     try {
-        $codecOrigin = Fetch-Pinned $source $lock.pyrowave -Codec
+        if ($lock.bitstreamId -cne $lock.pyrowave.commit.Substring(0,8)) { throw 'Bitstream ID/pin mismatch' }
+        $codecOrigin = Fetch-Pinned $source $lock.pyrowave
+        $apiHeader = Get-Content (Join-Path $source 'pyrowave.h') -Raw
+        foreach ($part in @(@('MAJOR',0),@('MINOR',6),@('PATCH',0))) {
+            if ($apiHeader -notmatch "(?m)^#define PYROWAVE_API_VERSION_$($part[0]) $($part[1])\s*$") {
+                throw 'Pinned source does not expose expected API 0.6.0'
+            }
+        }
+        if ($lock.apiVersion -cne '0.6.0') { throw 'Unsupported API lock' }
         $granite = Join-Path $source 'Granite'
         $null = Fetch-Pinned $granite $lock.granite
         foreach ($entry in @(@('third_party/volk',$lock.volk),
@@ -89,6 +89,20 @@ foreach ($arch in $Architecture) {
                 sourceArchiveSha256=(Get-FileHash -LiteralPath $archive).Hash.ToLowerInvariant()}
         }
         $hashes | ConvertTo-Json | Set-Content (Join-Path $evidence 'sources.json') -Encoding utf8
+        $phase = 'patch provenance/application'
+        $codecPatches = @()
+        foreach ($entry in $lock.patches) {
+            $patch = Join-Path $PSScriptRoot "pyrowave/patches/$($entry.file)"
+            $sha = (Get-FileHash -LiteralPath $patch -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($sha -cne $entry.sha256) { throw "Codec patch hash mismatch: $($entry.file)" }
+            # Audit retained host-only patches against the exact source too.
+            Invoke-Native git @('-C',$source,'apply','--check',$patch)
+            if ($entry.apply) { Invoke-Native git @('-C',$source,'apply',$patch) }
+            $codecPatches += [pscustomobject]@{file=$entry.file; sha256=$sha;
+                applied=$entry.apply; purpose=$entry.purpose; provenance=$lock.patchSource}
+        }
+        $codecPatches | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $evidence 'codec-patches.json') -Encoding utf8
+        Get-Git $source @('diff','--binary') | Set-Content (Join-Path $evidence 'codec-patch.diff')
         $patchHash = $null
         if ($arch -eq 'arm64' -and !$UnpatchedArm64) {
             $patch = Join-Path $PSScriptRoot 'pyrowave/granite-msvc-arm64-portable-math.patch'
@@ -97,6 +111,15 @@ foreach ($arch in $Architecture) {
             $patchHash = (Get-FileHash -LiteralPath $patch).Hash.ToLowerInvariant()
             Get-Git $granite @('diff') | Set-Content (Join-Path $evidence 'granite-patch.diff')
         }
+        $patchedHashes = @()
+        foreach ($tree in @($source,$granite)) {
+            foreach ($file in (Get-Git $tree @('diff','--name-only'))) {
+                if (!$file) { continue }
+                $patchedHashes += [pscustomobject]@{source=$tree; file=$file;
+                    sha256=(Get-FileHash -LiteralPath (Join-Path $tree $file)).Hash.ToLowerInvariant()}
+            }
+        }
+        $patchedHashes | ConvertTo-Json | Set-Content (Join-Path $evidence 'patched-source-sha256.json') -Encoding utf8
         $phase = 'configure'
         if (!$Generator) {
             $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
@@ -132,7 +155,8 @@ foreach ($arch in $Architecture) {
             cmake=$cmakeVersion; cmakePath=$cmakePath; cmakeSha256=(Get-FileHash $cmakePath).Hash;
             compiler=$compiler; compilerSha256=(Get-FileHash $compiler).Hash;
             windowsSdk=(@(([xml](Get-Content (Join-Path $build 'pyrowave-shared.vcxproj') -Raw)).Project.PropertyGroup | ForEach-Object { $_.WindowsTargetPlatformVersion } | Where-Object { $_ }) | Select-Object -First 1);
-            options=$options; patchSha256=$patchHash; os=[Environment]::OSVersion.VersionString;
+            options=$options; patchSha256=$patchHash; codecPatches=$codecPatches;
+            bitstreamId=$lock.bitstreamId; apiVersion=$lock.apiVersion; os=[Environment]::OSVersion.VersionString;
             runnerImage=$env:ImageVersion; runnerImageOS=$env:ImageOS;
             harnessCommit=(Get-Git (Split-Path $PSScriptRoot -Parent) @('rev-parse','HEAD'));
             workflowRun=$env:GITHUB_RUN_ID} | ConvertTo-Json -Depth 4 |
@@ -158,6 +182,7 @@ foreach ($arch in $Architecture) {
             Get-ChildItem $entry[1] -Filter 'LICENSE*' | Copy-Item -Destination $dest
         }
         Copy-Item (Join-Path $PSScriptRoot 'pyrowave/dependencies.json') (Join-Path $install 'source-notices')
+        Copy-Item (Join-Path $PSScriptRoot 'pyrowave/patches') (Join-Path $install 'source-notices/patches') -Recurse
         $runtime = Join-Path $install 'bin/libpyrowave-shared-0.dll'
         Assert-PyroWavePe $runtime $arch | ConvertTo-Json | Set-Content (Join-Path $evidence 'runtime-pe.json')
         foreach ($kind in @('headers','imports','dependents','exports')) {

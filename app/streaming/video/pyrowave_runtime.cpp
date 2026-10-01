@@ -116,7 +116,8 @@ bool Runtime::decode(const std::vector<std::uint8_t>& container, Pixels& output)
     const auto clear = [this](void*) { m_Api.clear(m_Decoder); };
     std::unique_ptr<void, decltype(clear)> cleanup(this, clear);
     Frame frame; std::string error;
-    if (!parseFrame(container.data(),container.size(),container.size(),frame,error)) return fail(error);
+    const StreamContext context{std::uint32_t(m_Width),std::uint32_t(m_Height),Chroma::Yuv420,true};
+    if (!parseFrame(container.data(),container.size(),container.size(),frame,error,&context)) return fail(error);
     for (const auto& p : frame.packets)
         if (!check(m_Api.push(m_Decoder,container.data()+p.offset,p.size),"packet push")) return false;
     if (!m_Api.ready(m_Decoder,false)) return fail("complete offline frame is not decode-ready");
@@ -137,8 +138,9 @@ bool Runtime::decode(const std::vector<std::uint8_t>& container, Pixels& output)
     output=std::move(pixels);
     return true;
 }
-bool Runtime::generateProofFrame(std::vector<std::uint8_t>& container) {
+bool Runtime::generateProofFrame(std::vector<std::uint8_t>& container, Framing framing) {
     container.clear();
+    if (framing == Framing::LegacyOffline) return fail("new fixtures must use Vibepollo framing");
     if (!m_Device || !m_Decoder) return fail("create P0 decoder/device before generating fixture");
 #define ENCODER(name) auto name = reinterpret_cast<decltype(&pyrowave_encoder_##name)>(symbol("pyrowave_encoder_" #name)); if (!name) return false
     ENCODER(create); ENCODER(destroy); ENCODER(encode_cpu_synchronous);
@@ -166,10 +168,10 @@ bool Runtime::generateProofFrame(std::vector<std::uint8_t>& container) {
                 planes[p][y*w+x]=p ? 128 : std::uint8_t(16+219*x/(w-1));
             b.data[p]=planes[p].data(); b.row_stride_in_bytes[p]=w; b.plane_size_in_bytes[p]=w*h;
         }
-        // Leave space for PYRW packet-length overhead below the full-frame safety cap.
+        // Leave space for compatibility packet-length overhead below the safety cap.
         const pyrowave_rate_control rate{800000};
         if (!check(encode_cpu_synchronous(encoder,&b,&rate),"proof encode")) return false;
-        constexpr std::size_t boundary=1200;
+        constexpr std::size_t boundary=1024; // Vibepollo compatibility packetizer boundary
         std::size_t count=0;
         if (!check(compute_num_packets(encoder,boundary,&count),"proof packet count")) return false;
         if (!count || count>MaxPackets) return fail("proof packet count outside safety limit");
@@ -178,17 +180,20 @@ bool Runtime::generateProofFrame(std::vector<std::uint8_t>& container) {
         std::size_t actual=count;
         if (!check(packetize(encoder,packets.data(),boundary,&actual,bitstream.data(),bitstream.size()),"proof packetize")) return false;
         if (actual!=count) return fail("proof packetizer count mismatch");
-        std::size_t total=8;
+        std::size_t total=4;
         for (const auto& p : packets) {
             if (!p.size || p.offset>bitstream.size() || p.size>bitstream.size()-p.offset ||
                 total>MaxFrameBytes-4 || p.size>MaxFrameBytes-total-4)
                 return fail("proof packet bounds exceeded");
             total+=4+p.size;
         }
-        std::vector<std::uint8_t> result{'P','Y','R','W',1,std::uint8_t(count>>8),std::uint8_t(count),0};
+        std::vector<std::uint8_t> result;
         result.reserve(total);
+        if (framing == Framing::Compatibility)
+            for (int shift : {0,8,16,24}) result.push_back(std::uint8_t(count>>shift));
         for (const auto& p : packets) {
-            for (int shift : {24,16,8,0}) result.push_back(std::uint8_t(p.size>>shift));
+            if (framing == Framing::Compatibility)
+                for (int shift : {0,8,16,24}) result.push_back(std::uint8_t(p.size>>shift));
             result.insert(result.end(),bitstream.begin()+p.offset,bitstream.begin()+p.offset+p.size);
         }
         container=std::move(result);

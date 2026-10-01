@@ -1,7 +1,14 @@
 {
-  "pyrowave": {"url":"https://github.com/joemossjr16/pyrowave.git","commit":"f6fb84eb0d8538f43f6f54e58d2040d101c8676c"},
+  "pyrowave": {"url":"https://github.com/Themaister/pyrowave.git","commit":"186f0393b77f7755953b5ecde994bb1cec2e4155"},
+  "bitstreamId": "186f0393",
+  "apiVersion": "0.6.0",
   "granite": {"url":"https://github.com/Themaister/Granite.git","commit":"b6cffd5ce81f540f0855e6778428483e14763d9b"},
   "volk": {"url":"https://github.com/zeux/volk.git","commit":"47cddf7ed97b94118a08aacb548a411188e016cc"},
   "vulkanHeaders": {"url":"https://github.com/KhronosGroup/Vulkan-Headers.git","commit":"6802bb4733b63ed5efd3adb308a6c885ef180ea1"},
-  "sourceBundle": {"file":"pyrowave-pinned.bundle","sha256":"e4387ce6b691724aa342d6df7677f51efffe30e98e3949415718e7b2b955c56e"}
+  "patchSource": {"url":"https://github.com/Nonary/Vibepollo","commit":"8a8c4b03a280ab9f567beb380110abb80f5220b8","path":"third-party/pyrowave/patches"},
+  "patches": [
+    {"file":"0001-encoder-buffer-pool.patch","sha256":"237b91b63f5520e8950d03394943bfb41f28e6388f8bfd71a0fac4a8f66338de","apply":false,"purpose":"Encoder performance only; retained for future multi-frame fixture generation"},
+    {"file":"0002-payload-data-444-sizing.patch","sha256":"8a3c3e71ee6bd73d71ef4845aef5a7b9fe88249d8c97c9f58aa5c35f0fdd4d38","apply":false,"purpose":"Encoder 4:4:4 buffer safety; retained for future 4:4:4 fixtures, not qualified"},
+    {"file":"0003-decoder-reject-short-block.patch","sha256":"325d417ca07818ad0fd164fbd6f6141fcfbbe87e8ffdcfc1c918dd8d0588710d","apply":true,"purpose":"Decoder safety: reject undersized blocks before duplicate early-out/cursor advance"}
+  ]
 }
