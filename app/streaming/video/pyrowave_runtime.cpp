@@ -139,6 +139,8 @@ bool Runtime::decode(const std::vector<std::uint8_t>& container, Pixels& output)
     return true;
 }
 bool Runtime::generateProofFrame(std::vector<std::uint8_t>& container, Framing framing) {
+    container.clear();
+    try {
     Pixels pixels;
     pixels.width=1920; pixels.height=1080;
     for (int p=0;p<3;++p) {
@@ -148,6 +150,7 @@ bool Runtime::generateProofFrame(std::vector<std::uint8_t>& container, Framing f
             pixels.planes[p][y*w+x]=p ? 128 : std::uint8_t(16+219*x/(w-1));
     }
     return encodeProofPixels(pixels,container,framing);
+    } catch (const std::bad_alloc&) { return fail("proof fixture allocation failed"); }
 }
 bool Runtime::encodeProofPixels(const Pixels& pixels, std::vector<std::uint8_t>& container, Framing framing) {
     container.clear();
@@ -182,7 +185,7 @@ bool Runtime::encodeProofPixels(const Pixels& pixels, std::vector<std::uint8_t>&
         constexpr std::size_t boundary=1024; // Vibepollo compatibility packetizer boundary
         std::size_t count=0;
         if (!check(compute_num_packets(encoder,boundary,&count),"proof packet count")) return false;
-        if (!count || count>MaxPackets) return fail("proof packet count outside safety limit");
+        if (!count || count>MaxPackets) return fail("proof packet count outside safety limit: " + std::to_string(count));
         std::vector<pyrowave_packet> packets(count);
         std::vector<std::uint8_t> bitstream(MaxFrameBytes);
         std::size_t actual=count;

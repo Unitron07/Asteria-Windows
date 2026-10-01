@@ -173,11 +173,12 @@ coordinates differ from output pixels. Native nearest inspection needs a
   compare raw/codec and both formats. Linear filtering should soften transitions.
   Visual evidence may reveal offsets; this test does not measure fractional
   chroma phase or prove a backend preserves exact sample-center coordinates.
-- Geometry: top 1px and bottom 2px checkerboards, 120px grid, center crosshair,
+- Geometry: upper-left 1px and lower-left 2px checker regions, 120px grid, center crosshair,
   border/corners and a centered 400x400 square. Square stays square, all corners
   remain visible and square windows add bars. Fractional scaling can alias fine
   checks; nearest has sharp steps, linear smooths. Codec ringing is distinguishable
-  by comparing raw. Gradient uses Y 16..235 with neutral chroma.
+  by comparing raw. Dense checks are localized to keep the fixture within the
+  unchanged frame/packet caps. Gradient uses Y 16..235 with neutral chroma.
 
 The existing verified v15 archive supplies **SDL2 API 2.32.70 through sdl2-compat**,
 backed by **SDL3 3.4.16** (ARM64 inventory in DEPENDENCIES_WINDOWS.md). No new major

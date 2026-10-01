@@ -29,8 +29,10 @@ inline PyroWave::Pixels pattern(Pattern kind) {
             value=(x%120<2 || y%120<2) ? 235 : 128;
             break;
         case Pattern::Geometry: {
+            // Localized fine checks keep the offline fixture inside the unchanged
+            // 850 KB / 1024-packet cap even with difficult wavelet coefficients.
             const int step=y<540 ? 1 : 2;
-            value=((x/step+y/step)&1) ? 235 : 16;
+            value=(x<480 && (y<240 || y>=840)) ? (((x/step+y/step)&1) ? 235 : 16) : 16;
             if (x%120==0 || y%120==0 || x==960 || y==540 ||
                 x<2 || y<2 || x>=1918 || y>=1078 ||
                 ((x==760 || x==1160) && y>=340 && y<=740) ||
