@@ -6,7 +6,7 @@
 #include <Limelight.h>
 #include <PyroWave.h>
 #ifdef PYROWAVE_EXPERIMENTAL
-#include "video/pyrowave.h"
+#include "video/pyrowave_decoder.h"
 #endif
 #include "SDL_compat.h"
 #include "utils.h"

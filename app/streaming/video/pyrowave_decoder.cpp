@@ -1,4 +1,4 @@
-#include "pyrowave.h"
+#include "pyrowave_decoder.h"
 #include "pyrowave_transport.h"
 #include "streaming/session.h"
 #include "streaming/streamutils.h"
