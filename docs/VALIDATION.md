@@ -204,15 +204,74 @@ min/max 9.691900/25.920200 ms, zero counted missed intervals. These are submissi
 observations, **not visual inspection, refresh/latency or true device-loss evidence**.
 Dense geometry checks are localized to preserve the existing packet/frame caps.
 
-Implementation is under review; record code/CI completion once merged. **Owner
-visual qualification is pending on RTX 4070 Ti x64 and native Adreno X1-85 ARM64.**
-Hosted CTests/builds and SDL submissions cannot establish visual correctness,
-centered-chroma alignment, leak freedom, production latency or true device-loss
-recovery. True device loss remains manual/unproven. 4:4:4 is separate and HDR
-remains excluded. Pinned SDL BT.709 limited conversion uses LEFT chroma metadata,
-against the authored CENTER pattern; SDL2 cannot independently select siting.
-Alignment is explicitly unqualified pending backend observation. Ordinary codecs, Session/common-c and release packaging stay
-unchanged; P1a negotiation and P1b transport have not started.
+### Owner hardware qualification: P0.5 COMPLETE
+
+[PR #20](https://github.com/Unitron07/Asteria-Windows/pull/20) merged at
+`2d443c6347fd04489bda17bafceccea0bbfa4b65`. Optional x64/native ARM64 CI passed
+as recorded above. The owner subsequently completed **manual visual qualification
+on both named targets**. These records are separate from the earlier hidden API
+checks and historical P0/P0-R decode results.
+
+| Owner qualification | Windows x64 | Native Windows ARM64 |
+| --- | --- | --- |
+| Hardware | NVIDIA GeForce RTX 4070 Ti | Surface Pro 11th Edition / Snapdragon X Plus / Qualcomm Adreno X1-85 |
+| SDL compiled/runtime | 2.32.70 / 2.32.70 | 2.32.70 / 2.32.70 |
+| Presentation | Direct3D11; SDL_PIXELFORMAT_IYUV; 1920x1080 source; aspect-preserving fit; nearest/linear exercised | Direct3D11; SDL_PIXELFORMAT_IYUV; 1920x1080 source; aspect-preserving fit; nearest/linear exercised |
+| Modes/patterns | Raw I420 and PyroWave compatibility/record presentation; all five patterns PASS; both framings and framing equality PASS | Raw I420 and PyroWave compatibility/record presentation; all five patterns PASS; both framings/framing equality PASS with identical decoded results |
+| Lifecycle/recovery | Ten cycles PASS; SDL_RENDER_TARGETS_RESET and SDL_RENDER_DEVICE_RESET paths exercised; synthetic full renderer/decoder/runtime recreation PASS | Cycles 0–9 PASS; both SDL reset paths exercised; synthetic full renderer/decoder/runtime recreation PASS |
+| Owner visual observation | All patterns looked correct; no obvious color/range/chroma issue, corruption or unexpected stretching/cropping; resize/maximize/fullscreen normal; recreation visually clean | All visuals looked good; no weird behavior, visible chroma issue or corruption; resize/fullscreen/scaling clean; recreation visually clean |
+| Visual result | **PASS** | **PASS** |
+
+ARM64 Vulkan adapter: `Qualcomm(R) Adreno(TM) X1-85 GPU`, `vendorID=20803`,
+`deviceID=909329200`, `driverVersion=2151112704`, `apiVersion=4210983`.
+These are raw Vulkan integers, not a display-driver marketing version.
+
+Representative decoded sample errors (MAE / maximum error); record framing
+matched compatibility framing:
+
+| Pattern | x64 MAE | x64 maxError | ARM64 MAE | ARM64 maxError |
+| --- | --- | --- | --- | --- |
+| Range | 0.000000 | 0 | 0.000000 | 0 |
+| BT.709 bars | 0.000000 | 0 | 0.000000 | 0 |
+| Centered chroma | 0.004776 | 11 | 0.003041 | 11 |
+| Geometry | 0.000028 | 1 | 0.000002 | 1 |
+| Gradient | 0.000694 | 1 | 0.001042 | 1 |
+
+| 30-second 60 FPS pacing sanity | x64 | Native ARM64 |
+| --- | --- | --- |
+| Intervals | 1799 | 1800 |
+| Average ms | 16.679525 | 16.667838 |
+| Minimum ms | 14.439500 | 5.625200 |
+| Maximum ms | 36.244300 | 27.692300 |
+| Missed intervals | 1 | 0 |
+| Total duration seconds | Not supplied | 30.571586 |
+| Present-loop seconds | Not supplied | 30.002108 |
+| Sanity result | PASS | PASS |
+
+**Qualified scope:** offline SDL IYUV presentation of 1920x1080 SDR 8-bit 4:2:0,
+BT.709 limited-range visual patterns; raw I420, compatibility and record framing;
+aspect fit, resize, nearest/linear, fullscreen/maximize/restore, renderer/texture
+recreation and synthetic reset/recovery paths on these two devices only.
+
+**Limits:** no visible chroma anomaly was observed on either target. Vibepollo
+authors CENTER 4:2:0 chroma, while the pinned SDL2-compat BT.709 limited path maps
+to SDL3 LEFT chroma-location metadata. SDL2 has no independent siting control;
+exact CENTER-versus-LEFT sampling remains **formally unqualified**. Visual
+inspection and sample errors do not mathematically prove center-sample preservation.
+Recovery logic was exercised successfully, but no forced physical GPU device-loss
+event was induced: true physical device-loss qualification remains manual/unproven.
+The loops show no catastrophic offline SDL presentation issue; they do not measure
+refresh accuracy, full frame pacing, production latency or end-to-end latency.
+Leak freedom is not established. No OS build, display-driver marketing version,
+exact display refresh, color calibration or chroma-phase measurement was supplied
+for these owner visual runs; the prior hidden API OS record is separate.
+
+P0.5 does not validate live RTP/UDP, RTSP/SDP/SCM negotiation, live Vibepollo host
+interoperability, adaptive FEC, partial-frame recovery, bandwidth probing, 4:4:4
+or HDR. Ordinary codecs, Session/common-c, runtime behavior and release packaging
+are unchanged. **P0-R remains COMPLETE; P1a live SDR 4:2:0 integration is the next
+future milestone**, and P1b transport hardening is later; neither is implemented
+by this documentation update.
 
 ## M1B P0 offline PyroWave validation
 
@@ -279,16 +338,16 @@ See [bundle provenance](../scripts/pyrowave/README.md) and the
 [spike evidence](M1B_PYROWAVE_SPIKE.md) for all dependency pins, toolchain,
 patch/import inventory, and x64 hashes.
 
-**Remaining scope:** PyroWave is experimental and off by default; normal
-releases do not ship active PyroWave streaming support. SDL presentation,
-display color/range/chroma correctness, pacing, 4:4:4, device-loss/recovery,
-production latency/performance comparison, and final runtime shipping/package
-policy are not yet qualified. HDR is excluded. Live RTSP/SDP negotiation is
-not implemented, and no Apollo/Vibepollo end-to-end PyroWave stream is validated.
-P0-R new-codec hardware requalification is complete. The current gate is
-[P0.5 offline SDL visual qualification](NEXT_STEP.md), followed by a
-separate P1 live opt-in integration with safe standard-codec fallback and
-H.264/HEVC/AV1 regressions.
+**Current status beyond the historical P0 record:** P0-R new-codec hardware
+requalification and P0.5 offline SDL presentation qualification are complete on
+both named targets; see their separate records above. PyroWave remains experimental
+and off by default; normal releases do not ship active PyroWave streaming support.
+Exact chroma siting, physical GPU device loss, full pacing, 4:4:4, HDR,
+production/end-to-end latency and final runtime shipping/package policy remain
+unqualified. Live SCM/RTSP/SDP integration is not implemented and no live
+Vibepollo end-to-end PyroWave stream has been validated. The next future milestone
+is [P1a live SDR 4:2:0 integration](NEXT_STEP.md), with safe standard-codec fallback
+and H.264/HEVC/AV1 regressions; P1b transport hardening follows later.
 
 ## Release checklist
 
