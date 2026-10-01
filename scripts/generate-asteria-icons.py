@@ -42,16 +42,16 @@ def main():
 
     # Display-only crop around the approved main mark's outer ring/glow. Remove
     # rectangular canvas corners, not the black circular interior or RGB artwork.
-    # Coordinates apply to the untouched 1254 px approved master.
+    # Coordinates apply to the finalized October 1, 2026 1254 px masters.
     if large.size != (1254, 1254) or small.size != (1254, 1254):
         raise ValueError("Review the crop coordinates if an approved master changes")
-    display = crop_emblem(large, (52, 56, 1192, 1172))
+    display = crop_emblem(large, (26, 30, 1228, 1202))
     (branding / "asteria-logo-readme.png").write_bytes(png_bytes(display))
 
     # Apply the same tight circular crop to the simplified artwork. Bounds follow
     # its thicker ring/glow. Transparent square padding preserves its aspect ratio
     # for Windows ICO frames; the black circular interior stays opaque.
-    cropped_small = crop_emblem(small, (48, 54, 1209, 1174))
+    cropped_small = crop_emblem(small, (25, 33, 1228, 1203))
     edge = max(cropped_small.size)
     icon = Image.new("RGBA", (edge, edge), (0, 0, 0, 0))
     icon.paste(cropped_small, ((edge - cropped_small.width) // 2,
