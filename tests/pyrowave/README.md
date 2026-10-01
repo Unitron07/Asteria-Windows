@@ -12,8 +12,10 @@ and [source/patch lock](../../scripts/pyrowave/dependencies.json).
 X Plus / Adreno X1-85 ARM64 with this codec/ID/API, both framing modes, three
 decoder lifetimes, expected I420 planes and malformed rejection/recovery. See
 [the owner hardware record](../../docs/VALIDATION.md#m1b-p0-r-vibepollo-validation).
-Old `f6fb84...` evidence remains historical. P0.5 tooling is implemented; code/CI
-completion follows merge and owner x64/ARM64 visual qualification is pending.
+Old `f6fb84...` evidence remains historical. **P0.5 is COMPLETE** after PR #20
+merged and owner visual qualification passed on both named targets. See the
+[P0.5 hardware record and limits](../../docs/VALIDATION.md#m1b-p05-offline-sdl-qualification).
+P1a live SDR 4:2:0 integration is the next future milestone, not implemented here.
 
 ## Dependencies and GPU-free parser tests
 
@@ -93,7 +95,7 @@ The CLI resolves paths to absolute paths. Save all logs, runtime/output hashes,
 Windows build and display-driver version. Confirm native ARM64 process execution.
 Unavailable Vulkan is exit 77 in CI, not a pass on hardware. Other decode failures
 remain failures. The owner has completed these new-codec P0-R commands on both
-targets. The next owner gate is P0.5 visual presentation below.
+targets. The completed P0.5 presentation qualification is reproducible below.
 
 ## qmake compile/link
 
@@ -111,9 +113,14 @@ compatibility packets; live MTU/FEC/overhead limits require a future review.
 
 The harness is isolated from Session and the normal application build. Initial
 contract: **1920x1080 SDR, 8-bit I420, BT.709 limited range, centered 4:2:0**.
-4:4:4 and HDR are excluded. P0-R is hardware-qualified; P0.5 owner visual
-qualification on x64 RTX 4070 Ti and native ARM64 Adreno X1-85 is **pending**.
-Implementation/code CI completion is recorded after merge, not visual completion.
+4:4:4 and HDR are excluded. P0-R remains hardware-qualified; **P0.5 is COMPLETE**
+on x64 RTX 4070 Ti and native Surface Pro 11 / Snapdragon X Plus / Adreno X1-85
+ARM64. Owner inspection passed all five raw/compatibility/record patterns,
+fit/resize, nearest/linear, fullscreen/maximize/restore and renderer/texture
+recreation. Ten lifecycles, both SDL reset recovery paths, synthetic full
+recreation and 30-second 60 FPS pacing sanity loops passed. Exact chroma siting,
+physical GPU loss, full pacing/production latency and live host/network
+interoperability remain unqualified. Commands below remain reusable for reruns.
 
 Optional CI artifacts include `presentation-x64/` or `presentation-arm64/` with
 the executable, matching SDL2.dll/SDL3.dll, `runtime/bin/`, source notices and
@@ -196,10 +203,12 @@ no independent chroma-siting control. The [pinned SDL3 colorspace definition](ht
 defines `SDL_COLORSPACE_BT709_LIMITED` with **LEFT chroma-location metadata**, while
 Vibepollo's source pattern is **CENTER**. This is a concrete metadata mismatch;
 the probe logs it and does not compensate or claim centered alignment is preserved.
-Backend sampling may expose an offset, which should be recorded as a qualification
-failure requiring a later presentation-path decision. Display/driver color
-management and actual backend sampling still require owner inspection. Full-range BT.709 and HDR are
-not qualified. See [SDL conversion API](https://wiki.libsdl.org/SDL2/SDL_SetYUVConversionMode).
+Owner inspection found no visible chroma anomaly on either tested device, but
+exact CENTER-versus-LEFT sampling behavior remains **formally unqualified**;
+visual agreement does not mathematically prove exact center-sample preservation.
+A visible offset on a future backend should be recorded as a qualification failure
+requiring a presentation-path decision. No display calibration or fractional
+chroma-phase measurement was supplied. Full-range BT.709 and HDR are not qualified. See [SDL conversion API](https://wiki.libsdl.org/SDL2/SDL_SetYUVConversionMode).
 
 ### Lifecycle, reset, timing and evidence limits
 
@@ -241,11 +250,14 @@ display-driver version, native process confirmation, observations and optional
 manual screenshots/photos. Screenshots are not captured automatically.
 
 Exit 0 proves successful checked upload/render calls and completion; visual output
-is always marked pending for owner review. Exit 77 explicitly reports unavailable
+is always marked pending for owner review in the per-run log. That reminder is
+not repository milestone status: the owner's completed inspection records qualify
+P0.5 on the two named devices. Exit 77 explicitly reports unavailable
 SDL window/renderer/Vulkan before first submission; losing availability afterward
 or failing upload/decode/recovery is a failure. Hosted CI cannot visually qualify
 color/range/chroma, scaling or true hardware loss. Log the renderer separately
-for RTX 4070 Ti x64 and Adreno X1-85 ARM64 before completing P0.5.
+for each future rerun; the completed RTX 4070 Ti x64 and Adreno X1-85 ARM64
+records both identify Direct3D11 with SDL compiled/runtime 2.32.70 and IYUV.
 
 ### Building the presentation probe
 
@@ -266,7 +278,8 @@ Parser-only CMake also runs headless deterministic patterns, pixel sizes,
 aspect-fit, reset policy and timing tests without SDL/GPU. Optional CI builds and
 runs both native targets, retains P0-R regressions, attempts hidden raw lifecycles
 and codec presentation, and stages experimental binaries only. Unavailable
-presentation is explicitly recorded, while visual qualification stays pending.
+presentation is explicitly recorded; hosted CI does not replace owner inspection.
+The completed hardware visual record is separate from those CI submissions.
 
 qmake presentation opt-in adds `CONFIG+=pyrowave_sdl SDL_ROOT=... SDL_ARCH=x64`
 (or arm64) to the existing offline command. The CI helper validates both target

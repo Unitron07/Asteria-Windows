@@ -18,8 +18,16 @@ Adreno X1-85 GPU results below remain historical. **P0-R is complete** on both
 real hardware targets with the new commit, bitstream ID `186f0393`, API 0.6.0,
 both framings, three decoder lifetimes, malformed rejection/recovery and expected
 I420 output; see [the current hardware record](VALIDATION.md#m1b-p0-r-vibepollo-validation).
-P0.5's offline SDL harness is implemented; owner visual qualification is pending
-on both targets. Hosted build/submission success cannot qualify display output.
+**P0.5 is complete** after [PR #20](https://github.com/Unitron07/Asteria-Windows/pull/20)
+merged and the owner visually qualified RTX 4070 Ti x64 and native Surface Pro 11 /
+Snapdragon X Plus / Adreno X1-85 ARM64. Raw I420 and compatibility/record SDL IYUV
+presentation passed all five SDR 8-bit 4:2:0 BT.709 limited patterns, fit/resize,
+nearest/linear, fullscreen/maximize/restore, recreation and synthetic reset paths;
+60 FPS loops passed pacing sanity checks. See [P0.5 hardware evidence](VALIDATION.md#m1b-p05-offline-sdl-qualification).
+No visible chroma anomaly was observed, but exact CENTER-versus-LEFT sampling is
+formally unqualified; true physical GPU loss remains manual/unproven. Production
+latency, full pacing, 4:4:4, HDR and live host/network interoperability are
+unqualified. **P1a is the next future milestone**, not implemented here.
 
 ## Historical PR #14 / PR #16 record (superseded codec and host framing)
 
@@ -29,9 +37,9 @@ current host wire format, active dependency pipeline or live integration plan.
 
 # M1B PyroWave status, source diff, and validation
 
-**Current status: source-diff groundwork and P0 offline dependency/runtime/parser/decode proof are complete.** [PR #16](https://github.com/Unitron07/Asteria-Windows/pull/16) is merged; its final P0 head was `a02902fb58ac66ae4820373dd3978d3087de7d24`. Offline GPU decode is validated on Windows x64 RTX 4070 Ti and native Windows ARM64 Surface Pro 11th Edition / Snapdragon X Plus / Adreno X1-85. PyroWave remains experimental and off by default; live host negotiation is not implemented, and normal releases do not ship active PyroWave streaming support.
+**Status at PR #16: source-diff groundwork and P0 offline dependency/runtime/parser/decode proof are complete.** [PR #16](https://github.com/Unitron07/Asteria-Windows/pull/16) is merged; its final P0 head was `a02902fb58ac66ae4820373dd3978d3087de7d24`. Offline GPU decode is validated on Windows x64 RTX 4070 Ti and native Windows ARM64 Surface Pro 11th Edition / Snapdragon X Plus / Adreno X1-85. PyroWave remains experimental and off by default; live host negotiation is not implemented, and normal releases do not ship active PyroWave streaming support.
 
-**Next: P0.5 presentation qualification, then a separate P1 live opt-in change.** Real SDL presentation, SDR display color/range/chroma, pacing, device-loss/recovery, 4:4:4, runtime deployment policy, and production latency/performance remain unqualified. HDR is excluded. No Apollo/Vibepollo end-to-end PyroWave stream has been validated. See [NEXT_STEP.md](NEXT_STEP.md) and the [validation record](VALIDATION.md#m1b-p0-offline-pyrowave-validation).
+**Next at that historical stage: P0.5 presentation qualification, then a separate P1 live opt-in change.** Real SDL presentation, SDR display color/range/chroma, pacing, device-loss/recovery, 4:4:4, runtime deployment policy, and production latency/performance remain unqualified. HDR is excluded. No Apollo/Vibepollo end-to-end PyroWave stream has been validated. See [NEXT_STEP.md](NEXT_STEP.md) and the [validation record](VALIDATION.md#m1b-p0-offline-pyrowave-validation).
 
 The PR #14 source-diff findings below are historical source-diff evidence only; the Vibepollo contract supersedes their host/framing assumptions. Their comparison boundary is historical; P0 build/runtime results later in this document supersede the initial build concerns. No Session, capability, RTSP/SDP, preference, bitrate, pacing, or normal preview-package behavior changed. M0A remains complete; use Moonlight's existing statistics for M1A.
 
@@ -151,7 +159,7 @@ P0 completed the dependency helper, parser/runtime sources, experimental qmake i
 | P0: `.github/workflows/pyrowave-offline.yml`; baseline workflows retained | Optional x64/native ARM64 dependency/prototype jobs alongside unchanged baseline matrix | Required baseline jobs remain. Feature-on cross-build alone is not hardware support. |
 | P0: `tests/pyrowave/`; future P0.5 presentation fixtures | Load runtime, decode generated PYRW frame into I420 CPU buffer; SDL presentation remains next | No host advertisement needed for first proof. Record architecture, driver, exports, output and cleanup. |
 
-## Milestone progression
+## Historical milestone progression (P0-era plan)
 
 **P0 complete:** exact dependency builds, GPU-free bounded parser, restricted runtime/API/export loading, and generated 1080p SDR 4:2:0 GPU decode into known I420 CPU buffers on x64 and native ARM64. Each hardware proof passed three decoder lifetimes and malformed-frame rejection/recovery. This is offline codec/runtime validation, not presentation or production streaming support.
 
@@ -161,7 +169,7 @@ P0 completed the dependency helper, parser/runtime sources, experimental qmake i
 
 ## Historical validation of the source-diff change
 
-Local `scripts/test-baseline-preflight.ps1`, `scripts/test-package-architecture-tests.ps1` and `scripts/test-arm64-package-repair.ps1` passed on 2026-09-25, including mixed-architecture rejection. No application or workflow code changed. The focused PR records the exact candidate SHA and hosted upstream/candidate x64/ARM64 results; those baseline builds do not build or qualify PyroWave. P0 dependency builds and offline hardware decode were outstanding at that source-diff stage; the completed results below supersede that status. Presentation and live interoperability remain outstanding.
+Local `scripts/test-baseline-preflight.ps1`, `scripts/test-package-architecture-tests.ps1` and `scripts/test-arm64-package-repair.ps1` passed on 2026-09-25, including mixed-architecture rejection. No application or workflow code changed. The focused PR records the exact candidate SHA and hosted upstream/candidate x64/ARM64 results; those baseline builds do not build or qualify PyroWave. P0 dependency builds and offline hardware decode were outstanding at that source-diff stage; the completed results below supersede that status. Presentation and live interoperability were outstanding at that stage; the current P0.5 record above supersedes presentation status.
 
 ## P0 implementation and evidence (2026-09-28 local / 2026-09-29 UTC)
 

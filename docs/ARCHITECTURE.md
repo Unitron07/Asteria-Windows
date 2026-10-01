@@ -4,7 +4,7 @@
 
 Use Moonlight PC as the application, retaining its source history and layout. Do not build a second Windows shell or extract its streaming internals into a new framework for the first release. This follows the project owner's September 12, 2026 direction.
 
-The [audit](FEATURE_AUDIT.md) pins the reviewed code. M0 integration is merged, x64 CI passed, and the owner confirmed the tested client works; see [BASELINE.md](BASELINE.md) for the evidence and remaining qualification records. Native x64/ARM64 builds and packaging pass CI, and the Asteria identity is implemented. M0A real-device ARM64 validation is complete; M1A begins with Moonlight's built-in statistics; M1B source-diff groundwork and P0 offline proof are complete on x64 and native ARM64; P0.5 presentation qualification is the next development task. Frame-pacing changes require measured evidence. The extension architecture below describes planned work.
+The [audit](FEATURE_AUDIT.md) pins the reviewed code. M0 integration is merged, x64 CI passed, and the owner confirmed the tested client works; see [BASELINE.md](BASELINE.md) for the evidence and remaining qualification records. Native x64/ARM64 builds and packaging pass CI, and the Asteria identity is implemented. M0A real-device ARM64 validation is complete; M1A begins with Moonlight's built-in statistics; M1B source-diff groundwork and historical P0 offline proof are complete on x64 and native ARM64. P0-R codec/framing requalification and P0.5 offline SDL presentation qualification are complete on the named x64/ARM64 hardware; P1a live SDR 4:2:0 integration is the next future milestone. Frame-pacing changes require measured evidence. The extension architecture below describes planned work.
 
 ## Native Windows targets
 
@@ -21,7 +21,7 @@ Reuse upstream's ARM64 Qt/MSVC/qmake and packaging paths. Keep architecture-spec
 | Discovery, pairing, host HTTP | `app/backend/nvcomputer.*`, `nvhttp.*` | Parse Apollo fields and add a bounded authenticated clipboard request path |
 | Session lifecycle | `app/streaming/session.cpp` | Attach extension services to the existing session |
 | Input | `app/streaming/input/` | Extend existing capture, direct-pointer, and shortcut paths |
-| Decode/render | Existing `app/streaming/` implementation | Preserve existing codecs; isolated P0 PyroWave offline GPU decode exists. P0-R is hardware-qualified on both targets; standalone P0.5 SDL harness awaits visual qualification, then P1a explicit integration |
+| Decode/render | Existing `app/streaming/` implementation | Preserve existing codecs; isolated P0 PyroWave offline GPU decode exists. P0-R is hardware-qualified on both targets; standalone P0.5 SDL presentation is qualified on both named targets; P1a explicit live integration remains future work |
 | Native protocol | `moonlight-common-c/moonlight-common-c/` | Keep the current upstream pin; P1 may add the reviewed minimal PyroWave protocol delta. Server-command extensions remain later work |
 | Build/package | `moonlight-qt.pro`, `app/app.pro`, `scripts/`, `wix/` | Asteria identity implemented; qualify portable packages before installer distribution |
 
@@ -64,15 +64,22 @@ malformed rejection/recovery and expected I420 output. The isolated P0.5 probe
 adds raw/codec I420 patterns, SDL2 IYUV upload, explicit BT.709 limited conversion,
 aspect fit, nearest/linear scaling, recreation and reset-event handling. It uses
 the existing v15 SDL2 compatibility runtime backed by SDL3, with no Session
-coupling. Visual qualification on x64/ARM64 and true device loss remain pending.
-Separate 4:4:4 presentation validation follows; no HDR support is added.
+coupling. **P0.5 is complete**: owner visual inspection passed on RTX 4070 Ti x64
+and native Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 ARM64 for raw,
+compatibility and record modes, all five patterns, resize/scaling,
+fullscreen/maximize/restore and recreation. Ten lifecycles and synthetic reset
+recovery passed; 60 FPS loops provide pacing sanity only. See [hardware evidence](VALIDATION.md#m1b-p05-offline-sdl-qualification).
+No visible chroma anomaly was observed; authored CENTER versus SDL3 LEFT metadata
+sampling remains formally unqualified because SDL2 has no independent siting
+control. True physical GPU loss was not induced and remains manual/unproven.
+Production/end-to-end latency, full pacing, 4:4:4 and HDR remain unqualified.
 
-P1a later adds explicit SDR 4:2:0 choice (Auto remains standard codecs), complete
+P1a is the next future milestone and would add explicit SDR 4:2:0 choice (Auto remains standard codecs), complete
 runtime/presentation preflight, bitstream-ID comparison, minimal SCM/RTSP/SDP
 negotiation, compatibility framing and safe fallback/reconnect without repeating
 host-app actions. P1b adds live record framing, record-start/critical-count/loss
 metadata, adaptive FEC and partial recovery. No live negotiation, user setting,
-partial loss recovery or bandwidth probe is implemented by P0-R.
+partial loss recovery or bandwidth probe is implemented by P0-R or P0.5.
 
 ## Planned Asteria VR boundary (M6)
 

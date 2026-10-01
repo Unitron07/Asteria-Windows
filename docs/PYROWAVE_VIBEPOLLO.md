@@ -137,15 +137,20 @@ No probe is implemented here, and bulk throughput would not prove UDP loss toler
    with three decoder lifetimes, expected I420 output and malformed recovery.
    See [current hardware evidence](VALIDATION.md#m1b-p0-r-vibepollo-validation).
    Old `f6fb84...` GPU results remain historical.
-2. **P0.5 ACTIVE:** standalone raw/codec SDL IYUV harness implemented; code/CI
-   completion follows merge, while owner x64/ARM64 visual qualification is pending.
-   See [commands, patterns and limits](../tests/pyrowave/README.md#p05-offline-sdl-presentation). Test
-   SDR color/range/chroma, resize/recreation/device loss, runtime deployment;
-   validate 4:4:4 presentation separately after 4:2:0. Stay offline; keep HDR excluded.
-3. **P1a:** explicit SDR 4:2:0 choice, complete runtime/presentation preflight,
+2. **P0.5 COMPLETE:** owner visual qualification passed on RTX 4070 Ti x64 and
+   native Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 ARM64. Raw I420 and
+   compatibility/record SDL IYUV passed all five SDR 8-bit 4:2:0 BT.709 limited
+   patterns, fit/resize, nearest/linear, fullscreen/maximize/restore and recreation.
+   Ten lifecycles and synthetic reset recovery passed; 60 FPS loops passed pacing
+   sanity checks. See [hardware evidence](VALIDATION.md#m1b-p05-offline-sdl-qualification)
+   and [commands and limits](../tests/pyrowave/README.md#p05-offline-sdl-presentation).
+   No visible chroma anomaly was observed; exact authored CENTER versus SDL3 LEFT
+   sampling is formally unqualified. True physical GPU loss remains manual/unproven;
+   full pacing, production latency, 4:4:4, HDR and live interoperability are unqualified.
+3. **P1a NEXT / FUTURE (not implemented):** explicit SDR 4:2:0 choice, complete runtime/presentation preflight,
    bitstream-ID check, reviewed SCM/RTSP/SDP negotiation, compatibility framing,
    safe standard-codec fallback/reconnect, H.264/HEVC/AV1 lifecycle/audio/input regressions.
-4. **P1b:** live record framing, record-start and critical-count metadata,
+4. **P1b LATER:** live record framing, record-start and critical-count metadata,
    adaptive FEC and partial recovery. Bandwidth probing is a later usability gate.
 
 Optional PyroWave CI stays separate from the baseline workflows and release

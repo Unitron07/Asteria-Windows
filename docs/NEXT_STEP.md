@@ -1,4 +1,4 @@
-# Next step: M1B P0.5 offline SDL presentation
+# Next step: M1B P1a live Vibepollo SDR 4:2:0 integration (future)
 
 **P0-R is COMPLETE** on Windows x64 RTX 4070 Ti and native Windows ARM64
 Surface Pro 11th Edition / Snapdragon X Plus / Adreno X1-85. The exact codec is
@@ -8,29 +8,33 @@ decoder lifetimes, load/reload and malformed rejection/recovery. See the
 [current hardware record](VALIDATION.md#m1b-p0-r-vibepollo-validation) and
 [Vibepollo contract](PYROWAVE_VIBEPOLLO.md). Old `f6fb84...` evidence stays historical.
 
-## P0.5 ACTIVE: offline presentation/color qualification
+## P0.5 COMPLETE: offline presentation/color qualification
 
-The standalone SDL harness is implemented; code/CI completion is recorded once
-merged. **Owner visual qualification on both targets remains pending.**
+The implementation merged in [PR #20](https://github.com/Unitron07/Asteria-Windows/pull/20)
+at `2d443c6347fd04489bda17bafceccea0bbfa4b65`; optional x64/native ARM64 CI passed.
+Owner visual qualification **passed on RTX 4070 Ti x64 and native Surface Pro 11 /
+Snapdragon X Plus / Adreno X1-85 ARM64**. Raw I420 and both compatibility/record
+framing passed all five patterns through Direct3D11 SDL IYUV presentation:
+1920x1080 SDR 8-bit 4:2:0, BT.709 limited range. Aspect fit, nearest/linear scaling,
+resize, fullscreen/maximize/restore and renderer/texture recreation were visually
+clean. Ten lifecycle cycles, target/device-reset recovery paths and synthetic
+renderer/decoder/runtime recreation passed; 30-second 60 FPS loops passed pacing
+sanity checks. See [the owner hardware record](VALIDATION.md#m1b-p05-offline-sdl-qualification)
+and [reproduction commands](../tests/pyrowave/README.md#p05-offline-sdl-presentation).
 
-1. Download the optional x64/native ARM64 artifacts and run raw I420, compatibility
-   and record modes using [exact commands and visual expectations](../tests/pyrowave/README.md#p05-offline-sdl-presentation).
-2. Inspect range, BT.709 bars, centered-chroma boundaries and geometry at native
-   resolution. Compare raw versus codec; test nearest/linear, smaller/larger/square
-   windows, repeated resize, maximize/restore and fullscreen. Save evidence logs.
-3. Run ten recreation cycles and a 60 FPS observation. Record backend, adapter,
-   dimensions and hashes. Synthetic reset/resource tests exercise recovery code;
-   true device-loss hardware behavior remains manual/unproven. Do not infer leak
-   freedom or production latency from this probe.
+No visible chroma anomaly was observed, but authored CENTER versus SDL3 LEFT
+metadata sampling remains formally unqualified. No forced physical GPU loss was
+induced; true device-loss qualification remains manual/unproven. Loop timing does
+not qualify refresh accuracy, full frame pacing, production or end-to-end latency,
+or leak freedom. 4:4:4 and HDR remain unqualified. This offline milestone does not
+validate live RTP/UDP, SCM/RTSP/SDP, Vibepollo host interoperability, adaptive FEC,
+partial-frame recovery or bandwidth probing. Normal application/release behavior
+is unchanged.
 
-Use SDR 8-bit limited-range 4:2:0 only. Separate 4:4:4 qualification follows;
-HDR is excluded. The existing pinned SDL2 API/runtime dependencies are reused.
-Normal Session/common-c, codec settings, release packaging and frame pacing stay
-unchanged. Local roundtrip and window submission do not prove live interoperability.
+## P1a NEXT / FUTURE: explicit live SDR 4:2:0
 
-## P1a: explicit live SDR 4:2:0
-
-Add explicit experimental codec choice, complete runtime/presentation preflight,
+P1a is not implemented by this documentation update. Future work would add explicit
+experimental codec choice, complete runtime/presentation preflight,
 bitstream-ID verification, minimal audited SCM/RTSP/SDP/common-c changes and
 Vibepollo LE length-prefixed compatibility framing. Auto remains standard codec
 selection. Refuse/warn on missing/mismatched bitstream ID; API 0.6.0 is a separate
@@ -40,7 +44,7 @@ missing/wrong DLL/export/API/driver, device loss, software policy and HDR exclus
 Re-run H.264/HEVC/AV1 lifecycle/audio/input tests and named-target measurements.
 No live work is implemented in P0-R or P0.5.
 
-## P1b: transport hardening
+## P1b LATER: transport hardening
 
 Add live record framing, record-start/lost-buffer metadata, critical packet counts,
 parity recovery and adaptive FEC; then bounded partial recovery and sideband
