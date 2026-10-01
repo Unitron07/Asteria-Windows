@@ -6,7 +6,7 @@ pyrowave_experimental {
     !exists($$PYROWAVE_ROOT/include/pyrowave/pyrowave.h): error("Missing pinned PyroWave header")
     !exists($$VULKAN_HEADERS/vulkan/vulkan_core.h): error("Missing pinned Vulkan header")
     DEFINES += PYROWAVE_EXPERIMENTAL=1
-    INCLUDEPATH += $$PYROWAVE_ROOT/include/pyrowave $$VULKAN_HEADERS
+    INCLUDEPATH += $$PYROWAVE_ROOT/include $$VULKAN_HEADERS
     SOURCES += $$PWD/pyrowave_frame.cpp $$PWD/pyrowave_runtime.cpp
     HEADERS += $$PWD/pyrowave_frame.h $$PWD/pyrowave_runtime.h
     # Offline probe includes this pri too; only the actual app owns Session/Qt.

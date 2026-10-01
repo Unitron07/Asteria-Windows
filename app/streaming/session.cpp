@@ -80,13 +80,6 @@ void Session::clStageStarting(int stage)
 
 void Session::clStageFailed(int stage, int errorCode)
 {
-    if (s_ActiveSession->m_StreamConfig.supportedVideoFormats == VIDEO_FORMAT_PYROWAVE) {
-        const QString reason = errorCode <= ML_ERROR_PYROWAVE_PROFILE && errorCode >= ML_ERROR_PYROWAVE_MISMATCH ?
-            QString::fromLatin1(pyrowaveNegotiationError(errorCode)) :
-            tr("Host setup/encoder or connection failed (error %1)").arg(errorCode);
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"PyroWave attempt ended: %s; manual standard-codec retry required",qPrintable(reason));
-        emit s_ActiveSession->displayLaunchError(tr("PyroWave: %1. Select Auto, H.264, HEVC or AV1 and reconnect. The host app was not automatically relaunched.").arg(reason));
-    }
     // Perform the port test now, while we're on the async connection thread and not blocking the UI.
     unsigned int portFlags = LiGetPortFlagsFromStage(stage);
     s_ActiveSession->m_PortTestResults = LiTestClientConnectivity(CONN_TEST_SERVER, 443, portFlags);
@@ -94,6 +87,15 @@ void Session::clStageFailed(int stage, int errorCode)
     char failingPorts[128];
     LiStringifyPortFlags(portFlags, ", ", failingPorts, sizeof(failingPorts));
     emit s_ActiveSession->stageFailed(QString::fromLocal8Bit(LiGetStageName(stage)), errorCode, QString(failingPorts));
+    if (s_ActiveSession->m_StreamConfig.supportedVideoFormats == VIDEO_FORMAT_PYROWAVE) {
+        const QString reason = errorCode <= ML_ERROR_PYROWAVE_PROFILE && errorCode >= ML_ERROR_PYROWAVE_MISMATCH ?
+            QString::fromLatin1(pyrowaveNegotiationError(errorCode)) :
+            tr("Host setup/encoder or connection failed (error %1)").arg(errorCode);
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"PyroWave attempt ended: %s; manual standard-codec retry required",qPrintable(reason));
+        // StreamSegue uses one dialog: emit last so the generic stage message
+        // cannot overwrite the exact bitstream/profile rejection and retry hint.
+        emit s_ActiveSession->displayLaunchError(tr("PyroWave: %1. Select Auto, H.264, HEVC or AV1 and reconnect. The host app was not automatically relaunched.").arg(reason));
+    }
 }
 
 void Session::clConnectionTerminated(int errorCode)
@@ -2049,6 +2051,16 @@ void Session::exec()
     // because we want to suspend all Qt processing until the stream is over.
     SDL_Event event;
     for (;;) {
+        // A failed SDL_PushEvent() must not strand a failed decoder. Check the
+        // experimental decoder independently of wakeups, including after timeout.
+        if (m_ActiveVideoFormat == VIDEO_FORMAT_PYROWAVE && m_VideoDecoder != nullptr) {
+            const QString error = m_VideoDecoder->getError();
+            if (!error.isEmpty()) {
+                m_UnexpectedTermination = true;
+                emit displayLaunchError(tr("PyroWave stream failed: %1. Select a standard codec and reconnect.").arg(error));
+                goto DispatchDeferredCleanup;
+            }
+        }
 #if SDL_VERSION_ATLEAST(2, 0, 18) && !defined(STEAM_LINK)
         // SDL 2.0.18 has a proper wait event implementation that uses platform
         // support to block on events rather than polling on Windows, macOS, X11,
@@ -2091,12 +2103,6 @@ void Session::exec()
             case SDL_CODE_FRAME_READY:
                 if (m_VideoDecoder != nullptr) {
                     m_VideoDecoder->renderFrameOnMainThread();
-                    const QString error = m_VideoDecoder->getError();
-                    if (!error.isEmpty()) {
-                        m_UnexpectedTermination = true;
-                        emit displayLaunchError(tr("PyroWave stream failed: %1. Select a standard codec and reconnect.").arg(error));
-                        goto DispatchDeferredCleanup;
-                    }
                 }
                 break;
             case SDL_CODE_FLUSH_WINDOW_EVENT_BARRIER:

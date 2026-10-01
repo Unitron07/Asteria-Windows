@@ -87,14 +87,14 @@ The joemossjr16/pyrollo comparisons and old `PYRW` proof remain historical evide
   [dependencies.json](../scripts/pyrowave/dependencies.json).
 
 The bitstream has no version field. API 0.6.0 alone does not establish codec
-compatibility. Future P1a must read `a=x-ss-pyrowave.bitstream:...`, compare it
-with the local build ID, and refuse/warn on a mismatch. Runtime load checks the
+compatibility. P1a reads `a=x-ss-pyrowave.bitstream:...` and compares it
+with the local build ID and refuses a mismatch. Runtime load checks the
 API and exports; it cannot discover a DLL's source commit. Deployments must bind
 the DLL to the build's source/patch/inventory hashes.
 
-Current scope remains **1920x1080, 8-bit SDR 4:2:0**, offline only. No Session
+The historical P0-R scope was **1920x1080, 8-bit SDR 4:2:0**, offline only. No Session
 hooks, host advertisement, RTSP negotiation, UI choice, HDR path, bandwidth probe,
-release packaging or frame-pacing change is included. H.264/HEVC/AV1 retain their
+release packaging or frame-pacing change was included. H.264/HEVC/AV1 retain their
 existing behavior. Complete local roundtrip does not prove network interoperability.
 
 ## Patch decisions

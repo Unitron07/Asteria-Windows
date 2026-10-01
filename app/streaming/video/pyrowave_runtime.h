@@ -6,7 +6,7 @@
 #include "pyrowave_frame.h"
 #include "pyrowave_pixels.h"
 #include <vulkan/vulkan_core.h>
-#include <pyrowave.h>
+#include <pyrowave/pyrowave.h>
 #include <filesystem>
 
 namespace PyroWave {
