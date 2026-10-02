@@ -35,7 +35,8 @@ int main(int argc,char** argv) {
     require(runtime.generateProofFrame(fixture));
     std::cerr<<"GPU proof: codec fixture generated\n";
     PyroWave::Frame frame; std::string error;
-    require(PyroWave::parseFrame(fixture.data(),fixture.size(),fixture.size(),frame,error));
+    const PyroWave::StreamContext context{1920,1080,PyroWave::Chroma::Yuv420,true};
+    require(PyroWave::parseFrame(fixture.data(),fixture.size(),fixture.size(),frame,error,&context));
     require(!frame.records.empty());
     const auto rangeByte=frame.records[0].offset+7;
     for (auto range:{PyroWave::YuvRange::Full,PyroWave::YuvRange::Limited}) {

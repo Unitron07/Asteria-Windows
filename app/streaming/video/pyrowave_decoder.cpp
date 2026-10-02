@@ -308,7 +308,11 @@ void PyroWaveVideoDecoder::renderFrameOnMainThread() {
         fail(QString("SDL output size: ") + SDL_GetError()); return;
     }
     if (!destination.w || !destination.h) {
-        if (slot>=0) { std::lock_guard<std::mutex> guard(m_Mutex); m_Slots.cancel(slot); ++m_Stats.pacerDroppedFrames; }
+        if (slot>=0 || !pixels.planes[0].empty()) {
+            std::lock_guard<std::mutex> guard(m_Mutex);
+            if (slot>=0) m_Slots.cancel(slot);
+            ++m_Stats.pacerDroppedFrames;
+        }
         return;
     }
     if (m_Gpu && !m_Gpu->beginRender(displayed)) { fail(QString::fromStdString(m_Gpu->error())); return; }
