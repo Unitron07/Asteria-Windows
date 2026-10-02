@@ -11,7 +11,7 @@ pyrowave_experimental {
     HEADERS += $$PWD/pyrowave_frame.h $$PWD/pyrowave_runtime.h
     # Offline probe includes this pri too; only the actual app owns Session/Qt.
     equals(TARGET, Asteria) {
-        SOURCES += $$PWD/pyrowave_decoder.cpp $$PWD/pyrowave_sdl.cpp
-        HEADERS += $$PWD/pyrowave_decoder.h $$PWD/pyrowave_pixels.h $$PWD/pyrowave_sdl.h
+        SOURCES += $$PWD/pyrowave_decoder.cpp $$PWD/pyrowave_sdl.cpp $$PWD/pyrowave_gpu.cpp
+        HEADERS += $$PWD/pyrowave_decoder.h $$PWD/pyrowave_pixels.h $$PWD/pyrowave_sdl.h $$PWD/pyrowave_gpu.h $$PWD/pyrowave_queue.h $$PWD/pyrowave_stats.h
     }
 }

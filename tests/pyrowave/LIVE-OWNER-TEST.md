@@ -1,3 +1,10 @@
+> Owner update: live P1a video succeeded on Surface Pro 11 / Snapdragon X Plus /
+> Adreno X1-85 at 2560x1440, target 120 FPS, with audio/input working. The CPU
+> bring-up path measured ~93.3 FPS, ~12.45 ms decode pipeline, ~1.24 ms render.
+> GPU-resident shared-plane presentation and standard-layout stats are now added.
+> Final performance qualification remains **PENDING owner x64/ARM64 retest**.
+> See [GPU presentation and timing definitions](../../docs/PYROWAVE_GPU_PRESENTATION.md).
+
 # P1a live Vibepollo owner test (qualification PENDING)
 
 Use `Asteria-P1a-Experimental-x64-<run>` on RTX 4070 Ti, or the matching
@@ -8,7 +15,7 @@ The portable marker keeps this test's settings/pairing beside this executable.
 Use the included `pyrowave/` directory intact; do not copy a different codec DLL.
 
 1. Pair/connect to Vibepollo using the ordinary UI.
-2. Open Settings → Video codec → **PyroWave (Experimental)**. Turn HDR and YUV
+2. Open Settings â†’ Video codec â†’ **PyroWave (Experimental)**. Turn HDR and YUV
    4:4:4 off. Keep decoder Auto or Force hardware. Initially use 1920x1080 at
    60 FPS, default packet size, and record the configured bitrate. PyroWave
    needs substantially more bandwidth than conventional codecs; this build
@@ -51,7 +58,7 @@ handoff rather than introducing advanced pacing. The existing statistics overlay
 shows received/decoded/rendered rates, bytes, loss, decode/render time and RTT.
 Full latency/pacing and true GPU loss are not qualified by a successful stream.
 
-Supported allocations are even dimensions 128..4096 with at most 3840×2160
+Supported allocations are even dimensions 128..4096 with at most 3840Ã—2160
 pixels; only 1080p was previously hardware-qualified offline. Live complete
 envelopes are limited to 8 MiB and 65,536 codec packets; transport packet sizes
 are 1024..2048 bytes and decode units contain at most 4,000 transport fragments.

@@ -1,3 +1,10 @@
+> Owner update: live P1a video succeeded on Surface Pro 11 / Snapdragon X Plus /
+> Adreno X1-85 at 2560x1440, target 120 FPS, with audio/input working. The CPU
+> bring-up path measured ~93.3 FPS, ~12.45 ms decode pipeline, ~1.24 ms render.
+> GPU-resident shared-plane presentation and standard-layout stats are now added.
+> Final performance qualification remains **PENDING owner x64/ARM64 retest**.
+> See [GPU presentation and timing definitions](PYROWAVE_GPU_PRESENTATION.md).
+
 # M1B P0-R: Vibepollo compatibility realignment
 
 ## M1B P1a implementation / live qualification pending
@@ -379,7 +386,7 @@ Qualcomm(R) Adreno(TM) X1-85 GPU vendorID=20803 deviceID=909329200 driverVersion
 ```
 
 These driver/API values are raw Vulkan integers. Cycles **0, 1, and 2** each
-decoded the generated **60,312-byte** frame to **1920×1080 8-bit SDR 4:2:0**,
+decoded the generated **60,312-byte** frame to **1920Ã—1080 8-bit SDR 4:2:0**,
 with I420 **Y = 2,073,600; U = 518,400; V = 518,400 bytes** and MAE
 **0.00104167**. This ARM64 MAE is separate from the RTX 4070 Ti x64 result
 **0.000694444**.
