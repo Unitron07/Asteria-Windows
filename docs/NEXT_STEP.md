@@ -1,4 +1,4 @@
-# Next step: qualify M1B P1a live Vibepollo SDR 4:2:0
+# Next step: qualify M1B P1a GPU presentation performance
 
 **P0-R is COMPLETE** on Windows x64 RTX 4070 Ti and native Windows ARM64
 Surface Pro 11th Edition / Snapdragon X Plus / Adreno X1-85. The exact codec is
@@ -31,7 +31,7 @@ validate live RTP/UDP, SCM/RTSP/SDP, Vibepollo host interoperability, adaptive F
 partial-frame recovery or bandwidth probing. Normal application/release behavior
 is unchanged.
 
-## P1a implemented: hardware interoperability qualification PENDING
+## P1a live ARM64 video succeeded: GPU performance qualification PENDING
 
 The experimental explicit live SDR 8-bit 4:2:0 path is implemented. Auto stays
 on standard codecs. Restricted runtime/API/build-metadata preflight and real SDL
@@ -40,16 +40,19 @@ DESCRIBE/bitstream-ID checks gate negotiation. Compatibility complete frames fee
 the existing runtime and live main-thread SDL decoder. See
 [the current contract](PYROWAVE_VIBEPOLLO.md) and [owner guide](../tests/pyrowave/LIVE-OWNER-TEST.md).
 
-Baseline and optional x64/native ARM64 build/test checks **PASS**. The P1a
-implementation is **COMPLETE / READY FOR HARDWARE INTEROPERABILITY TEST**;
-exact code commit, runs, package hashes and recorded GPU skips are in
-[VALIDATION.md](VALIDATION.md#m1b-p1a-live-integration-validation).
-Owner tests on RTX 4070 Ti x64 and Surface Pro 11 / Snapdragon X Plus / Adreno
-X1-85 ARM64 must still prove video updates, audio/input, resize/fullscreen,
-disconnect/reconnect and standard codec use afterward. Record logs, negotiated
-extent/FPS/bitrate, GPU and runtime/API/bitstream IDs in VALIDATION.md. Do not
-mark P1a fully complete from CI alone. Retry failures manually using a standard
-codec; no host launch/resume is automatically repeated.
+The owner confirmed live PyroWave video, audio/input and good visual quality on
+Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 ARM64 at 2560x1440, target
+120 FPS. The CPU-output bring-up baseline was ~93.3 FPS, ~12.45 ms decode
+pipeline time, and ~1.24 ms render. Gated shared GPU planes, Qualcomm fragment
+preference, bounded frame slots and standard-layout stats are now implemented.
+See [presentation/timing definitions](PYROWAVE_GPU_PRESENTATION.md).
+
+Owner retest on RTX 4070 Ti x64 and Surface Pro 11 ARM64 must establish the
+actual improvement and verify resize/fullscreen, disconnect/reconnect and
+standard codecs afterward. Record each overlay metric and the selected GPU or
+CPU timing mode. Final P1a performance qualification remains **PENDING**; CI and
+an offline GPU proof do not establish live 120 FPS. Retry failures manually using
+a standard codec; no host launch/resume is automatically repeated.
 
 ## P1b LATER: transport hardening
 

@@ -4,7 +4,8 @@
 #include <iostream>
 #include <filesystem>
 #include <cstdlib>
-static void require(bool ok) { if (!ok) { std::cerr<<"FAIL GPU presentation: "<<SDL_GetError()<<'\n'; std::exit(1); } }
+static void check(bool ok,int line) { if (!ok) { std::cerr<<"FAIL GPU presentation at line "<<line<<": "<<SDL_GetError()<<'\n'; std::exit(1); } }
+#define require(ok) check((ok),__LINE__)
 int main(int argc,char** argv) {
     SDL_SetMainReady(); require(SDL_Init(SDL_INIT_VIDEO)==0);
     auto window=SDL_CreateWindow("PyroWave shared GPU proof",0,0,1920,1080,SDL_WINDOW_HIDDEN);
@@ -32,6 +33,7 @@ int main(int argc,char** argv) {
     if (!renderer) return 77;
     std::vector<uint8_t> fixture;
     require(runtime.generateProofFrame(fixture));
+    std::cerr<<"GPU proof: codec fixture generated\n";
     PyroWave::Frame frame; std::string error;
     require(PyroWave::parseFrame(fixture.data(),fixture.size(),fixture.size(),frame,error));
     require(!frame.records.empty());
@@ -42,6 +44,7 @@ int main(int argc,char** argv) {
         if (!gpu.initialize(renderer,1920,1080)) {
             std::cerr<<"SKIP: shared GPU path unsupported: "<<gpu.error()<<'\n'; runtime.resetDecoder(); return 77;
         }
+        std::cerr<<"GPU proof: shared planes/fences initialized\n";
         if (range==PyroWave::YuvRange::Full) fixture[rangeByte]&=~0x40u; else fixture[rangeByte]|=0x40u;
         for (int n=0;n<24;++n) {
             const int slot=n%3; std::size_t packets=0; PyroWave::DecodeTiming timing;
@@ -53,6 +56,7 @@ int main(int argc,char** argv) {
                 std::vector<uint32_t> rgb(1920*1080);
                 require(SDL_RenderReadPixels(renderer,nullptr,SDL_PIXELFORMAT_ARGB8888,rgb.data(),1920*4)==0);
                 const int black=rgb[540*1920+8]&255,white=rgb[540*1920+1912]&255;
+                std::cerr<<"GPU proof: rendered endpoints "<<black<<" / "<<white<<" range="<<int(range)<<'\n';
                 require(std::abs(black-(range==PyroWave::YuvRange::Full ? 16 : 0))<=5);
                 require(std::abs(white-(range==PyroWave::YuvRange::Full ? 235 : 255))<=5);
             }

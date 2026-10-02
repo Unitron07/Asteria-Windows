@@ -7,20 +7,21 @@
 
 # M1B P0-R: Vibepollo compatibility realignment
 
-## M1B P1a implementation / live qualification pending
+## M1B P1a live video succeeded / GPU performance qualification pending
 
 The first live path now reuses the qualified runtime/parser through a dedicated
 `IVideoDecoder`. It handles complete compatibility-framed decode units only,
 strict matching bitstream ID `186f0393`, API 0.6.0, restricted runtime/provenance
-preflight and paired pinned HTTPS host capability. SDR 8-bit I420 BT.709 limited
-is uploaded through main-thread SDL; audio/input keep their existing paths.
+preflight and paired pinned HTTPS host capability. SDR 8-bit BT.709 full/limited
+planes now use gated GPU-resident shared D3D11 presentation; CPU I420 upload
+remains the initialization fallback. Audio/input keep their existing paths.
 
 The old 850,000-byte/1,024-packet offline bounds remain unchanged. Live envelopes
 have separate 8 MiB/65,536 codec-packet bounds, with up to 4,000 transport buffers
 at 1024..2048-byte packet sizes and bounded even dimensions up to 4K pixel count.
 The [current contract](PYROWAVE_VIBEPOLLO.md) documents these choices, the maintained
 common-c patch, the CENTER/LEFT chroma caveat and all P1b/later exclusions.
-Live owner qualification is **PENDING**. Use the separate optional x64/ARM64
+Live ARM64 video succeeded; final GPU performance qualification is **PENDING**. Use the separate optional x64/ARM64
 portable artifacts and [owner guide](../tests/pyrowave/LIVE-OWNER-TEST.md);
 manually retry standard codecs after failures. No automatic host action replay.
 

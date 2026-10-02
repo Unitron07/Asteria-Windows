@@ -9,10 +9,11 @@
 
 ## M1B P1a live integration validation
 
-Implementation is **COMPLETE / READY FOR HARDWARE INTEROPERABILITY TEST** behind
-the explicit optional build flag. Live owner
-Vibepollo qualification is **PENDING** on RTX 4070 Ti x64 and native Surface
-Pro 11 / Snapdragon X Plus / Adreno X1-85 ARM64. P0-R/P0.5 history below is unchanged.
+Live P1a video, audio and input have now succeeded on native Surface Pro 11 /
+Snapdragon X Plus / Adreno X1-85 ARM64 at 2560x1440, target 120 FPS. The CPU
+bring-up pipeline sustained about 93.3 FPS. GPU presentation and performance
+qualification remain **PENDING** owner x64/ARM64 retests. P0-R/P0.5 history below
+is unchanged; original P1a build evidence is retained separately.
 The live guide is
 [LIVE-OWNER-TEST.md](../tests/pyrowave/LIVE-OWNER-TEST.md).
 
@@ -36,8 +37,10 @@ The focused interoperability fix supports BT.709 full and limited SDR 8-bit
 and rejects unexpected range changes before submitting packets. HDR/PQ, BT.2020,
 4:4:4, malformed sequence/framing and extent mismatches remain rejected.
 First-sequence logging identifies range once; malformed-frame logs stay rate-limited.
-P1a owner qualification remains **PENDING** until a new hardware retest confirms
-decoded/rendered live video. Earlier passing CI below predates this fix.
+The subsequent owner retest confirmed decoded/rendered live video, audio and
+input as recorded above. It exposed the CPU-output performance baseline, so
+final P1a performance qualification remains **PENDING**. Earlier CI below predates
+both the range fix and GPU presentation pass.
 
 Validation for this fix is recorded with the focused PR; existing parser/runtime,
 offline compatibility/record, standard-codec policy and package isolation gates
