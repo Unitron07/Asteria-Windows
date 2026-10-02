@@ -46,8 +46,10 @@ template<class Stats> std::string formatStats(const Stats& stats,const PipelineS
     if (stats.framesWithHostProcessingLatency)
         append("Host processing latency min/max/average: %.1f/%.1f/%.1f ms\n",stats.minHostProcessingLatency/10.0,
             stats.maxHostProcessingLatency/10.0,stats.totalHostProcessingLatency/10.0/stats.framesWithHostProcessingLatency);
-    append("Frames dropped by your network connection: %.2f%%\nFrames dropped due to network jitter: %.2f%%\n",
-        percent(stats.networkDroppedFrames,stats.totalFrames),percent(stats.pacerDroppedFrames,stats.decodedFrames));
+    if (stats.totalFrames) append("Frames dropped by your network connection: %.2f%%\n",percent(stats.networkDroppedFrames,stats.totalFrames));
+    else append("Frames dropped by your network connection: N/A\n");
+    if (stats.decodedFrames) append("Frames dropped due to network jitter: %.2f%%\n",percent(stats.pacerDroppedFrames,stats.decodedFrames));
+    else append("Frames dropped due to network jitter: N/A\n");
     if (stats.lastRtt) append("Average network latency: %u ms (variance: %u ms)\n",stats.lastRtt,stats.lastRttVariance);
     else append("Average network latency: N/A\n");
     if (stats.decodedFrames) append("Average decoding time: %.2f ms\n",stats.totalDecodeTimeUs/1000.0/stats.decodedFrames);

@@ -229,10 +229,10 @@ void PyroWaveVideoDecoder::updateStats() {
     PyroWave::PipelineStats pipeline;
     const auto now = LiGetMicroseconds();
     if (now - m_StatsTime < 1000000) return;
-    m_StatsTime = now;
     {
         std::lock_guard<std::mutex> guard(m_Mutex);
-        if (!m_Stats.measurementStartUs) return;
+        if (!m_Stats.measurementStartUs || PyroWave::elapsed(now,m_Stats.measurementStartUs)<1000000) return;
+        m_StatsTime = now;
         // Like FFmpeg, display the previous and active approximately one-second windows.
         PyroWave::addStats(m_LastStats,stats);
         PyroWave::addStats(m_Stats,stats);

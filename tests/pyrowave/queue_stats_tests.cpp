@@ -50,5 +50,6 @@ int main() {
     const auto cpu=PyroWave::formatStats(merged,{},2560,1440,3000000,false);
     require(cpu.find("13 ms (variance: 5 ms)")!=std::string::npos && cpu.find("readback not separable")!=std::string::npos);
     require(PyroWave::formatStats(Stats{}, {},128,128,1000000,false).find("Average decoding time: N/A")!=std::string::npos);
+    require(PyroWave::formatStats(Stats{}, {},128,128,1000000,false).find("network connection: N/A")!=std::string::npos);
     std::cout<<"PASS: bounded latest-frame queue, retained redraw, stats windows, host latency, drops and timing\n";
 }
