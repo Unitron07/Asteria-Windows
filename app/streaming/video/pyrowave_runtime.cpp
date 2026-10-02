@@ -77,7 +77,7 @@ void Runtime::close() {
     m_Vulkan = nullptr;
     m_DeviceDescription.clear();
 }
-bool Runtime::createDecoder(int width, int height) {
+bool Runtime::createDecoder(int width, int height, bool preferGpuPath) {
     resetDecoder();
     m_Error.clear();
     if (!m_Module) return fail("runtime is not loaded");
@@ -105,7 +105,14 @@ bool Runtime::createDecoder(int width, int height) {
         " apiVersion=" + std::to_string(properties.apiVersion);
     pyrowave_decoder_create_info info{};
     info.device=m_Device; info.width=width; info.height=height;
-    info.chroma=PYROWAVE_CHROMA_SUBSAMPLING_420; info.fragment_path=false;
+    info.chroma=PYROWAVE_CHROMA_SUBSAMPLING_420;
+    m_FragmentPath=false;
+    if (preferGpuPath) {
+        const auto prefers=reinterpret_cast<decltype(&pyrowave_decoder_device_prefers_fragment_path)>(symbol("pyrowave_decoder_device_prefers_fragment_path"));
+        if (!prefers) return false;
+        m_FragmentPath=prefers(m_Device);
+    }
+    info.fragment_path=m_FragmentPath;
     if (!check(m_Api.createDecoder(&info,&m_Decoder),"decoder creation")) { resetDecoder(); return false; }
     if (!m_Decoder) return fail("decoder creation returned a null decoder");
     m_Width=width; m_Height=height;

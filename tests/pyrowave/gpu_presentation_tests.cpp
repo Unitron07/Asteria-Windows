@@ -33,7 +33,8 @@ int main(int argc,char** argv) {
     std::vector<uint8_t> fixture;
     require(runtime.generateProofFrame(fixture));
     PyroWave::Frame frame; std::string error;
-    require(PyroWave::parseCompatibilityFrame(fixture.data(),fixture.size(),fixture.size(),frame,error));
+    require(PyroWave::parseFrame(fixture.data(),fixture.size(),fixture.size(),frame,error));
+    require(!frame.records.empty());
     const auto rangeByte=frame.records[0].offset+7;
     for (auto range:{PyroWave::YuvRange::Full,PyroWave::YuvRange::Limited}) {
         require(runtime.createDecoder(1920,1080));

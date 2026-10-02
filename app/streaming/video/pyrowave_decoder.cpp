@@ -129,6 +129,7 @@ bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU presentation unavailable: %s; retaining CPU I420 fallback",
             m_Gpu->error().c_str());
         m_Gpu.reset();
+        if (!m_Runtime.createDecoder(m_Width,m_Height)) return fail(QString::fromStdString(m_Runtime.error()));
     } else SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU presentation initialized: shared D3D11 R8 planes, timeline fences, 3 slots");
     m_TestOnly = params->testOnly;
     if (!m_TestOnly) Session::get()->getOverlayManager().setOverlayRenderer(this);
@@ -284,6 +285,7 @@ void PyroWaveVideoDecoder::renderFrameOnMainThread() {
         pixels = std::move(m_Pending);
         m_Pending = {};
     }
+    const auto dequeued = LiGetMicroseconds();
     updateStats();
     const auto start = LiGetMicroseconds();
     if (!pixels.planes[0].empty()) {
@@ -321,7 +323,7 @@ void PyroWaveVideoDecoder::renderFrameOnMainThread() {
     if (!pixels.planes[0].empty() || slot>=0) {
         std::lock_guard<std::mutex> guard(m_Mutex);
         if (slot>=0) m_Slots.displayed(slot);
-        m_Stats.totalPacerTimeUs += PyroWave::elapsed(start,readyUs);
+        m_Stats.totalPacerTimeUs += PyroWave::elapsed(dequeued,readyUs);
         ++m_Stats.renderedFrames;
         m_Stats.totalRenderTimeUs += LiGetMicroseconds() - start;
     }

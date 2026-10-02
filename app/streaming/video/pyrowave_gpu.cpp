@@ -97,6 +97,10 @@ bool GpuPresentation::initialize(SDL_Renderer* renderer,int width,int height) {
     props(physical,&properties);
     if (!ids.deviceLUIDValid || std::memcmp(ids.deviceLUID,&desc.AdapterLuid,VK_LUID_SIZE))
         return p.fail("Vulkan decoder and SDL D3D11 renderer adapters differ");
+    // The pin recommends fragment decode for proprietary Qualcomm drivers.
+    // Recreate before live packets; CPU fallback restores the bring-up decoder.
+    if (!r.createDecoder(width,height,true)) return p.fail(r.error());
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU decoder path: %s",r.m_FragmentPath ? "fragment" : "compute");
     // D3D owns the allocations, as recommended by the pinned Windows interop test.
     // Each import and fence import is a real driver capability gate on x64/ARM64.
     for (auto& slot:p.slots) {
@@ -115,7 +119,7 @@ bool GpuPresentation::initialize(SDL_Renderer* renderer,int width,int height) {
             td.Width=width>>(plane!=0); td.Height=height>>(plane!=0);
             td.MipLevels=td.ArraySize=td.SampleDesc.Count=1;
             td.Format=DXGI_FORMAT_R8_UNORM; td.Usage=D3D11_USAGE_DEFAULT;
-            td.BindFlags=D3D11_BIND_SHADER_RESOURCE|D3D11_BIND_UNORDERED_ACCESS;
+            td.BindFlags=D3D11_BIND_SHADER_RESOURCE | (r.m_FragmentPath ? D3D11_BIND_RENDER_TARGET : D3D11_BIND_UNORDERED_ACCESS);
             td.MiscFlags=D3D11_RESOURCE_MISC_SHARED|D3D11_RESOURCE_MISC_SHARED_NTHANDLE;
             if (!p.hr(p.device->CreateTexture2D(&td,nullptr,&slot.planes[plane]),"shared R8 plane")) return false;
             ComPtr<IDXGIResource1> resource;
@@ -125,7 +129,7 @@ bool GpuPresentation::initialize(SDL_Renderer* renderer,int width,int height) {
             image.imageType=VK_IMAGE_TYPE_2D; image.format=VK_FORMAT_R8_UNORM;
             image.extent={td.Width,td.Height,1}; image.mipLevels=image.arrayLayers=1;
             image.samples=VK_SAMPLE_COUNT_1_BIT; image.tiling=VK_IMAGE_TILING_OPTIMAL;
-            image.usage=VK_IMAGE_USAGE_STORAGE_BIT|VK_IMAGE_USAGE_SAMPLED_BIT;
+            image.usage=VK_IMAGE_USAGE_SAMPLED_BIT | (r.m_FragmentPath ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : VK_IMAGE_USAGE_STORAGE_BIT);
             image.sharingMode=VK_SHARING_MODE_EXCLUSIVE;
             pyrowave_image_create_info info{};
             info.device=r.m_Device; info.external_handle=reinterpret_cast<uintptr_t>(handle);

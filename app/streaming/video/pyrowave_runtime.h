@@ -25,7 +25,7 @@ public:
     Runtime(const Runtime&) = delete;
     Runtime& operator=(const Runtime&) = delete;
     bool load(const std::filesystem::path& dependencyDirectory);
-    bool createDecoder(int width, int height);
+    bool createDecoder(int width, int height, bool preferGpuPath = false);
     bool decode(const std::vector<std::uint8_t>& container, Pixels& output);
     bool decodeLive(const std::vector<std::uint8_t>& container, Pixels& output,
                     std::size_t& packetCount, DecodeTiming* timing = nullptr);
@@ -72,6 +72,7 @@ private:
     void* m_Vulkan = nullptr;
     pyrowave_device m_Device = nullptr;
     pyrowave_decoder m_Decoder = nullptr;
+    bool m_FragmentPath = false;
     int m_Width = 0;
     int m_Height = 0;
     std::string m_Error;

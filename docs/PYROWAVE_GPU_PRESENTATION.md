@@ -28,8 +28,13 @@ colorspace values as the CPU path. No new shader, swapchain, Vulkan loader impor
 or codec runtime import is required. Existing aspect fitting, linear scaling,
 overlays, resize behavior and V-sync presentation remain SDL-owned.
 
+GPU decode follows `pyrowave_decoder_device_prefers_fragment_path`: proprietary
+Qualcomm uses the pin's fragment path and R8 color attachments; desktop drivers
+use compute and R8 storage images. Failed GPU preflight recreates the original
+CPU bring-up decoder before starting live packets.
+
 Cross-API output is enabled only after adapter LUID equality, ID3D11Device5 /
-Context4 availability, every real R8 storage-image import, every timeline fence
+Context4 availability, every real R8 output-image import, every timeline fence
 import, and both range-specific SDL wrappers succeed. This is a capability gate
 on both x64 and ARM64, not a claim that all NVIDIA or Qualcomm drivers support it.
 If any initialization step fails, the reason is logged and the already validated
