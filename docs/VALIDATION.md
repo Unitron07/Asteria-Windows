@@ -1,11 +1,19 @@
+> Owner update: live P1a video succeeded on Surface Pro 11 / Snapdragon X Plus /
+> Adreno X1-85 at 2560x1440, target 120 FPS, with audio/input working. The CPU
+> bring-up path measured ~93.3 FPS, ~12.45 ms decode pipeline, ~1.24 ms render.
+> GPU-resident shared-plane presentation and standard-layout stats are now added.
+> Final performance qualification remains **PENDING owner x64/ARM64 retest**.
+> See [GPU presentation and timing definitions](PYROWAVE_GPU_PRESENTATION.md).
+
 # Validation and release evidence
 
 ## M1B P1a live integration validation
 
-Implementation is **COMPLETE / READY FOR HARDWARE INTEROPERABILITY TEST** behind
-the explicit optional build flag. Live owner
-Vibepollo qualification is **PENDING** on RTX 4070 Ti x64 and native Surface
-Pro 11 / Snapdragon X Plus / Adreno X1-85 ARM64. P0-R/P0.5 history below is unchanged.
+Live P1a video, audio and input have now succeeded on native Surface Pro 11 /
+Snapdragon X Plus / Adreno X1-85 ARM64 at 2560x1440, target 120 FPS. The CPU
+bring-up pipeline sustained about 93.3 FPS. GPU presentation and performance
+qualification remain **PENDING** owner x64/ARM64 retests. P0-R/P0.5 history below
+is unchanged; original P1a build evidence is retained separately.
 The live guide is
 [LIVE-OWNER-TEST.md](../tests/pyrowave/LIVE-OWNER-TEST.md).
 
@@ -29,8 +37,10 @@ The focused interoperability fix supports BT.709 full and limited SDR 8-bit
 and rejects unexpected range changes before submitting packets. HDR/PQ, BT.2020,
 4:4:4, malformed sequence/framing and extent mismatches remain rejected.
 First-sequence logging identifies range once; malformed-frame logs stay rate-limited.
-P1a owner qualification remains **PENDING** until a new hardware retest confirms
-decoded/rendered live video. Earlier passing CI below predates this fix.
+The subsequent owner retest confirmed decoded/rendered live video, audio and
+input as recorded above. It exposed the CPU-output performance baseline, so
+final P1a performance qualification remains **PENDING**. Earlier CI below predates
+both the range fix and GPU presentation pass.
 
 Validation for this fix is recorded with the focused PR; existing parser/runtime,
 offline compatibility/record, standard-codec policy and package isolation gates
@@ -88,7 +98,7 @@ Use the result template below to fill applicable gaps during release qualificati
 
 ## Owner-reported Windows ARM64 comparison (2026-09-25)
 
-- **Clients and workload:** native ARM64 Asteria versus stock x64 Moonlight under emulation on a Surface Pro 11th Edition with Snapdragon X Plus and 16 GB RAM and an Apollo host; same game, 2560×1440, approximately 60 FPS, AV1. The owner repeated the comparison.
+- **Clients and workload:** native ARM64 Asteria versus stock x64 Moonlight under emulation on a Surface Pro 11th Edition with Snapdragon X Plus and 16 GB RAM and an Apollo host; same game, 2560Ã—1440, approximately 60 FPS, AV1. The owner repeated the comparison.
 - **Observed streaming result:** effectively identical streaming in these runs, with no meaningful decode, render, or frame-queue difference and no observed stream regression. The initial on-screen samples were near 60 FPS with zero displayed network/jitter drops. This is an observed result for this setup, not a controlled median/p95 benchmark or a universal performance claim.
 - **Qualitative UI observation:** Asteria menus/settings felt noticeably smoother and snappier. Subjective, with no timing measurement.
 - **Native execution:** the owner verified the Asteria process as native ARM64. The comparison used the official x64 Moonlight release under Windows ARM64 emulation on the same device. No official native ARM64 upstream Moonlight release exists; CI-built unmodified upstream ARM64 artifacts are internal reference builds only.
@@ -293,7 +303,7 @@ checks and historical P0/P0-R decode results.
 | SDL compiled/runtime | 2.32.70 / 2.32.70 | 2.32.70 / 2.32.70 |
 | Presentation | Direct3D11; SDL_PIXELFORMAT_IYUV; 1920x1080 source; aspect-preserving fit; nearest/linear exercised | Direct3D11; SDL_PIXELFORMAT_IYUV; 1920x1080 source; aspect-preserving fit; nearest/linear exercised |
 | Modes/patterns | Raw I420 and PyroWave compatibility/record presentation; all five patterns PASS; both framings and framing equality PASS | Raw I420 and PyroWave compatibility/record presentation; all five patterns PASS; both framings/framing equality PASS with identical decoded results |
-| Lifecycle/recovery | Ten cycles PASS; SDL_RENDER_TARGETS_RESET and SDL_RENDER_DEVICE_RESET paths exercised; synthetic full renderer/decoder/runtime recreation PASS | Cycles 0–9 PASS; both SDL reset paths exercised; synthetic full renderer/decoder/runtime recreation PASS |
+| Lifecycle/recovery | Ten cycles PASS; SDL_RENDER_TARGETS_RESET and SDL_RENDER_DEVICE_RESET paths exercised; synthetic full renderer/decoder/runtime recreation PASS | Cycles 0â€“9 PASS; both SDL reset paths exercised; synthetic full renderer/decoder/runtime recreation PASS |
 | Owner visual observation | All patterns looked correct; no obvious color/range/chroma issue, corruption or unexpected stretching/cropping; resize/maximize/fullscreen normal; recreation visually clean | All visuals looked good; no weird behavior, visible chroma issue or corruption; resize/fullscreen/scaling clean; recreation visually clean |
 | Visual result | **PASS** | **PASS** |
 
@@ -376,7 +386,7 @@ GPU results below supply the offline decode evidence.
 | Restricted runtime load | API 0.6.0; load/reload passed | API 0.6.0; required exports and load/reload passed |
 | Vulkan device | NVIDIA adapter/device creation succeeded | Qualcomm Adreno X1-85 adapter/device creation succeeded |
 | Generated PYRW frame | 60,312 bytes | 60,312 bytes |
-| Decoded output | 1920×1080, 8-bit SDR 4:2:0 I420 | 1920×1080, 8-bit SDR 4:2:0 I420 |
+| Decoded output | 1920Ã—1080, 8-bit SDR 4:2:0 I420 | 1920Ã—1080, 8-bit SDR 4:2:0 I420 |
 | Plane sizes | Y = 2,073,600; U = 518,400; V = 518,400 bytes | Y = 2,073,600; U = 518,400; V = 518,400 bytes |
 | Mean absolute sample error | **0.000694444** | **0.00104167** |
 | Lifetimes and malformed input | Three decoder cycles; rejection and recovery passed | Three decoder cycles; rejection and recovery passed |

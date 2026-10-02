@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 #include <new>
+#include <chrono>
 
 static_assert(PYROWAVE_API_VERSION_MAJOR == 0 && PYROWAVE_API_VERSION_MINOR == 6 &&
               PYROWAVE_API_VERSION_PATCH == 0, "P0 requires pinned API 0.6.0 headers");
@@ -76,7 +77,7 @@ void Runtime::close() {
     m_Vulkan = nullptr;
     m_DeviceDescription.clear();
 }
-bool Runtime::createDecoder(int width, int height) {
+bool Runtime::createDecoder(int width, int height, bool preferGpuPath) {
     resetDecoder();
     m_Error.clear();
     if (!m_Module) return fail("runtime is not loaded");
@@ -104,7 +105,14 @@ bool Runtime::createDecoder(int width, int height) {
         " apiVersion=" + std::to_string(properties.apiVersion);
     pyrowave_decoder_create_info info{};
     info.device=m_Device; info.width=width; info.height=height;
-    info.chroma=PYROWAVE_CHROMA_SUBSAMPLING_420; info.fragment_path=false;
+    info.chroma=PYROWAVE_CHROMA_SUBSAMPLING_420;
+    m_FragmentPath=false;
+    if (preferGpuPath) {
+        const auto prefers=reinterpret_cast<decltype(&pyrowave_decoder_device_prefers_fragment_path)>(symbol("pyrowave_decoder_device_prefers_fragment_path"));
+        if (!prefers) return false;
+        m_FragmentPath=prefers(m_Device);
+    }
+    info.fragment_path=m_FragmentPath;
     if (!check(m_Api.createDecoder(&info,&m_Decoder),"decoder creation")) { resetDecoder(); return false; }
     if (!m_Decoder) return fail("decoder creation returned a null decoder");
     m_Width=width; m_Height=height;
@@ -114,12 +122,17 @@ bool Runtime::decode(const std::vector<std::uint8_t>& container, Pixels& output)
     return decodeImpl(container,output,false,nullptr);
 }
 bool Runtime::decodeLive(const std::vector<std::uint8_t>& container, Pixels& output,
-                         std::size_t& packetCount) {
+                         std::size_t& packetCount, DecodeTiming* timing) {
     packetCount = 0;
-    return decodeImpl(container,output,true,&packetCount);
+    return decodeImpl(container,output,true,&packetCount,timing);
 }
 bool Runtime::decodeImpl(const std::vector<std::uint8_t>& container, Pixels& output,
-                         bool live, std::size_t* packetCount) {
+                         bool live, std::size_t* packetCount, DecodeTiming* timing,
+                         const pyrowave_gpu_buffers* gpu,
+                         const pyrowave_gpu_sync_operation* acquire,
+                         const pyrowave_gpu_sync_operation* release) {
+    const auto preparationStart = std::chrono::steady_clock::now();
+    if (timing) *timing = {};
     m_FrameRejected = false;
     output = {};
     m_Error.clear();
@@ -150,6 +163,15 @@ bool Runtime::decodeImpl(const std::vector<std::uint8_t>& container, Pixels& out
     for (const auto& p : frame.packets)
         if (!check(m_Api.push(m_Decoder,container.data()+p.offset,p.size),"packet push")) return false;
     if (!m_Api.ready(m_Decoder,false)) return fail("complete frame is not decode-ready");
+    if (gpu) {
+        auto decodeGpu = reinterpret_cast<decltype(&pyrowave_decoder_decode_gpu_buffer)>(symbol("pyrowave_decoder_decode_gpu_buffer"));
+        if (!decodeGpu) return false;
+        const auto start = std::chrono::steady_clock::now();
+        if (timing) timing->preparationUs = std::chrono::duration_cast<std::chrono::microseconds>(start-preparationStart).count();
+        const bool ok = check(decodeGpu(m_Decoder,acquire,release,gpu),"GPU output decode");
+        if (timing) timing->decodeUs = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-start).count();
+        return ok;
+    }
     Pixels pixels; pixels.width=m_Width; pixels.height=m_Height;
     pixels.range=frame.sequence.range;
     pyrowave_cpu_buffer buffer{};
@@ -164,7 +186,11 @@ bool Runtime::decodeImpl(const std::vector<std::uint8_t>& container, Pixels& out
             buffer.row_stride_in_bytes[p]=w; buffer.plane_size_in_bytes[p]=w*h;
         }
     } catch (const std::bad_alloc&) { return fail("I420 output allocation failed"); }
-    if (!check(m_Api.decode(m_Decoder,&buffer),"synchronous CPU decode")) return false;
+    const auto start = std::chrono::steady_clock::now();
+    if (timing) timing->preparationUs = std::chrono::duration_cast<std::chrono::microseconds>(start-preparationStart).count();
+    const bool ok = check(m_Api.decode(m_Decoder,&buffer),"synchronous CPU decode");
+    if (timing) timing->decodeUs = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-start).count();
+    if (!ok) return false;
     output=std::move(pixels);
     return true;
 }

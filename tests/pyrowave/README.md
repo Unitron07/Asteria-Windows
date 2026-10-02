@@ -308,3 +308,11 @@ qmake presentation opt-in adds `CONFIG+=pyrowave_sdl SDL_ROOT=... SDL_ARCH=x64`
 (or arm64) to the existing offline command. The CI helper validates both target
 qmake builds. SDL2.dll and SDL3.dll must be beside that executable. Application
 qmake files, Session/common-c, H.264/HEVC/AV1 and normal packaging are unchanged.
+
+
+GPU/stats pass: `pyrowave-queue-stats-tests` is GPU-free. With the explicit SDL
+probe build, `pyrowave-gpu-presentation-tests` without arguments proves rejected
+GPU preflight preserves CPU texture creation. With the absolute runtime bin path
+it checks actual shared R8 imports, timeline fence/reuse, and full/limited RGB
+endpoints; exit 77 is unsupported/unavailable, not hardware qualification.
+See [timing semantics](../../docs/PYROWAVE_GPU_PRESENTATION.md).

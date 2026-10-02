@@ -132,6 +132,9 @@ jobs:
       - name: Attempt roundtrip (hosted runner GPU may be unavailable)
         shell: pwsh
         run: |
+          & ./build/probe-${{ matrix.arch }}/Release/pyrowave-gpu-presentation-tests.exe "$env:PYROWAVE_DEPS/install/bin" 2>&1 | Tee-Object "$env:PYROWAVE_DEPS/evidence/gpu-presentation.txt"
+          $gpuCode = $LASTEXITCODE
+          if ($gpuCode -ne 0 -and $gpuCode -ne 77) { throw 'Shared GPU presentation regression failed' }
           & ./build/probe-${{ matrix.arch }}/Release/pyrowave-offline-proof.exe --live-range-test "$env:PYROWAVE_DEPS/install/bin" 2>&1 | Tee-Object "$env:PYROWAVE_DEPS/evidence/live-range-test.txt"
           $rangeCode = $LASTEXITCODE
           if ($rangeCode -ne 0 -and $rangeCode -ne 77) { throw 'Live range decode regression failed' }
@@ -168,6 +171,8 @@ jobs:
             build/pyrowave*/${{ matrix.arch }}/install/
             build/probe-${{ matrix.arch }}/Release/pyrowave-offline-proof.exe
             build/probe-${{ matrix.arch }}/Release/pyrowave-live-sdl-tests.exe
+            build/probe-${{ matrix.arch }}/Release/pyrowave-gpu-presentation-tests.exe
+            build/probe-${{ matrix.arch }}/Release/pyrowave-queue-stats-tests.exe
             build/probe-${{ matrix.arch }}/Release/SDL*.dll
             build/presentation-${{ matrix.arch }}/
             build/evidence/${{ matrix.arch }}/dependencies.json

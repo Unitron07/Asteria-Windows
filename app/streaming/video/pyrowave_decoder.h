@@ -2,6 +2,9 @@
 #include "decoder.h"
 #include "overlaymanager.h"
 #include "pyrowave_runtime.h"
+#include "pyrowave_gpu.h"
+#include "pyrowave_queue.h"
+#include "pyrowave_stats.h"
 #include <mutex>
 
 // Decode on common-c's VideoDec thread; all SDL resources belong to the SDL main
@@ -36,11 +39,16 @@ private:
     SDL_Texture* m_OverlayTextures[Overlay::OverlayMax] = {};
     std::mutex m_Mutex;
     PyroWave::Pixels m_Pending;
-    VIDEO_STATS m_Stats = {};
+    uint64_t m_PendingReadyUs = 0;
+    std::unique_ptr<PyroWave::GpuPresentation> m_Gpu;
+    PyroWave::FrameSlots m_Slots;
+    uint64_t m_GpuReadyUs[PyroWave::FrameSlots::Count] = {};
+    VIDEO_STATS m_Stats = {}, m_LastStats = {};
+    PyroWave::PipelineStats m_Pipeline, m_LastPipeline;
     QString m_Error;
     int m_Width = 0, m_Height = 0;
     uint32_t m_LastFrameNumber = 0;
-    uint64_t m_Bytes = 0, m_StatsTime = 0, m_Rejected = 0;
+    uint64_t m_StatsTime = 0, m_Rejected = 0;
     bool m_TestOnly = true, m_EventQueued = false, m_Failed = false;
     bool m_FirstFrame = true, m_HaveTextureFrame = false;
     bool m_FirstSequence = true;

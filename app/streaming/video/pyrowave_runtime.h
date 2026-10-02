@@ -11,6 +11,11 @@
 #include <optional>
 
 namespace PyroWave {
+struct DecodeTiming {
+    uint64_t preparationUs = 0;
+    // CPU API duration: submission only for GPU output; decode + readback for CPU output.
+    uint64_t decodeUs = 0;
+};
 // Serialized P0/live owner. Module outlives every device/decoder and API call.
 // No global instance and no startup load. Missing DLL is a normal false result.
 class Runtime {
@@ -20,10 +25,10 @@ public:
     Runtime(const Runtime&) = delete;
     Runtime& operator=(const Runtime&) = delete;
     bool load(const std::filesystem::path& dependencyDirectory);
-    bool createDecoder(int width, int height);
+    bool createDecoder(int width, int height, bool preferGpuPath = false);
     bool decode(const std::vector<std::uint8_t>& container, Pixels& output);
     bool decodeLive(const std::vector<std::uint8_t>& container, Pixels& output,
-                    std::size_t& packetCount);
+                    std::size_t& packetCount, DecodeTiming* timing = nullptr);
     bool frameRejected() const { return m_FrameRejected; }
     std::optional<YuvRange> liveRange() const { return m_LiveRange; }
     void discardFrame();
@@ -40,8 +45,12 @@ public:
                            Framing framing = Framing::Compatibility);
 
 private:
+    friend class GpuPresentation;
     bool decodeImpl(const std::vector<std::uint8_t>& container, Pixels& output,
-                    bool live, std::size_t* packetCount);
+                    bool live, std::size_t* packetCount, DecodeTiming* timing = nullptr,
+                    const pyrowave_gpu_buffers* gpu = nullptr,
+                    const pyrowave_gpu_sync_operation* acquire = nullptr,
+                    const pyrowave_gpu_sync_operation* release = nullptr);
     bool m_FrameRejected = false;
     std::optional<YuvRange> m_LiveRange;
     bool fail(const std::string& reason);
@@ -63,6 +72,7 @@ private:
     void* m_Vulkan = nullptr;
     pyrowave_device m_Device = nullptr;
     pyrowave_decoder m_Decoder = nullptr;
+    bool m_FragmentPath = false;
     int m_Width = 0;
     int m_Height = 0;
     std::string m_Error;

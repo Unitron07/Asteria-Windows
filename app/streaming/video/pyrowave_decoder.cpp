@@ -50,6 +50,8 @@ PyroWaveVideoDecoder::~PyroWaveVideoDecoder() {
     // Session holds its decoder lock while destroying us, then stops common-c.
     if (!m_TestOnly) Session::get()->getOverlayManager().setOverlayRenderer(nullptr);
     for (auto texture : m_OverlayTextures) if (texture) SDL_DestroyTexture(texture);
+    m_Runtime.resetDecoder();
+    m_Gpu.reset();
     if (m_Texture) SDL_DestroyTexture(m_Texture);
     if (m_Renderer) SDL_DestroyRenderer(m_Renderer);
     m_Runtime.close();
@@ -94,7 +96,13 @@ bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
 
     Uint32 flags = SDL_RENDERER_ACCELERATED;
     if (params->enableVsync) flags |= SDL_RENDERER_PRESENTVSYNC;
-    m_Renderer = SDL_CreateRenderer(params->window,-1,flags);
+    int driver = -1;
+    for (int i=0;i<SDL_GetNumRenderDrivers();++i) {
+        SDL_RendererInfo candidate{};
+        if (SDL_GetRenderDriverInfo(i,&candidate)==0 && candidate.name && std::string(candidate.name)=="direct3d11") driver=i;
+    }
+    m_Renderer = SDL_CreateRenderer(params->window,driver,flags);
+    if (!m_Renderer && driver>=0) m_Renderer=SDL_CreateRenderer(params->window,-1,flags);
     if (!m_Renderer) return fail(QString("SDL renderer creation: ") + SDL_GetError());
     // Limited black is only a preflight image. The first parsed live sequence
     // selects the actual texture colorspace on the main thread before upload.
@@ -116,6 +124,13 @@ bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
     SDL_GetRendererInfo(m_Renderer,&info);
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave SDL presentation initialized: %s I420; live sequence range pending",
                 info.name ? info.name : "unknown");
+    m_Gpu = std::make_unique<PyroWave::GpuPresentation>(m_Runtime);
+    if (!m_Gpu->initialize(m_Renderer,m_Width,m_Height)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU presentation unavailable: %s; retaining CPU I420 fallback",
+            m_Gpu->error().c_str());
+        m_Gpu.reset();
+        if (!m_Runtime.createDecoder(m_Width,m_Height)) return fail(QString::fromStdString(m_Runtime.error()));
+    } else SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU presentation initialized: shared D3D11 R8 planes, timeline fences, 3 slots");
     m_TestOnly = params->testOnly;
     if (!m_TestOnly) Session::get()->getOverlayManager().setOverlayRenderer(this);
     return true;
@@ -140,24 +155,30 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
         }
         m_LastFrameNumber = du->frameNumber;
         ++m_Stats.receivedFrames; ++m_Stats.totalFrames;
-        m_Stats.totalReassemblyTimeUs += du->enqueueTimeUs - du->receiveTimeUs;
-        if (du->fullLength > 0) m_Bytes += du->fullLength;
-        if (du->frameHostProcessingLatency) {
-            const auto latency = du->frameHostProcessingLatency;
-            m_Stats.minHostProcessingLatency = m_Stats.minHostProcessingLatency ?
-                std::min(m_Stats.minHostProcessingLatency,latency) : latency;
-            m_Stats.maxHostProcessingLatency = std::max(m_Stats.maxHostProcessingLatency,latency);
-            m_Stats.totalHostProcessingLatency += latency;
-            ++m_Stats.framesWithHostProcessingLatency;
-        }
+        m_Stats.totalReassemblyTimeUs += PyroWave::elapsed(du->enqueueTimeUs,du->receiveTimeUs);
+        m_Pipeline.decoderQueueUs += PyroWave::elapsed(now,du->enqueueTimeUs);
+        if (du->fullLength > 0) m_Pipeline.bytes += du->fullLength;
+        PyroWave::hostLatency(m_Stats,du->frameHostProcessingLatency);
     }
     PyroWave::Pixels pixels;
     std::size_t packets = 0;
     std::string rejection;
+    PyroWave::DecodeTiming timing;
+    int slot = -1;
+    const auto preparationStart = LiGetMicroseconds();
     try {
         std::vector<std::uint8_t> bytes;
         if (PyroWave::assembleLiveDecodeUnit(*du,bytes,rejection)) {
-            const bool decoded = m_Runtime.decodeLive(bytes,pixels,packets);
+            if (m_Gpu) {
+                std::lock_guard<std::mutex> guard(m_Mutex);
+                bool dropped;
+                slot=m_Slots.reserve(dropped);
+                if (dropped) ++m_Stats.pacerDroppedFrames;
+            }
+            if (m_Gpu && slot<0) { fail("GPU frame slot invariant failed"); return DR_OK; }
+            const auto assembled = LiGetMicroseconds();
+            const bool decoded = m_Gpu ? m_Gpu->decode(slot,bytes,packets,timing) : m_Runtime.decodeLive(bytes,pixels,packets,&timing);
+            timing.preparationUs += PyroWave::elapsed(assembled,preparationStart);
             if (m_FirstSequence && m_Runtime.liveRange()) {
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave sequence: BT.709 %s-range, SDR 4:2:0",
                     *m_Runtime.liveRange() == PyroWave::YuvRange::Full ? "full" : "limited");
@@ -172,6 +193,10 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
     if (!rejection.empty()) {
         // Includes reassembly rejection before any runtime packet submission.
         m_Runtime.discardFrame();
+        if (slot>=0) {
+            std::lock_guard<std::mutex> guard(m_Mutex);
+            m_Slots.cancel(slot);
+        }
         if (++m_Rejected <= 5 || (m_Rejected % 256) == 0)
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"PyroWave rejected frame %u: %s (rejected=%llu)",
                         du->frameNumber,rejection.c_str(),static_cast<unsigned long long>(m_Rejected));
@@ -180,45 +205,47 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
     std::lock_guard<std::mutex> guard(m_Mutex);
     if (m_FirstFrame) {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "First valid PyroWave decode unit: %d bytes, compatibility packets=%zu; first I420 decode succeeded",
-                    du->fullLength,packets);
+                    "First valid PyroWave decode unit: %d bytes, compatibility packets=%zu; first %s decode succeeded",
+                    du->fullLength,packets,m_Gpu ? "GPU output" : "I420");
         m_FirstFrame = false;
     }
     ++m_Stats.decodedFrames;
-    m_Stats.totalDecodeTimeUs += LiGetMicroseconds() - du->enqueueTimeUs;
-    if (!m_Pending.planes[0].empty()) ++m_Stats.pacerDroppedFrames;
-    m_Pending = std::move(pixels);
+    m_Stats.totalDecodeTimeUs += timing.decodeUs;
+    m_Pipeline.preparationUs += timing.preparationUs;
+    if (m_Gpu) {
+        m_GpuReadyUs[slot]=LiGetMicroseconds();
+        if (m_Slots.publish(slot)) ++m_Stats.pacerDroppedFrames;
+    } else {
+        if (!m_Pending.planes[0].empty()) ++m_Stats.pacerDroppedFrames;
+        m_Pending = std::move(pixels);
+        m_PendingReadyUs=LiGetMicroseconds();
+    }
     wakeRenderer();
     return DR_OK;
 }
 
 void PyroWaveVideoDecoder::updateStats() {
-    VIDEO_STATS stats;
-    uint64_t bytes;
+    VIDEO_STATS stats{};
+    PyroWave::PipelineStats pipeline;
     const auto now = LiGetMicroseconds();
     if (now - m_StatsTime < 1000000) return;
-    m_StatsTime = now;
     {
         std::lock_guard<std::mutex> guard(m_Mutex);
-        stats = m_Stats; bytes = m_Bytes;
+        if (!m_Stats.measurementStartUs || PyroWave::elapsed(now,m_Stats.measurementStartUs)<1000000) return;
+        m_StatsTime = now;
+        // Like FFmpeg, display the previous and active approximately one-second windows.
+        PyroWave::addStats(m_LastStats,stats);
+        PyroWave::addStats(m_Stats,stats);
+        pipeline.bytes=m_LastPipeline.bytes+m_Pipeline.bytes;
+        pipeline.preparationUs=m_LastPipeline.preparationUs+m_Pipeline.preparationUs;
+        pipeline.decoderQueueUs=m_LastPipeline.decoderQueueUs+m_Pipeline.decoderQueueUs;
+        m_LastStats=m_Stats; m_LastPipeline=m_Pipeline;
+        m_Stats={}; m_Stats.measurementStartUs=now; m_Pipeline={};
     }
-    if (!stats.measurementStartUs) return;
-    const double seconds = double(now - stats.measurementStartUs) / 1000000.0;
-    if (seconds <= 0) return;
-    LiGetEstimatedRttInfo(&stats.lastRtt,&stats.lastRttVariance);
-    char text[768];
-    snprintf(text,sizeof(text),
-        "PyroWave SDR 8-bit 4:2:0 %dx%d\nIncoming / decoded / rendered: %.1f / %.1f / %.1f FPS\n"
-        "Video: %.1f Mbps; network dropped: %u; presentation dropped: %u\n"
-        "Average decode: %.2f ms; render: %.2f ms; RTT: %u ms (variance %u ms)",
-        m_Width,m_Height,stats.receivedFrames/seconds,stats.decodedFrames/seconds,
-        stats.renderedFrames/seconds,bytes*8.0/seconds/1000000.0,
-        stats.networkDroppedFrames,stats.pacerDroppedFrames,
-        stats.decodedFrames ? stats.totalDecodeTimeUs/1000.0/stats.decodedFrames : 0,
-        stats.renderedFrames ? stats.totalRenderTimeUs/1000.0/stats.renderedFrames : 0,
-        stats.lastRtt,stats.lastRttVariance);
+    if (!LiGetEstimatedRttInfo(&stats.lastRtt,&stats.lastRttVariance)) stats.lastRtt=stats.lastRttVariance=0;
+    const auto text=PyroWave::formatStats(stats,pipeline,m_Width,m_Height,now,bool(m_Gpu));
     auto& overlays = Session::get()->getOverlayManager();
-    if (overlays.isOverlayEnabled(Overlay::OverlayDebug)) overlays.updateOverlayText(Overlay::OverlayDebug,text);
+    if (overlays.isOverlayEnabled(Overlay::OverlayDebug)) overlays.updateOverlayText(Overlay::OverlayDebug,text.c_str());
 }
 
 void PyroWaveVideoDecoder::renderOverlays() {
@@ -244,13 +271,22 @@ void PyroWaveVideoDecoder::renderOverlays() {
 
 void PyroWaveVideoDecoder::renderFrameOnMainThread() {
     PyroWave::Pixels pixels;
+    int slot=-1,displayed=-1;
+    uint64_t readyUs=0;
     {
         std::lock_guard<std::mutex> guard(m_Mutex);
         m_EventQueued = false;
         if (m_Failed) return; // Session reads getError() and tears down normally
+        if (m_Gpu) {
+            slot=m_Slots.take(); displayed=slot>=0 ? slot : m_Slots.current();
+            if (slot>=0) readyUs=m_GpuReadyUs[slot];
+        }
+        else readyUs=m_PendingReadyUs;
         pixels = std::move(m_Pending);
         m_Pending = {};
     }
+    const auto dequeued = LiGetMicroseconds();
+    updateStats();
     const auto start = LiGetMicroseconds();
     if (!pixels.planes[0].empty()) {
         if (!m_TextureRange) {
@@ -266,22 +302,32 @@ void PyroWaveVideoDecoder::renderFrameOnMainThread() {
         }
         m_HaveTextureFrame = true;
     }
-    updateStats();
-    if (!m_HaveTextureFrame) return;
+    if (!m_HaveTextureFrame && displayed<0) return;
     SDL_Rect source{0,0,m_Width,m_Height}, destination{0,0,0,0};
     if (SDL_GetRendererOutputSize(m_Renderer,&destination.w,&destination.h) != 0) {
         fail(QString("SDL output size: ") + SDL_GetError()); return;
     }
-    if (!destination.w || !destination.h) return;
+    if (!destination.w || !destination.h) {
+        if (slot>=0 || !pixels.planes[0].empty()) {
+            std::lock_guard<std::mutex> guard(m_Mutex);
+            if (slot>=0) m_Slots.cancel(slot);
+            ++m_Stats.pacerDroppedFrames;
+        }
+        return;
+    }
+    if (m_Gpu && !m_Gpu->beginRender(displayed)) { fail(QString::fromStdString(m_Gpu->error())); return; }
     StreamUtils::scaleSourceToDestinationSurface(&source,&destination);
     if (SDL_RenderClear(m_Renderer) != 0 ||
-        SDL_RenderCopy(m_Renderer,m_Texture,nullptr,&destination) != 0) {
+        SDL_RenderCopy(m_Renderer,m_Gpu ? m_Gpu->texture(displayed) : m_Texture,nullptr,&destination) != 0) {
         fail(QString("SDL presentation: ") + SDL_GetError()); return;
     }
     renderOverlays();
     SDL_RenderPresent(m_Renderer);
-    if (!pixels.planes[0].empty()) {
+    if (m_Gpu && !m_Gpu->endRender(displayed)) { fail(QString::fromStdString(m_Gpu->error())); return; }
+    if (!pixels.planes[0].empty() || slot>=0) {
         std::lock_guard<std::mutex> guard(m_Mutex);
+        if (slot>=0) m_Slots.displayed(slot);
+        m_Stats.totalPacerTimeUs += PyroWave::elapsed(dequeued,readyUs);
         ++m_Stats.renderedFrames;
         m_Stats.totalRenderTimeUs += LiGetMicroseconds() - start;
     }
