@@ -68,6 +68,7 @@ GpuPresentation::~GpuPresentation() {
 bool GpuPresentation::initialize(SDL_Renderer* renderer,int width,int height) {
     auto& p=*m_Impl; auto& r=p.runtime;
     if (!r.m_Device || !r.m_Decoder || !r.m_Vulkan) return p.fail("Vulkan decoder/device not initialized");
+    if (r.m_Width!=width || r.m_Height!=height) return p.fail("GPU presentation extent must match decoder");
 #define RESOLVE(member, name) p.member=reinterpret_cast<decltype(p.member)>(GetProcAddress(static_cast<HMODULE>(r.m_Module),#name)); if (!p.member) return p.fail("missing GPU API: " #name)
     RESOLVE(imageCreate,pyrowave_image_create);
     RESOLVE(imageDestroy,pyrowave_image_destroy);

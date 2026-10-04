@@ -65,12 +65,14 @@ int main(int argc,char** argv) {
                     for (auto byte:pixels.planes[p]) require(byte==(p ? 128 : 16));
                 }
             }
-            // Callback plumbing is identical for CPU and GPU output.
-            require(PyroWave::RuntimeTestAccess::gpuDecode(runtime,bytes));
             std::vector<std::string> messages;
+            require(!runtime.reportPerformanceStats(nullptr,&messages) && runtime.error().empty());
+            // Callback plumbing after CPU output.
             require(runtime.reportPerformanceStats(collect,&messages));
             require(messages==std::vector<std::string>{"Dequant: 0.125 ms per frame",
                 fragment ? "iDWT fragment: 0.250 ms per frame" : "iDWT: 0.250 ms per frame","reset=false"});
+            // The same device callback after GPU output.
+            require(PyroWave::RuntimeTestAccess::gpuDecode(runtime,bytes));
             messages.clear(); require(runtime.reportPerformanceStats(collect,&messages,true));
             require(messages.back()=="reset=true");
             configure(fragment,vendor,true);
@@ -82,6 +84,10 @@ int main(int argc,char** argv) {
         require(!runtime.reportPerformanceStats(collect,nullptr) && runtime.error().empty());
         runtime.resetDecoder();
         require(runtime.createDecoder(128,128) && runtime.decoderPath()==path);
+        std::vector<uint8_t> bytes;
+        word(bytes,1); word(bytes,8); word(bytes,0x80000000u|(127u<<14)|127u); word(bytes,0u);
+        PyroWave::Pixels pixels; std::size_t packets=0;
+        require(runtime.decodeLive(bytes,pixels,packets));
         runtime.close();
         require(!runtime.reportPerformanceStats(collect,nullptr));
     }

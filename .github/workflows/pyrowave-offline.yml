@@ -45,10 +45,11 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
+          fetch-depth: 2
       - name: Check focused diff whitespace
         shell: pwsh
         run: |
-          git show --format= --check HEAD
+          git diff --check HEAD^ HEAD
           if ($LASTEXITCODE) { throw 'diff whitespace check failed' }
       - name: Apply reviewed P1a delta to pinned common-c
         shell: pwsh
