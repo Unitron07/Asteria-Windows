@@ -4,7 +4,8 @@
 #include <iostream>
 #include <algorithm>
 using Bytes = std::vector<std::uint8_t>;
-static void require(bool ok) { if (!ok) { std::cerr << "FAIL live frame test\n"; std::exit(1); } }
+static void check(bool ok,int line) { if (!ok) { std::cerr << "FAIL live frame test at line " << line << '\n'; std::exit(1); } }
+#define require(ok) check((ok),__LINE__)
 static void word(Bytes& b,std::uint32_t n) { for (int i=0;i<4;++i) b.push_back(std::uint8_t(n>>(8*i))); }
 static void set(Bytes& b,std::size_t offset,std::uint32_t n) { for (int i=0;i<4;++i) b[offset+i]=std::uint8_t(n>>(8*i)); }
 static Bytes sequence(unsigned blocks,unsigned w=1920,unsigned h=1080) {
@@ -78,23 +79,72 @@ complete:
     const PyroWave::StreamContext fourK{3840,2160,PyroWave::Chroma::Yuv420,true};
     require(large.size()>PyroWave::MaxFrameBytes);
     parse(large,true,fourK);
+    const auto packetStorage=frame.packets.data(), packetEnd=frame.packets.data()+frame.packets.size();
+    const auto recordStorage=frame.records.data();
+    const auto indexStorage=frame.blockIndices.data();
+    const auto packetCapacity=frame.packets.capacity(), recordCapacity=frame.records.capacity(), indexCapacity=frame.blockIndices.capacity();
+    const auto largePackets=frame.packets;
+    for (int repeat=0;repeat<4;++repeat) {
+        parse(valid,true,context);
+        bad=large; set(bad,4,0xffffffffu); parse(bad,false,fourK);
+        parse(large,true,fourK);
+        require(frame.packets.data()==packetStorage && frame.packets.data()+frame.packets.size()==packetEnd);
+        require(frame.records.data()==recordStorage && frame.blockIndices.data()==indexStorage);
+        require(frame.packets.capacity()==packetCapacity && frame.records.capacity()==recordCapacity && frame.blockIndices.capacity()==indexCapacity);
+        for (std::size_t i=0;i<largePackets.size();++i)
+            require(frame.packets[i].offset==largePackets[i].offset && frame.packets[i].size==largePackets[i].size);
+        require(frame.blockIndices.size()==1500);
+    }
+    bad=large;
+    // Duplicate validation must still reject a reused record/index table.
+    std::copy_n(bad.begin()+largePackets[1].offset+4,4,bad.begin()+largePackets[2].offset+4);
+    parse(bad,false,fourK);
+    require(error.find("duplicate block index")!=std::string::npos);
+    parse(large,true,fourK);
     require(!PyroWave::parseFrame(large.data(),large.size(),large.size(),frame,error,&fourK));
 
     // Arbitrary common-c fragment cuts, including cuts inside lengths/records.
-    for (const auto& fixture : {valid,full}) for (unsigned cut=1;cut<fixture.size();++cut) {
+    Bytes bytes;
+    // Truncated-chain tests declare one extra byte; reserve for that valid
+    // growth request too, before checking that subsequent frames reuse storage.
+    bytes.reserve(large.size()+1);
+    const auto assemblyStorage=bytes.data();
+    const auto assemblyCapacity=bytes.capacity();
+    for (const auto& fixture : {valid,full,large}) for (unsigned cut=1;cut<std::min<std::size_t>(fixture.size(),32);++cut) {
         LENTRY second{}; second.data=(char*)fixture.data()+cut; second.length=int(fixture.size()-cut); second.bufferType=BUFFER_TYPE_PICDATA;
         LENTRY first{}; first.data=(char*)fixture.data(); first.length=cut; first.bufferType=BUFFER_TYPE_PICDATA; first.next=&second;
         DECODE_UNIT du{}; du.fullLength=int(fixture.size()); du.bufferList=&first;
-        Bytes bytes;
         require(PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes==fixture);
-        parse(bytes,true,context);
+        require(bytes.data()==assemblyStorage && bytes.capacity()==assemblyCapacity);
+        parse(bytes,true,fixture.size()==large.size() ? fourK : context);
         ++du.fullLength; require(!PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes.empty());
         --du.fullLength; second.bufferType=BUFFER_TYPE_SPS;
         require(!PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes.empty());
         second.bufferType=BUFFER_TYPE_PICDATA; second.next=&first;
         require(!PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes.empty());
         second.next=nullptr;
+        second.data=nullptr; require(!PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes.empty());
+        second.data=(char*)fixture.data()+cut;
+        second.length=0; require(!PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes.empty());
+        second.length=-1; require(!PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes.empty());
+        second.length=int(fixture.size()-cut);
+        du.fullLength=int(PyroWave::LiveLimits.frameBytes+1);
+        require(!PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes.empty());
+        du.fullLength=0; require(!PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes.empty());
+        du.fullLength=int(fixture.size());
+        require(PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes==fixture && bytes.capacity()==assemblyCapacity);
     }
+    std::vector<LENTRY> fragments(4001);
+    char byte=0;
+    for (std::size_t i=0;i<fragments.size();++i) {
+        fragments[i].data=&byte; fragments[i].length=1; fragments[i].bufferType=BUFFER_TYPE_PICDATA;
+        fragments[i].next=i+1<fragments.size() ? &fragments[i+1] : nullptr;
+    }
+    DECODE_UNIT du{}; du.fullLength=4001; du.bufferList=fragments.data();
+    require(!PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes.empty());
+    fragments[3999].next=nullptr; du.fullLength=4000;
+    require(PyroWave::assembleLiveDecodeUnit(du,bytes,error) && bytes==Bytes(4000,0));
+    require(bytes.capacity()==assemblyCapacity);
     parse(valid,true,context);
     std::cout << "PASS: live bounds, profiles, arbitrary DU fragments, malformed rejection/recovery; large=" << large.size() << "\n";
 }

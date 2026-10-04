@@ -11,6 +11,7 @@
 #include <QDir>
 #include <algorithm>
 #include <new>
+#include <cstring>
 
 namespace {
 // The C API does not expose the codec commit. Bind the experimental build's
@@ -51,6 +52,8 @@ PyroWaveVideoDecoder::~PyroWaveVideoDecoder() {
     if (!m_TestOnly) Session::get()->getOverlayManager().setOverlayRenderer(nullptr);
     for (auto texture : m_OverlayTextures) if (texture) SDL_DestroyTexture(texture);
     m_Runtime.resetDecoder();
+    // Decoder destruction drains its Vulkan work; report while the device lives.
+    if (!m_FirstFrame) reportGpuTiming();
     m_Gpu.reset();
     if (m_Texture) SDL_DestroyTexture(m_Texture);
     if (m_Renderer) SDL_DestroyRenderer(m_Renderer);
@@ -93,6 +96,7 @@ bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                 "PyroWave preflight: runtime/API=0.6.0 bitstream=%s extent=%dx%d GPU=%s",
                 PyroWave::BitstreamId,m_Width,m_Height,m_Runtime.deviceDescription().c_str());
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave preferred decoder path: %s",m_Runtime.decoderPath());
 
     Uint32 flags = SDL_RENDERER_ACCELERATED;
     if (params->enableVsync) flags |= SDL_RENDERER_PRESENTVSYNC;
@@ -129,7 +133,8 @@ bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU presentation unavailable: %s; retaining CPU I420 fallback",
             m_Gpu->error().c_str());
         m_Gpu.reset();
-        if (!m_Runtime.createDecoder(m_Width,m_Height)) return fail(QString::fromStdString(m_Runtime.error()));
+        // The probe does not change the validated decoder or submit packets.
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave CPU fallback decoder path: %s",m_Runtime.decoderPath());
     } else SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU presentation initialized: shared D3D11 R8 planes, timeline fences, 3 slots");
     m_TestOnly = params->testOnly;
     if (!m_TestOnly) Session::get()->getOverlayManager().setOverlayRenderer(this);
@@ -165,10 +170,12 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
     std::string rejection;
     PyroWave::DecodeTiming timing;
     int slot = -1;
-    const auto preparationStart = LiGetMicroseconds();
+    const auto assemblyStart = LiGetMicroseconds();
+    uint64_t assemblyUs = 0;
     try {
-        std::vector<std::uint8_t> bytes;
+        auto& bytes = m_FrameBytes;
         if (PyroWave::assembleLiveDecodeUnit(*du,bytes,rejection)) {
+            assemblyUs = PyroWave::elapsed(LiGetMicroseconds(),assemblyStart);
             if (m_Gpu) {
                 std::lock_guard<std::mutex> guard(m_Mutex);
                 bool dropped;
@@ -176,9 +183,7 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
                 if (dropped) ++m_Stats.pacerDroppedFrames;
             }
             if (m_Gpu && slot<0) { fail("GPU frame slot invariant failed"); return DR_OK; }
-            const auto assembled = LiGetMicroseconds();
             const bool decoded = m_Gpu ? m_Gpu->decode(slot,bytes,packets,timing) : m_Runtime.decodeLive(bytes,pixels,packets,&timing);
-            timing.preparationUs += PyroWave::elapsed(assembled,preparationStart);
             if (m_FirstSequence && m_Runtime.liveRange()) {
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave sequence: BT.709 %s-range, SDR 4:2:0",
                     *m_Runtime.liveRange() == PyroWave::YuvRange::Full ? "full" : "limited");
@@ -202,26 +207,53 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
                         du->frameNumber,rejection.c_str(),static_cast<unsigned long long>(m_Rejected));
         return DR_OK; // Independent frames: no IDR/hot-switch or partial recovery
     }
-    std::lock_guard<std::mutex> guard(m_Mutex);
-    if (m_FirstFrame) {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "First valid PyroWave decode unit: %d bytes, compatibility packets=%zu; first %s decode succeeded",
-                    du->fullLength,packets,m_Gpu ? "GPU output" : "I420");
-        m_FirstFrame = false;
+    {
+        std::lock_guard<std::mutex> guard(m_Mutex);
+        if (m_FirstFrame) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "First valid PyroWave decode unit: %d bytes, compatibility packets=%zu; first %s decode succeeded",
+                        du->fullLength,packets,m_Gpu ? "GPU output" : "I420");
+            m_FirstFrame = false;
+            m_PerformanceStartUs = LiGetMicroseconds();
+        }
+        ++m_Stats.decodedFrames;
+        m_Stats.totalDecodeTimeUs += timing.decodeUs;
+        m_Pipeline.preparationUs += timing.preparationUs;
+        m_Pipeline.assemblyUs += assemblyUs;
+        if (m_Gpu) {
+            m_GpuReadyUs[slot]=LiGetMicroseconds();
+            if (m_Slots.publish(slot)) ++m_Stats.pacerDroppedFrames;
+        } else {
+            if (!m_Pending.planes[0].empty()) ++m_Stats.pacerDroppedFrames;
+            m_Pending = std::move(pixels);
+            m_PendingReadyUs=LiGetMicroseconds();
+        }
+        wakeRenderer();
     }
-    ++m_Stats.decodedFrames;
-    m_Stats.totalDecodeTimeUs += timing.decodeUs;
-    m_Pipeline.preparationUs += timing.preparationUs;
-    if (m_Gpu) {
-        m_GpuReadyUs[slot]=LiGetMicroseconds();
-        if (m_Slots.publish(slot)) ++m_Stats.pacerDroppedFrames;
-    } else {
-        if (!m_Pending.planes[0].empty()) ++m_Stats.pacerDroppedFrames;
-        m_Pending = std::move(pixels);
-        m_PendingReadyUs=LiGetMicroseconds();
+    // Once after ten seconds of live frames, and once after draining at shutdown.
+    // Serialized with all codec API calls, outside the measured decode interval
+    // and renderer mutex. No per-frame queries, timestamp reset or GPU drain.
+    if (!m_ReportedStableTiming && PyroWave::elapsed(LiGetMicroseconds(),m_PerformanceStartUs)>=10000000) {
+        m_ReportedStableTiming = true;
+        reportGpuTiming();
     }
-    wakeRenderer();
     return DR_OK;
+}
+
+void PyroWaveVideoDecoder::reportGpuTiming() {
+    unsigned timestamps = 0;
+    const auto callback = [](void* userdata,const char* message) {
+        if (!message || !*message) return;
+        // Upstream also reports memory budgets. Preserve that terminology too.
+        const bool memory = std::strncmp(message,"Memory Heap ",12)==0;
+        if (!memory) ++*static_cast<unsigned*>(userdata);
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave %s: %s",
+            memory ? "device performance" : "GPU timing",message);
+    };
+    if (!m_Runtime.reportPerformanceStats(callback,&timestamps))
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU timing unavailable: native reporting API/device unavailable");
+    else if (!timestamps)
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU timing unavailable: no resolved native timestamp intervals");
 }
 
 void PyroWaveVideoDecoder::updateStats() {
@@ -238,6 +270,7 @@ void PyroWaveVideoDecoder::updateStats() {
         PyroWave::addStats(m_Stats,stats);
         pipeline.bytes=m_LastPipeline.bytes+m_Pipeline.bytes;
         pipeline.preparationUs=m_LastPipeline.preparationUs+m_Pipeline.preparationUs;
+        pipeline.assemblyUs=m_LastPipeline.assemblyUs+m_Pipeline.assemblyUs;
         pipeline.decoderQueueUs=m_LastPipeline.decoderQueueUs+m_Pipeline.decoderQueueUs;
         m_LastStats=m_Stats; m_LastPipeline=m_Pipeline;
         m_Stats={}; m_Stats.measurementStartUs=now; m_Pipeline={};

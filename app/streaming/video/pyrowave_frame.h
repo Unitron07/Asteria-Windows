@@ -66,10 +66,11 @@ struct Frame {
     // Offsets into the caller-owned input; no payload copies or GPU work.
     std::vector<Packet> packets;
     std::vector<Record> records; // includes padding; packets exclude it
+    std::vector<std::uint32_t> blockIndices; // Reusable duplicate-validation scratch.
     Sequence sequence;
     Framing framing = Framing::Compatibility;
     std::size_t payloadBytes = 0;
-    void clear() { packets.clear(); records.clear(); sequence = {}; payloadBytes = 0;
+    void clear() { packets.clear(); records.clear(); blockIndices.clear(); sequence = {}; payloadBytes = 0;
                    framing = Framing::Compatibility; }
 };
 

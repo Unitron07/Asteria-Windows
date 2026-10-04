@@ -11,6 +11,14 @@ HDR/444 rejection, full/limited range acceptance, recovery and a structurally va
 with 1,501 codec packets (larger than both old offline limits). Existing parser,
 legacy, loader/export/API, Granite and P0.5 presentation suites are retained.
 
+Runtime policy tests inject a mock C API/Vulkan-property module on both targets,
+cover fragment/compute recommendations independently of vendor IDs, nonfatal GPU
+initialization failure, CPU I420 full/limited output, recreation and native
+callback userdata/reset/empty/unavailable plumbing for CPU and GPU output.
+These are plumbing tests, not codec/GPU correctness or performance proof. Live
+frame tests verify retained assembly/metadata capacity and exact output across
+large/small/rejected frames, fragment-count bounds and malformed recovery.
+
 The optional workflow also builds the full experimental app on x64/native ARM64.
 `scripts/build-pyrowave-live.ps1` invokes the established Qt/MSVC build with
 `CONFIG+=pyrowave_experimental`, verifies metadata, then stages the verified

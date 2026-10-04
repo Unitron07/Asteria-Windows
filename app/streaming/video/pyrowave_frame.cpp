@@ -195,7 +195,10 @@ bool scanRecords(const std::uint8_t* data, const std::vector<Packet>& spans,
                     return reject(frame,error,"block sequence mismatch");
                 index = b >> 8;
                 if (index >= sequence.blockCapacity) return reject(frame,error,"impossible block index");
-                if (!validBlockPayload(data + cursor,bytes,sequence,index))
+                // The first pass validates the entire immutable payload before
+                // any record allocation. Collection need not scan coefficients
+                // a second time; all header/bounds checks remain in both passes.
+                if (!collect && !validBlockPayload(data + cursor,bytes,sequence,index))
                     return reject(frame,error,"malformed block ballot or coefficient payload");
                 if (++blocks > sequence.totalBlocks) return reject(frame,error,"excess block records");
                 kind = RecordKind::Block;
@@ -216,7 +219,8 @@ bool validateRecords(const std::uint8_t* data, const std::vector<Packet>& spans,
     // is bounded by frame bytes; never reserve from an untrusted total_blocks.
     if (!scanRecords(data,spans,frame,error,context,false)) return false;
     if (!scanRecords(data,spans,frame,error,context,true)) return false;
-    std::vector<std::uint32_t> indices;
+    auto& indices = frame.blockIndices;
+    indices.clear();
     for (const auto& r : frame.records)
         if (r.kind == RecordKind::Block) indices.push_back(r.blockIndex);
     std::sort(indices.begin(),indices.end());
