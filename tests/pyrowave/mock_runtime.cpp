@@ -1,5 +1,6 @@
 // GPU-free C API test double. Never staged with an experimental owner package.
 #define PYROWAVE_EXPORT_SYMBOLS
+#define VK_NO_PROTOTYPES
 #include <vulkan/vulkan_core.h>
 #include <pyrowave/pyrowave.h>
 #include <cstring>

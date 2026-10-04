@@ -1,3 +1,4 @@
+#define SDL_MAIN_HANDLED
 #include "pyrowave_runtime.h"
 #include "pyrowave_gpu.h"
 #define WIN32_LEAN_AND_MEAN
