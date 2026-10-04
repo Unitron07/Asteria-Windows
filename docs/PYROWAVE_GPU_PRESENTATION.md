@@ -88,8 +88,9 @@ Measured stages:
   envelope. Per-decoder byte capacity is retained across frames.
 - Parser/packet preparation: compatibility/record validation, packet pushes and
   output setup, excluding assembly and the decode API. Runtime packet, record
-  and duplicate-index storage is reused. Bounds, two-pass validation, fragment
-  semantics and full/limited range restrictions are unchanged.
+  and duplicate-index storage is reused. The complete first validation pass is
+  retained; the metadata pass avoids scanning coefficient payloads again.
+  Bounds, duplicate checks, fragment semantics and range restrictions are unchanged.
 - Average decoding time: the narrow decode API call only. GPU output measures
   CPU recording/submission, including any internal bounded-context wait. It is
   **not GPU execution duration** and must not be compared directly against an

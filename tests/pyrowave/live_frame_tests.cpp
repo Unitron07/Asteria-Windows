@@ -94,6 +94,12 @@ complete:
             require(frame.packets[i].offset==largePackets[i].offset && frame.packets[i].size==largePackets[i].size);
         require(frame.blockIndices.size()==1500);
     }
+    bad=large;
+    // Duplicate validation must still reject a reused record/index table.
+    std::copy_n(bad.begin()+largePackets[1].offset+4,4,bad.begin()+largePackets[2].offset+4);
+    parse(bad,false,fourK);
+    require(error.find("duplicate block index")!=std::string::npos);
+    parse(large,true,fourK);
     require(!PyroWave::parseFrame(large.data(),large.size(),large.size(),frame,error,&fourK));
 
     // Arbitrary common-c fragment cuts, including cuts inside lengths/records.
