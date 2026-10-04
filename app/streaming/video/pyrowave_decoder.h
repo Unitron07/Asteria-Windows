@@ -33,7 +33,9 @@ private:
     void wakeRenderer(); // m_Mutex held
     void updateStats();
     void renderOverlays();
+    void reportGpuTiming(); // Decoder thread, or shutdown after decode is stopped.
     PyroWave::Runtime m_Runtime;
+    std::vector<std::uint8_t> m_FrameBytes; // Dedicated common-c decoder thread scratch.
     SDL_Renderer* m_Renderer = nullptr;
     SDL_Texture* m_Texture = nullptr;
     SDL_Texture* m_OverlayTextures[Overlay::OverlayMax] = {};
@@ -49,6 +51,8 @@ private:
     int m_Width = 0, m_Height = 0;
     uint32_t m_LastFrameNumber = 0;
     uint64_t m_StatsTime = 0, m_Rejected = 0;
+    uint64_t m_PerformanceStartUs = 0;
+    bool m_ReportedStableTiming = false;
     bool m_TestOnly = true, m_EventQueued = false, m_Failed = false;
     bool m_FirstFrame = true, m_HaveTextureFrame = false;
     bool m_FirstSequence = true;

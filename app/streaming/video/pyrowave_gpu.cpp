@@ -40,7 +40,8 @@ struct GpuPresentation::Impl {
         return SUCCEEDED(result) || fail(std::string(op)+" HRESULT="+std::to_string(uint32_t(result)));
     }
     bool pyro(pyrowave_result result,const char* op) {
-        return result==PYROWAVE_SUCCESS || fail(std::string(op)+" result="+std::to_string(result));
+        return result==PYROWAVE_SUCCESS || fail(std::string(op)+" result="+std::to_string(result) +
+            (result==PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE ? " (PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE)" : ""));
     }
 };
 GpuPresentation::GpuPresentation(Runtime& runtime) : m_Impl(new Impl(runtime)) {}
@@ -75,7 +76,7 @@ bool GpuPresentation::initialize(SDL_Renderer* renderer,int width,int height) {
     RESOLVE(syncDestroy,pyrowave_sync_object_destroy);
     RESOLVE(syncSemaphore,pyrowave_sync_object_get_semaphore);
 #undef RESOLVE
-    if (!GetProcAddress(static_cast<HMODULE>(r.m_Module),"pyrowave_decoder_decode_gpu_buffer"))
+    if (!r.m_Api.decodeGpu)
         return p.fail("missing GPU decode API");
     auto base=static_cast<ID3D11Device*>(rendererD3D11Device(renderer));
     if (!base) return p.fail("SDL renderer does not expose a D3D11 device");
@@ -98,10 +99,9 @@ bool GpuPresentation::initialize(SDL_Renderer* renderer,int width,int height) {
     props(physical,&properties);
     if (!ids.deviceLUIDValid || std::memcmp(ids.deviceLUID,&desc.AdapterLuid,VK_LUID_SIZE))
         return p.fail("Vulkan decoder and SDL D3D11 renderer adapters differ");
-    // The pin recommends fragment decode for proprietary Qualcomm drivers.
-    // Recreate before live packets; CPU fallback restores the bring-up decoder.
-    if (!r.createDecoder(width,height,true)) return p.fail(r.error());
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU decoder path: %s",r.m_FragmentPath ? "fragment" : "compute");
+    // Preflight already selected the device-recommended path for either output.
+    // No recreation is needed just to probe presentation capabilities.
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU decoder path: %s",r.decoderPath());
     // D3D owns the allocations, as recommended by the pinned Windows interop test.
     // Each import and fence import is a real driver capability gate on x64/ARM64.
     for (auto& slot:p.slots) {

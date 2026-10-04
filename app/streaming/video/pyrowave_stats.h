@@ -6,7 +6,7 @@
 
 namespace PyroWave {
 struct PipelineStats {
-    uint64_t bytes=0, preparationUs=0, decoderQueueUs=0;
+    uint64_t bytes=0, preparationUs=0, decoderQueueUs=0, assemblyUs=0;
 };
 // Operates on VIDEO_STATS. Kept generic so GPU-free tests need no Qt/SDL.
 template<class Stats> void addStats(const Stats& src,Stats& dst) {
@@ -61,8 +61,11 @@ template<class Stats> std::string formatStats(const Stats& stats,const PipelineS
     append("Bitrate: %.1f Mbps\n",pipeline.bytes*8.0/seconds/1000000.0);
     if (stats.receivedFrames) append("Average network reassembly / decoder queue wait: %.2f / %.2f ms\n",
         stats.totalReassemblyTimeUs/1000.0/stats.receivedFrames,pipeline.decoderQueueUs/1000.0/stats.receivedFrames);
-    if (stats.decodedFrames) append("Average parser / frame preparation: %.2f ms\n",pipeline.preparationUs/1000.0/stats.decodedFrames);
-    append("Decode timing: %s\n",gpu ? "CPU GPU-decode submission; GPU execution not measured" : "CPU API decode + readback; readback not separable");
+    if (stats.decodedFrames) {
+        append("Average frame assembly: %.2f ms\n",pipeline.assemblyUs/1000.0/stats.decodedFrames);
+        append("Average parser / packet preparation: %.2f ms\n",pipeline.preparationUs/1000.0/stats.decodedFrames);
+    }
+    append("Decode timing: %s; native GPU timestamps in log\n",gpu ? "CPU GPU-decode submission; GPU execution not measured by overlay" : "CPU API decode + readback; readback not separable");
     return output;
 }
 }

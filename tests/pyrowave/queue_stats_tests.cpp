@@ -41,10 +41,13 @@ int main() {
     require(merged.totalHostProcessingLatency==400 && merged.framesWithHostProcessingLatency==3);
     require(PyroWave::percent(10,100)==10 && PyroWave::percent(20,80)==25 && PyroWave::percent(0,0)==0);
     require(PyroWave::elapsed(2000,1000)==1000 && PyroWave::elapsed(1000,2000)==0);
-    const auto text=PyroWave::formatStats(merged,{},2560,1440,3000000,true);
+    PyroWave::PipelineStats pipeline;
+    pipeline.assemblyUs=40000; pipeline.preparationUs=120000;
+    const auto text=PyroWave::formatStats(merged,pipeline,2560,1440,3000000,true);
     for (const auto expected:{"2560x1440 50.00 FPS","network: 45.00 FPS","5.0/25.0/13.3 ms","connection: 10.00%",
             "jitter: 25.00%","Average decoding time: 2.00 ms","Average frame queue delay: 3.00 ms",
-            "V-sync latency): 4.00 ms","network latency: N/A","GPU execution not measured"})
+            "V-sync latency): 4.00 ms","network latency: N/A","GPU execution not measured",
+            "Average frame assembly: 0.50 ms","Average parser / packet preparation: 1.50 ms","native GPU timestamps in log"})
         require(text.find(expected)!=std::string::npos);
     merged.lastRtt=13; merged.lastRttVariance=5;
     const auto cpu=PyroWave::formatStats(merged,{},2560,1440,3000000,false);

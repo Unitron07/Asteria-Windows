@@ -73,6 +73,23 @@ jobs:
             default { throw "Unsupported target: $env:TARGET_ARCH" }
           }
           ./harness/scripts/build-baseline.ps1 -SourceRoot ./source -Architecture $env:TARGET_ARCH -QtBin "$env:QT_ROOT/$kit/bin"
+      - name: Verify ordinary package excludes experimental PyroWave runtime
+        if: inputs.label == 'asteria'
+        shell: pwsh
+        run: |
+          $packages = @(Get-ChildItem 'source/build/installer-${{ inputs.architecture }}-release' -Filter '*.zip')
+          if ($packages.Count -ne 1) { throw 'Expected one ordinary portable package' }
+          $archive = [IO.Compression.ZipFile]::OpenRead($packages[0].FullName)
+          try {
+            if ($archive.Entries | Where-Object { $_.FullName.Replace('\','/') -match '(^|/)pyrowave/|(^|/)(libpyrowave-shared.*\.dll|pyrowave-runtime\.json)$' }) {
+              throw 'Ordinary package contains experimental PyroWave runtime files'
+            }
+          } finally { $archive.Dispose() }
+          $dumpbin = Get-Content 'source/build/evidence/${{ inputs.architecture }}/dumpbin-path.txt' | Select-Object -First 1
+          $imports = & $dumpbin /imports 'source/build/deploy-${{ inputs.architecture }}-release/Asteria.exe'
+          if ($LASTEXITCODE) { throw 'Cannot inspect ordinary client imports' }
+          $imports | Set-Content 'source/build/evidence/${{ inputs.architecture }}/baseline-client-imports.txt'
+          if ($imports -match 'libpyrowave-shared|vulkan-1\.dll') { throw 'Ordinary client has an experimental startup import' }
       - name: Verify packaged Asteria icon resources
         if: inputs.label == 'asteria'
         shell: pwsh

@@ -3,10 +3,12 @@
 The owner reports the first successful live P1a video on Surface Pro 11,
 Snapdragon X Plus / Adreno X1-85: 2560x1440, target 120 FPS / 120 Hz. Video
 rendered, audio/input worked, and visual quality and responsiveness felt good.
-The CPU-output bring-up path measured approximately 93.3 incoming/decoded/rendered
-FPS, 450.9 Mbps, 21 network drops, one presentation drop, 12.45 ms decode pipeline,
-1.24 ms render, and 13 ms RTT. These are owner observations, not measurements of
-this change. P1a performance qualification remains **PENDING owner retest**.
+The latest owner baseline is ~109.7 incoming/decoded/rendered FPS, ~501.6 Mbps,
+~3.47 ms synchronous decode/readback, ~2.64 ms combined parser/frame preparation,
+~8.72 ms reassembly, ~0.55 ms decoder queue wait, ~0.08 ms frame queue delay and
+~1.20 ms render. The game did not produce a full 120 FPS. These are owner
+observations before this cleanup, not measurements of this change. P1a
+performance qualification remains **PENDING owner retest**.
 
 ## Chosen path and pinned API evidence
 
@@ -28,10 +30,13 @@ colorspace values as the CPU path. No new shader, swapchain, Vulkan loader impor
 or codec runtime import is required. Existing aspect fitting, linear scaling,
 overlays, resize behavior and V-sync presentation remain SDL-owned.
 
-GPU decode follows `pyrowave_decoder_device_prefers_fragment_path`: proprietary
-Qualcomm uses the pin's fragment path and R8 color attachments; desktop drivers
-use compute and R8 storage images. Failed GPU preflight recreates the original
-CPU bring-up decoder before starting live packets.
+All decoder creation follows `pyrowave_decoder_device_prefers_fragment_path`,
+including CPU output and offline validation. The tested Qualcomm Adreno X1-85
+selects fragment. The tested Qualcomm driver rejects D3D11/D3D12 timeline-fence
+import with `-7` (`PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE`), safely retaining
+CPU I420. The GPU probe now keeps the preflight decoder, so no mode-changing
+recreation occurs on fallback; the retained fragment/compute mode is logged.
+Selection comes solely from the pinned API, with no application vendor table.
 
 Cross-API output is enabled only after adapter LUID equality, ID3D11Device5 /
 Context4 availability, every real R8 output-image import, every timeline fence
@@ -42,12 +47,9 @@ CPU I420 renderer remains usable. Partial resources are destroyed. A live device
 loss/submission failure ends the stream through normal Session cleanup; it does
 not replay host launch or silently continue with suspect GPU resources.
 
-A separate Vulkan presenter was considered. It would require another surface,
-swapchain, YUV shader/conversion and overlay integration (or changes to the
-borrowed-device creation contract). Because this pin and SDL already support
-D3D-owned planes and imported timeline fences, gated sharing keeps the existing
-presentation machinery. Unsupported drivers retain CPU output until hardware
-qualification establishes what further work is needed.
+A dedicated native Vulkan PyroWave presenter (GPU Y/U/V images, conversion shader
+and Vulkan swapchain) is **deferred until after v0.2.0**. It is not implemented.
+Unsupported interop continues to use synchronized CPU I420 output.
 
 ## Lifetime and latency
 
@@ -82,14 +84,28 @@ Measured stages:
 
 - Network reassembly: decode-unit enqueue minus first packet receipt.
 - Decoder queue wait: submit callback start minus enqueue.
-- Parser/frame preparation: fragment assembly, validation, packet pushes, and
-  output setup, excluding the decode API call.
+- Frame assembly: common-c transport fragments into a contiguous compatibility
+  envelope. Per-decoder byte capacity is retained across frames.
+- Parser/packet preparation: compatibility/record validation, packet pushes and
+  output setup, excluding assembly and the decode API. Runtime packet, record
+  and duplicate-index storage is reused. Bounds, two-pass validation, fragment
+  semantics and full/limited range restrictions are unchanged.
 - Average decoding time: the narrow decode API call only. GPU output measures
   CPU recording/submission, including any internal bounded-context wait. It is
   **not GPU execution duration** and must not be compared directly against an
   FFmpeg hardware completion duration. The overlay explicitly says this.
 - CPU fallback decode includes GPU execution/readback in the synchronous API;
-  the pin cannot separate those. The overlay explicitly reports this limitation.
+  this API interval cannot separate those. The overlay reports this limitation.
+- Native GPU diagnostics: `pyrowave_device_report_performance_stats` forwards the
+  pin's callback text, including `Dequant`, `iDWT` / `iDWT fragment` and its
+  **ms per frame** terminology, to `PyroWave GPU timing` log lines. Memory-budget
+  messages retain their own terminology under `PyroWave device performance`.
+  Reports run once after ten seconds of live frames on the decoder thread and
+  once after decoder teardown drains work, before device destruction. Neither
+  report resets the cumulative counters or adds a per-frame wait. Missing
+  reporting exports or no resolved timestamps are nonfatal diagnostics.
+  Both CPU/GPU output use the same device reporting. Native stages aid comparison
+  with CPU API time; their difference is not an isolated readback measurement.
 - Frame queue delay: submission/output-ready publication to main-thread dequeue.
   On GPU output the frame is submitted, not necessarily GPU-complete; the
   remaining fence wait executes on the GPU during presentation.
@@ -113,10 +129,14 @@ Unsupported Vulkan/interoperability is an explicit 77 skip; it is not GPU proof.
 CI builds/packages x64 and native ARM64 and preserves runtime provenance and
 baseline isolation checks. The experimental packages are for owner retesting.
 
-On RTX 4070 Ti x64 and Surface Pro 11 ARM64, confirm `GPU presentation initialized`
-in the log, inspect range/color, overlays, resizing/minimize/restore/reconnect,
-and record incoming/decoded/rendered FPS, host latency min/max/average, network
-and presentation drop percentages, RTT, decode timing mode, queue delay, render
-time, bitrate, and all additional timing stages. At 2560x1440/120 on ARM64 compare
-to ~93.3 FPS / ~12.45 ms old decode pipeline / ~1.24 ms render. Report actual
-results; no sub-millisecond target or sustained 120 FPS qualification is asserted.
+On RTX 4070 Ti x64 and Surface Pro 11 ARM64, inspect range/color, overlays,
+resize/minimize/restore/reconnect and audio/input. On ARM64 confirm adapter
+Adreno X1-85, preferred fragment mode, the unsupported external-handle fallback
+reason, `PyroWave CPU fallback decoder path: fragment`, and first I420 decode
+success. Capture native timing logs after at least ten seconds and shutdown.
+Record all standard stats plus assembly and parser/preparation separately.
+Compare assembly + parser/preparation to the previous combined ~2.64 ms; compare
+synchronous decode/readback to ~3.47 ms, queue wait ~0.55 ms, frame queue ~0.08 ms
+and render ~1.20 ms at 2560x1440/120 Hz. Achieved FPS alone is not a success
+criterion: the prior ~109.7 FPS game workload may not supply 120 FPS. No CI
+performance improvement or final hardware qualification is claimed.

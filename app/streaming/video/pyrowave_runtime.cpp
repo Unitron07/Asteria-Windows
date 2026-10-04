@@ -51,18 +51,32 @@ bool Runtime::load(const std::filesystem::path& directory) {
     RESOLVE(destroyDevice, pyrowave_device_destroy)
     RESOLVE(deviceHandles, pyrowave_device_get_vk_device_handles)
     RESOLVE(createDecoder, pyrowave_decoder_create)
+    RESOLVE(prefersFragment, pyrowave_decoder_device_prefers_fragment_path)
     RESOLVE(destroyDecoder, pyrowave_decoder_destroy)
     RESOLVE(clear, pyrowave_decoder_clear)
     RESOLVE(push, pyrowave_decoder_push_packet)
     RESOLVE(ready, pyrowave_decoder_decode_is_ready)
     RESOLVE(decode, pyrowave_decoder_decode_cpu_buffer_synchronous)
 #undef RESOLVE
+    // Optional diagnostics and presentation never make CPU-output loading fail.
+    m_Api.reportStats = reinterpret_cast<decltype(m_Api.reportStats)>(
+        GetProcAddress(static_cast<HMODULE>(m_Module), "pyrowave_device_report_performance_stats"));
+    m_Api.decodeGpu = reinterpret_cast<decltype(m_Api.decodeGpu)>(
+        GetProcAddress(static_cast<HMODULE>(m_Module), "pyrowave_decoder_decode_gpu_buffer"));
+    return true;
+}
+bool Runtime::reportPerformanceStats(pyrowave_message_cb callback, void* userdata, bool reset) {
+    // This void upstream API has no failure result. Missing exports/device or
+    // unavailable timestamps are diagnostic-only, never a decoder error.
+    if (!m_Device || !m_Api.reportStats || !callback) return false;
+    m_Api.reportStats(m_Device, callback, userdata, reset);
     return true;
 }
 void Runtime::resetDecoder() {
     if (m_Decoder) m_Api.destroyDecoder(m_Decoder);
     m_Decoder = nullptr; m_Width = m_Height = 0;
     m_LiveRange.reset();
+    m_Frame.clear();
 }
 void Runtime::discardFrame() {
     if (m_Decoder) m_Api.clear(m_Decoder);
@@ -77,7 +91,7 @@ void Runtime::close() {
     m_Vulkan = nullptr;
     m_DeviceDescription.clear();
 }
-bool Runtime::createDecoder(int width, int height, bool preferGpuPath) {
+bool Runtime::createDecoder(int width, int height) {
     resetDecoder();
     m_Error.clear();
     if (!m_Module) return fail("runtime is not loaded");
@@ -106,12 +120,7 @@ bool Runtime::createDecoder(int width, int height, bool preferGpuPath) {
     pyrowave_decoder_create_info info{};
     info.device=m_Device; info.width=width; info.height=height;
     info.chroma=PYROWAVE_CHROMA_SUBSAMPLING_420;
-    m_FragmentPath=false;
-    if (preferGpuPath) {
-        const auto prefers=reinterpret_cast<decltype(&pyrowave_decoder_device_prefers_fragment_path)>(symbol("pyrowave_decoder_device_prefers_fragment_path"));
-        if (!prefers) return false;
-        m_FragmentPath=prefers(m_Device);
-    }
+    m_FragmentPath=m_Api.prefersFragment(m_Device);
     info.fragment_path=m_FragmentPath;
     if (!check(m_Api.createDecoder(&info,&m_Decoder),"decoder creation")) { resetDecoder(); return false; }
     if (!m_Decoder) return fail("decoder creation returned a null decoder");
@@ -141,7 +150,8 @@ bool Runtime::decodeImpl(const std::vector<std::uint8_t>& container, Pixels& out
     // Always clear on success, parser failure, push failure, not-ready and decode failure.
     const auto clear = [this](void*) { m_Api.clear(m_Decoder); };
     std::unique_ptr<void, decltype(clear)> cleanup(this, clear);
-    Frame frame; std::string error;
+    auto& frame = m_Frame;
+    std::string error;
     const StreamContext context{std::uint32_t(m_Width),std::uint32_t(m_Height),Chroma::Yuv420,true};
     const bool parsed = live ?
         parseLiveCompatibilityFrame(container.data(),container.size(),container.size(),frame,error,context) :
@@ -164,11 +174,10 @@ bool Runtime::decodeImpl(const std::vector<std::uint8_t>& container, Pixels& out
         if (!check(m_Api.push(m_Decoder,container.data()+p.offset,p.size),"packet push")) return false;
     if (!m_Api.ready(m_Decoder,false)) return fail("complete frame is not decode-ready");
     if (gpu) {
-        auto decodeGpu = reinterpret_cast<decltype(&pyrowave_decoder_decode_gpu_buffer)>(symbol("pyrowave_decoder_decode_gpu_buffer"));
-        if (!decodeGpu) return false;
+        if (!m_Api.decodeGpu) return fail("missing GPU decode API");
         const auto start = std::chrono::steady_clock::now();
         if (timing) timing->preparationUs = std::chrono::duration_cast<std::chrono::microseconds>(start-preparationStart).count();
-        const bool ok = check(decodeGpu(m_Decoder,acquire,release,gpu),"GPU output decode");
+        const bool ok = check(m_Api.decodeGpu(m_Decoder,acquire,release,gpu),"GPU output decode");
         if (timing) timing->decodeUs = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-start).count();
         return ok;
     }

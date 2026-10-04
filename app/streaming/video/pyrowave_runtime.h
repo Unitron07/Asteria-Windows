@@ -25,7 +25,11 @@ public:
     Runtime(const Runtime&) = delete;
     Runtime& operator=(const Runtime&) = delete;
     bool load(const std::filesystem::path& dependencyDirectory);
-    bool createDecoder(int width, int height, bool preferGpuPath = false);
+    // All output modes use the pinned API's device recommendation.
+    bool createDecoder(int width, int height);
+    const char* decoderPath() const { return m_FragmentPath ? "fragment" : "compute"; }
+    // Best-effort, serialized with decode; native callback text/units are unchanged.
+    bool reportPerformanceStats(pyrowave_message_cb callback, void* userdata, bool reset = false);
     bool decode(const std::vector<std::uint8_t>& container, Pixels& output);
     bool decodeLive(const std::vector<std::uint8_t>& container, Pixels& output,
                     std::size_t& packetCount, DecodeTiming* timing = nullptr);
@@ -46,6 +50,7 @@ public:
 
 private:
     friend class GpuPresentation;
+    friend struct RuntimeTestAccess;
     bool decodeImpl(const std::vector<std::uint8_t>& container, Pixels& output,
                     bool live, std::size_t* packetCount, DecodeTiming* timing = nullptr,
                     const pyrowave_gpu_buffers* gpu = nullptr,
@@ -62,6 +67,9 @@ private:
         decltype(&pyrowave_device_destroy) destroyDevice = nullptr;
         decltype(&pyrowave_device_get_vk_device_handles) deviceHandles = nullptr;
         decltype(&pyrowave_decoder_create) createDecoder = nullptr;
+        decltype(&pyrowave_decoder_device_prefers_fragment_path) prefersFragment = nullptr;
+        decltype(&pyrowave_device_report_performance_stats) reportStats = nullptr;
+        decltype(&pyrowave_decoder_decode_gpu_buffer) decodeGpu = nullptr;
         decltype(&pyrowave_decoder_destroy) destroyDecoder = nullptr;
         decltype(&pyrowave_decoder_clear) clear = nullptr;
         decltype(&pyrowave_decoder_push_packet) push = nullptr;
@@ -73,6 +81,7 @@ private:
     pyrowave_device m_Device = nullptr;
     pyrowave_decoder m_Decoder = nullptr;
     bool m_FragmentPath = false;
+    Frame m_Frame; // Reuse bounded packet/record/validation metadata across frames.
     int m_Width = 0;
     int m_Height = 0;
     std::string m_Error;

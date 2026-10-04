@@ -216,7 +216,8 @@ bool validateRecords(const std::uint8_t* data, const std::vector<Packet>& spans,
     // is bounded by frame bytes; never reserve from an untrusted total_blocks.
     if (!scanRecords(data,spans,frame,error,context,false)) return false;
     if (!scanRecords(data,spans,frame,error,context,true)) return false;
-    std::vector<std::uint32_t> indices;
+    auto& indices = frame.blockIndices;
+    indices.clear();
     for (const auto& r : frame.records)
         if (r.kind == RecordKind::Block) indices.push_back(r.blockIndex);
     std::sort(indices.begin(),indices.end());
