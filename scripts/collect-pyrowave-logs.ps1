@@ -23,9 +23,11 @@ Frame queue delay (ms):
 Render including V-sync latency (ms):
 Native PyroWave GPU timestamp output (ten-second report and shutdown):
 Bitrate (Mbps), reassembly / decoder wait / frame assembly / parser preparation (ms):
-ARM64 2560x1440/120 Hz comparison to ~3.47 ms decode/readback,
-~2.64 ms combined assembly+preparation, ~0.55 ms decoder wait,
-~0.08 ms frame queue and ~1.20 ms render; workload was ~109.7 FPS:
+ARM64 2560x1440/120 Hz: preferred/GPU fragment, fallback compute expected.
+Compare latest fragment ~4.31 ms decode/readback to earlier compute ~3.47 ms.
+Latest fragment: ~0.97 ms assembly, ~1.76 ms preparation, ~2.19 ms decoder wait,
+~1.50 ms render, ~101.7 FPS; native iDWT fragment ~1.98 and Dequant ~0.83 ms/frame:
+Conditions differed; do not require exact targets as gameplay/network load vary.
 Do not infer performance improvement from CI or achieved FPS alone.
 '@ | Set-Content (Join-Path $Destination 'OWNER-RESULT.txt') -Encoding utf8
 Write-Output "Collected logs in $Destination"

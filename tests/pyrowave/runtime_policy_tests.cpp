@@ -32,7 +32,8 @@ int main(int argc,char** argv) {
     HMODULE module=LoadLibraryExW(dll.c_str(),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
     require(module!=nullptr);
     auto configure=reinterpret_cast<void(*)(bool,uint32_t,bool)>(GetProcAddress(module,"mock_configure"));
-    require(configure!=nullptr);
+    auto decoderState=reinterpret_cast<void(*)(uint32_t*,bool*)>(GetProcAddress(module,"mock_decoder_state"));
+    require(configure!=nullptr && decoderState!=nullptr);
     // Identical vendor with either recommendation, and different vendors with the
     // same recommendation: no vendor heuristic may determine decoder selection.
     for (const uint32_t vendor:{0x5143u,0x10deu,0u}) for (bool fragment:{false,true}) {
@@ -40,20 +41,30 @@ int main(int argc,char** argv) {
         PyroWave::Runtime runtime;
         require(runtime.load(directory));
         require(PyroWave::RuntimeTestAccess::attachMockVulkan(runtime,dll));
-        require(runtime.createDecoder(128,128));
+        uint32_t creations=0, after=0; bool actualFragment=false;
+        decoderState(&creations,&actualFragment);
+        require(runtime.createDecoder(128,128,true)); // GPU presentation preflight.
         const std::string path=fragment ? "fragment" : "compute";
         require(runtime.decoderPath()==path);
+        decoderState(&after,&actualFragment);
+        require(after==creations+1 && actualFragment==fragment);
         {
             PyroWave::GpuPresentation gpu(runtime);
             // Mock intentionally lacks image-import exports. Initialization fails
-            // before accessing SDL; the same decoder must remain usable afterward.
+            // before accessing SDL; the GPU probe retains the preferred decoder.
             require(!gpu.initialize(nullptr,128,128));
             require(gpu.error().find("missing GPU API")!=std::string::npos);
         }
         require(runtime.decoderPath()==path);
+        // Mirror live initialization: failed presentation recreates default CPU
+        // output. Check the actual C API arguments and a new decoder creation.
+        require(runtime.createDecoder(128,128));
+        require(std::string(runtime.decoderPath())=="compute");
+        decoderState(&creations,&actualFragment);
+        require(creations==after+1 && !actualFragment);
         for (bool limited:{false,true}) {
             require(runtime.createDecoder(128,128)); // Also cover restoration/reconnect.
-            require(runtime.decoderPath()==path);
+            require(std::string(runtime.decoderPath())=="compute");
             std::vector<uint8_t> bytes;
             word(bytes,1); word(bytes,8); word(bytes,0x80000000u|(127u<<14)|127u); word(bytes,limited ? 1u<<30 : 0u);
             PyroWave::Pixels pixels; std::size_t packets=0;
@@ -71,11 +82,14 @@ int main(int argc,char** argv) {
             // Callback plumbing after CPU output.
             require(runtime.reportPerformanceStats(collect,&messages));
             require(messages==std::vector<std::string>{"Dequant: 0.125 ms per frame",
-                fragment ? "iDWT fragment: 0.250 ms per frame" : "iDWT: 0.250 ms per frame","reset=false"});
-            // The same device callback after GPU output.
+                "iDWT: 0.250 ms per frame","reset=false"});
+            // Preferred GPU output and its native diagnostics remain supported.
+            require(runtime.createDecoder(128,128,true) && runtime.decoderPath()==path);
             require(PyroWave::RuntimeTestAccess::gpuDecode(runtime,bytes));
             messages.clear(); require(runtime.reportPerformanceStats(collect,&messages,true));
+            require(messages[1]==(fragment ? "iDWT fragment: 0.250 ms per frame" : "iDWT: 0.250 ms per frame"));
             require(messages.back()=="reset=true");
+            require(runtime.createDecoder(128,128,false));
             configure(fragment,vendor,true);
             messages.clear(); require(runtime.reportPerformanceStats(collect,&messages) && messages.empty());
             require(runtime.error().empty() && runtime.decodeLive(bytes,pixels,packets));
@@ -84,7 +98,7 @@ int main(int argc,char** argv) {
         PyroWave::RuntimeTestAccess::disableStats(runtime);
         require(!runtime.reportPerformanceStats(collect,nullptr) && runtime.error().empty());
         runtime.resetDecoder();
-        require(runtime.createDecoder(128,128) && runtime.decoderPath()==path);
+        require(runtime.createDecoder(128,128) && std::string(runtime.decoderPath())=="compute");
         std::vector<uint8_t> bytes;
         word(bytes,1); word(bytes,8); word(bytes,0x80000000u|(127u<<14)|127u); word(bytes,0u);
         PyroWave::Pixels pixels; std::size_t packets=0;
@@ -93,5 +107,5 @@ int main(int argc,char** argv) {
         require(!runtime.reportPerformanceStats(collect,nullptr));
     }
     FreeLibrary(module);
-    std::cout<<"PASS: API-driven fragment/compute, nonfatal GPU fallback, I420/ranges, optional native callbacks\n";
+    std::cout<<"PASS: preferred GPU path, recreated compute CPU fallback, I420/ranges, optional native callbacks\n";
 }

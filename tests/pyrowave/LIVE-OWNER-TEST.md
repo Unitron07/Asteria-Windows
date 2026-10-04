@@ -1,9 +1,12 @@
 > Owner update: live P1a video succeeded on Surface Pro 11 / Snapdragon X Plus /
 > Adreno X1-85 at 2560x1440, target 120 FPS, with audio/input working. Latest
-> baseline: ~109.7 FPS, ~3.47 ms decode/readback, ~2.64 ms combined preparation,
-> ~0.55 ms decoder queue, ~0.08 ms frame queue and ~1.20 ms render. The game did
-> not supply a full 120 FPS. Qualcomm's unsupported external-fence import safely
-> retains CPU I420; this cleanup preserves its preferred fragment mode.
+> fragment CPU fallback: ~101.7 FPS, ~4.31 ms decode/readback, ~2.19 ms decoder
+> queue, ~0.97 ms assembly, ~1.76 ms parser/preparation and ~1.50 ms render.
+> Native `iDWT fragment` was ~1.98 ms/frame and `Dequant` ~0.83 ms/frame.
+> Earlier compute CPU fallback measured ~3.47 ms decode/readback. Conditions
+> differed; fragment did not improve measured CPU-output performance on this
+> device. Unsupported interop now recreates default compute CPU I420 fallback;
+> the preferred fragment GPU path and diagnostics remain available.
 > Final performance qualification remains **PENDING owner x64/ARM64 retest**.
 > See [GPU presentation and timing definitions](../../docs/PYROWAVE_GPU_PRESENTATION.md).
 
@@ -29,9 +32,10 @@ Use the included `pyrowave/` directory intact; do not copy a different codec DLL
    The first valid sequence must log `PyroWave sequence: BT.709 full-range, SDR 4:2:0`
    or `limited-range`, followed by the first successful decode diagnostic.
    Confirm the preferred compute/fragment path and presentation outcome. On ARM64,
-   verify GPU Adreno X1-85, `PyroWave preferred decoder path: fragment`, potential
+   verify GPU Adreno X1-85, `PyroWave preferred decoder path: fragment`,
+   `PyroWave GPU decoder path: fragment`, potential
    fence import `-7 (PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE)`, then
-   `PyroWave CPU fallback decoder path: fragment` and first I420 decode success.
+   `PyroWave CPU fallback decoder path: compute` and first I420 decode success.
    On supported x64 interop, confirm `GPU presentation initialized`.
    Keep the stream running at least ten seconds and disconnect cleanly; capture
    `PyroWave GPU timing` native output (or the explicit unavailable diagnostic).
@@ -83,8 +87,9 @@ bandwidth probing, bitrate usability tuning, 4:4:4, HDR and advanced pacing.
 CI build/test success is not performance qualification. At 2560x1440/120 Hz
 record standard stats, native GPU stage timings, frame assembly, parser/packet
 preparation, queue delay and render time. Compare decode/readback against
-~3.47 ms; assembly + parser/preparation against the prior combined ~2.64 ms;
-decoder queue wait ~0.55 ms; frame queue ~0.08 ms; render ~1.20 ms. Achieved FPS
-alone is insufficient: the prior ~109.7 FPS workload may not supply 120 FPS.
+the latest fragment ~4.31 ms and earlier compute ~3.47 ms. Compare assembly and
+parser/preparation to ~0.97 ms and ~1.76 ms, queue wait to ~2.19 ms and render to
+~1.50 ms from the latest test. Do not require exact targets: gameplay and network
+conditions vary, and achieved FPS alone is insufficient.
 Record results in `docs/VALIDATION.md`. The dedicated native Vulkan presenter
 remains deferred until after v0.2.0 and is not present in these packages.

@@ -91,7 +91,7 @@ bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
     QString reason;
     if (!verifyProvenance(directory,reason)) return fail(reason);
     if (!m_Runtime.load(std::filesystem::path(directory.toStdWString())) ||
-        !m_Runtime.createDecoder(m_Width,m_Height))
+        !m_Runtime.createDecoder(m_Width,m_Height,true))
         return fail(QString::fromStdString(m_Runtime.error()));
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                 "PyroWave preflight: runtime/API=0.6.0 bitstream=%s extent=%dx%d GPU=%s",
@@ -133,7 +133,10 @@ bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU presentation unavailable: %s; retaining CPU I420 fallback",
             m_Gpu->error().c_str());
         m_Gpu.reset();
-        // The probe does not change the validated decoder or submit packets.
+        // CPU readback uses the default compute path, independently of vendor.
+        // No packets have been submitted during the presentation probe.
+        if (!m_Runtime.createDecoder(m_Width,m_Height))
+            return fail(QString::fromStdString(m_Runtime.error()));
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave CPU fallback decoder path: %s",m_Runtime.decoderPath());
     } else SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU presentation initialized: shared D3D11 R8 planes, timeline fences, 3 slots");
     m_TestOnly = params->testOnly;
