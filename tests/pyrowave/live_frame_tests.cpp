@@ -4,7 +4,8 @@
 #include <iostream>
 #include <algorithm>
 using Bytes = std::vector<std::uint8_t>;
-static void require(bool ok) { if (!ok) { std::cerr << "FAIL live frame test\n"; std::exit(1); } }
+static void check(bool ok,int line) { if (!ok) { std::cerr << "FAIL live frame test at line " << line << '\n'; std::exit(1); } }
+#define require(ok) check((ok),__LINE__)
 static void word(Bytes& b,std::uint32_t n) { for (int i=0;i<4;++i) b.push_back(std::uint8_t(n>>(8*i))); }
 static void set(Bytes& b,std::size_t offset,std::uint32_t n) { for (int i=0;i<4;++i) b[offset+i]=std::uint8_t(n>>(8*i)); }
 static Bytes sequence(unsigned blocks,unsigned w=1920,unsigned h=1080) {
@@ -104,7 +105,9 @@ complete:
 
     // Arbitrary common-c fragment cuts, including cuts inside lengths/records.
     Bytes bytes;
-    bytes.reserve(large.size());
+    // Truncated-chain tests declare one extra byte; reserve for that valid
+    // growth request too, before checking that subsequent frames reuse storage.
+    bytes.reserve(large.size()+1);
     const auto assemblyStorage=bytes.data();
     const auto assemblyCapacity=bytes.capacity();
     for (const auto& fixture : {valid,full,large}) for (unsigned cut=1;cut<std::min<std::size_t>(fixture.size(),32);++cut) {
