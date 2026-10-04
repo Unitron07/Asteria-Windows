@@ -3,12 +3,18 @@
 The owner reports the first successful live P1a video on Surface Pro 11,
 Snapdragon X Plus / Adreno X1-85: 2560x1440, target 120 FPS / 120 Hz. Video
 rendered, audio/input worked, and visual quality and responsiveness felt good.
-The latest owner baseline is ~109.7 incoming/decoded/rendered FPS, ~501.6 Mbps,
+The earlier compute CPU fallback baseline was ~109.7 incoming/decoded/rendered FPS, ~501.6 Mbps,
 ~3.47 ms synchronous decode/readback, ~2.64 ms combined parser/frame preparation,
 ~8.72 ms reassembly, ~0.55 ms decoder queue wait, ~0.08 ms frame queue delay and
 ~1.20 ms render. The game did not produce a full 120 FPS. These are owner
-observations before this cleanup, not measurements of this change. P1a
-performance qualification remains **PENDING owner retest**.
+observations before the preparation cleanup. A later fragment CPU fallback test
+on the same system at 2560x1440/120 Hz reported ~101.7 FPS, ~4.31 ms decode/readback,
+~2.19 ms decoder queue wait, ~0.97 ms assembly, ~1.76 ms parser/packet preparation
+and ~1.50 ms render. Native stages were ~1.98 ms/frame `iDWT fragment` and
+~0.83 ms/frame `Dequant`. Conditions were not identical: fragment CPU output did
+not improve measured performance and appears worse on this tested device, not
+universally. This correction restores compute CPU fallback; its performance
+qualification remains **PENDING owner retest**.
 
 ## Chosen path and pinned API evidence
 
@@ -30,13 +36,15 @@ colorspace values as the CPU path. No new shader, swapchain, Vulkan loader impor
 or codec runtime import is required. Existing aspect fitting, linear scaling,
 overlays, resize behavior and V-sync presentation remain SDL-owned.
 
-All decoder creation follows `pyrowave_decoder_device_prefers_fragment_path`,
-including CPU output and offline validation. The tested Qualcomm Adreno X1-85
-selects fragment. The tested Qualcomm driver rejects D3D11/D3D12 timeline-fence
-import with `-7` (`PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE`), safely retaining
-CPU I420. The GPU probe now keeps the preflight decoder, so no mode-changing
-recreation occurs on fallback; the retained fragment/compute mode is logged.
-Selection comes solely from the pinned API, with no application vendor table.
+GPU presentation preflight follows `pyrowave_decoder_device_prefers_fragment_path`.
+The tested Qualcomm Adreno X1-85 still selects fragment for GPU output. Successful
+presentation keeps that decoder. The tested Qualcomm driver rejects D3D11/D3D12
+timeline-fence import with `-7` (`PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE`).
+After any failed presentation probe, the decoder is recreated for synchronous
+CPU I420 output using the default compute path for v0.2.0. Offline CPU validation
+also defaults to compute. Preferred, GPU and fallback modes remain logged; this
+output-path policy has no vendor table. Native timing and preparation diagnostics
+are retained. Future native Vulkan presentation may produce a different result.
 
 Cross-API output is enabled only after adapter LUID equality, ID3D11Device5 /
 Context4 availability, every real R8 output-image import, every timeline fence
@@ -133,11 +141,11 @@ baseline isolation checks. The experimental packages are for owner retesting.
 On RTX 4070 Ti x64 and Surface Pro 11 ARM64, inspect range/color, overlays,
 resize/minimize/restore/reconnect and audio/input. On ARM64 confirm adapter
 Adreno X1-85, preferred fragment mode, the unsupported external-handle fallback
-reason, `PyroWave CPU fallback decoder path: fragment`, and first I420 decode
+reason, `PyroWave GPU decoder path: fragment`, `PyroWave CPU fallback decoder path: compute`, and first I420 decode
 success. Capture native timing logs after at least ten seconds and shutdown.
 Record all standard stats plus assembly and parser/preparation separately.
 Compare assembly + parser/preparation to the previous combined ~2.64 ms; compare
-synchronous decode/readback to ~3.47 ms, queue wait ~0.55 ms, frame queue ~0.08 ms
-and render ~1.20 ms at 2560x1440/120 Hz. Achieved FPS alone is not a success
-criterion: the prior ~109.7 FPS game workload may not supply 120 FPS. No CI
+synchronous decode/readback to the latest fragment ~4.31 ms and earlier compute
+~3.47 ms at 2560x1440/120 Hz. Record the other stages above without requiring an
+exact timing or FPS target: gameplay and network conditions vary. No CI
 performance improvement or final hardware qualification is claimed.

@@ -25,8 +25,8 @@ public:
     Runtime(const Runtime&) = delete;
     Runtime& operator=(const Runtime&) = delete;
     bool load(const std::filesystem::path& dependencyDirectory);
-    // All output modes use the pinned API's device recommendation.
-    bool createDecoder(int width, int height);
+    // GPU output uses the device recommendation; CPU I420 defaults to compute.
+    bool createDecoder(int width, int height, bool preferGpuPath = false);
     const char* decoderPath() const { return m_FragmentPath ? "fragment" : "compute"; }
     // Best-effort, serialized with decode; native callback text/units are unchanged.
     bool reportPerformanceStats(pyrowave_message_cb callback, void* userdata, bool reset = false);

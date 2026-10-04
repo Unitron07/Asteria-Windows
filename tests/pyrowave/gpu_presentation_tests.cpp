@@ -25,7 +25,7 @@ int main(int argc,char** argv) {
     if (argc==1) { SDL_DestroyWindow(window); SDL_Quit(); std::cout<<"PASS: unsupported GPU initialization preserves CPU fallback\n"; return 0; }
     require(argc==2);
     if (!runtime.load(std::filesystem::absolute(argv[1]))) return 1;
-    if (!runtime.createDecoder(1920,1080)) { std::cerr<<"SKIP: Vulkan unavailable: "<<runtime.error()<<'\n'; return 77; }
+    if (!runtime.createDecoder(1920,1080,true)) { std::cerr<<"SKIP: Vulkan unavailable: "<<runtime.error()<<'\n'; return 77; }
     int driver=-1;
     for (int i=0;i<SDL_GetNumRenderDrivers();++i) { SDL_RendererInfo info{}; SDL_GetRenderDriverInfo(i,&info); if (std::string(info.name)=="direct3d11") driver=i; }
     if (driver<0) return 77;
@@ -40,7 +40,7 @@ int main(int argc,char** argv) {
     require(!frame.records.empty());
     const auto rangeByte=frame.records[0].offset+7;
     for (auto range:{PyroWave::YuvRange::Full,PyroWave::YuvRange::Limited}) {
-        require(runtime.createDecoder(1920,1080));
+        require(runtime.createDecoder(1920,1080,true));
         PyroWave::GpuPresentation gpu(runtime);
         if (!gpu.initialize(renderer,1920,1080)) {
             std::cerr<<"SKIP: shared GPU path unsupported: "<<gpu.error()<<'\n'; runtime.resetDecoder(); return 77;

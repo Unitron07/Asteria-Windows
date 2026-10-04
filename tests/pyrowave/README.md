@@ -12,8 +12,9 @@ with 1,501 codec packets (larger than both old offline limits). Existing parser,
 legacy, loader/export/API, Granite and P0.5 presentation suites are retained.
 
 Runtime policy tests inject a mock C API/Vulkan-property module on both targets,
-cover fragment/compute recommendations independently of vendor IDs, nonfatal GPU
-initialization failure, CPU I420 full/limited output, recreation and native
+cover preferred fragment/compute GPU modes independently of vendor IDs, nonfatal
+GPU initialization failure followed by recreated default compute CPU fallback,
+CPU I420 full/limited output, recreation and native
 callback userdata/reset/empty/unavailable plumbing for CPU and GPU output.
 These are plumbing tests, not codec/GPU correctness or performance proof. Live
 frame tests verify retained assembly/metadata capacity and exact output across

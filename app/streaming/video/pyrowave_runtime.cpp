@@ -91,7 +91,7 @@ void Runtime::close() {
     m_Vulkan = nullptr;
     m_DeviceDescription.clear();
 }
-bool Runtime::createDecoder(int width, int height) {
+bool Runtime::createDecoder(int width, int height, bool preferGpuPath) {
     resetDecoder();
     m_Error.clear();
     if (!m_Module) return fail("runtime is not loaded");
@@ -120,7 +120,7 @@ bool Runtime::createDecoder(int width, int height) {
     pyrowave_decoder_create_info info{};
     info.device=m_Device; info.width=width; info.height=height;
     info.chroma=PYROWAVE_CHROMA_SUBSAMPLING_420;
-    m_FragmentPath=m_Api.prefersFragment(m_Device);
+    m_FragmentPath=preferGpuPath && m_Api.prefersFragment(m_Device);
     info.fragment_path=m_FragmentPath;
     if (!check(m_Api.createDecoder(&info,&m_Decoder),"decoder creation")) { resetDecoder(); return false; }
     if (!m_Decoder) return fail("decoder creation returned a null decoder");

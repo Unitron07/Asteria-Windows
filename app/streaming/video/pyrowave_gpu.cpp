@@ -100,7 +100,7 @@ bool GpuPresentation::initialize(SDL_Renderer* renderer,int width,int height) {
     props(physical,&properties);
     if (!ids.deviceLUIDValid || std::memcmp(ids.deviceLUID,&desc.AdapterLuid,VK_LUID_SIZE))
         return p.fail("Vulkan decoder and SDL D3D11 renderer adapters differ");
-    // Preflight already selected the device-recommended path for either output.
+    // Preflight selected the device-recommended path for the GPU output probe.
     // No recreation is needed just to probe presentation capabilities.
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU decoder path: %s",r.decoderPath());
     // D3D owns the allocations, as recommended by the pinned Windows interop test.
