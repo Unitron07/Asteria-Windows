@@ -157,7 +157,12 @@ mkdir %INSTALLER_FOLDER%
 mkdir %SYMBOLS_FOLDER%
 
 echo Preparing pinned PyroWave runtime for the normal Windows build
-powershell -NoProfile -ExecutionPolicy Bypass -File "%SOURCE_ROOT%\scripts\prepare-pyrowave.ps1" -Architecture %ARCH% -EnvironmentFile "%BUILD_FOLDER%\pyrowave-env.cmd"
+rem Prefer the CI/host PowerShell 7 runtime to avoid inheriting its module paths
+rem into Windows PowerShell. Clean command prompts can still use Windows PowerShell.
+set PYROWAVE_POWERSHELL=powershell
+where /q pwsh.exe
+if !ERRORLEVEL! EQU 0 set PYROWAVE_POWERSHELL=pwsh
+%PYROWAVE_POWERSHELL% -NoProfile -ExecutionPolicy Bypass -File "%SOURCE_ROOT%\scripts\prepare-pyrowave.ps1" -Architecture %ARCH% -EnvironmentFile "%BUILD_FOLDER%\pyrowave-env.cmd"
 if !ERRORLEVEL! NEQ 0 goto Error
 call "%BUILD_FOLDER%\pyrowave-env.cmd"
 if !ERRORLEVEL! NEQ 0 goto Error
@@ -289,7 +294,7 @@ if "%SIGN%"=="1" (
 
 rem Keep the pinned runtime bytes and hash metadata intact. Stage after the
 rem optional signing loop, before WiX harvesting, so MSI and ZIP both include it.
-powershell -NoProfile -ExecutionPolicy Bypass -File "%SOURCE_ROOT%\scripts\stage-pyrowave-runtime.ps1" -Architecture %ARCH% -DependencyRoot "%ASTERIA_PYROWAVE_DEPS%" -DeployDirectory "%DEPLOY_FOLDER%" -ClientPath "%BUILD_FOLDER%\app\%BUILD_CONFIG%\Asteria.exe"
+%PYROWAVE_POWERSHELL% -NoProfile -ExecutionPolicy Bypass -File "%SOURCE_ROOT%\scripts\stage-pyrowave-runtime.ps1" -Architecture %ARCH% -DependencyRoot "%ASTERIA_PYROWAVE_DEPS%" -DeployDirectory "%DEPLOY_FOLDER%" -ClientPath "%BUILD_FOLDER%\app\%BUILD_CONFIG%\Asteria.exe"
 if !ERRORLEVEL! NEQ 0 goto Error
 
 if "%ML_SYMBOL_STORE%" NEQ "" (
