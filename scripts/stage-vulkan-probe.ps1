@@ -28,4 +28,3 @@ Get-ChildItem -LiteralPath $stage -File -Recurse | ForEach-Object {
     @{file=$_.FullName.Substring($stage.Length+1);sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $stage 'sha256.json')
 Compress-Archive -Path (Join-Path $stage '*') -DestinationPath (Join-Path $source "build/vulkan-owner-$Architecture.zip") -Force
-
