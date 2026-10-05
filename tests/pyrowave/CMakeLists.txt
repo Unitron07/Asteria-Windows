@@ -46,7 +46,7 @@ if(PYROWAVE_EXPERIMENTAL)
     add_executable(pyrowave-offline-proof offline_proof.cpp)
     target_link_libraries(pyrowave-offline-proof PRIVATE pyrowave_runtime)
     if(PYROWAVE_SDL_PRESENTATION)
-        # Consume the same verified v15 target archive as the normal Windows build.
+        # Consume the same verified v19 target archive as the normal Windows build.
         # SDL_ROOT is libs/windows; SDL_ARCH is x64 or arm64. No find/fallback to system SDL.
         if(NOT SDL_ARCH MATCHES "^(x64|arm64)$")
             message(FATAL_ERROR "Set SDL_ARCH to the selected target architecture")

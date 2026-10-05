@@ -1,11 +1,53 @@
-> Owner update: live P1a video succeeded on Surface Pro 11 / Snapdragon X Plus /
-> Adreno X1-85 at 2560x1440, target 120 FPS, with audio/input working. The CPU
-> bring-up path measured ~93.3 FPS, ~12.45 ms decode pipeline, ~1.24 ms render.
-> GPU-resident shared-plane presentation and standard-layout stats are now added.
-> Final performance qualification remains **PENDING owner x64/ARM64 retest**.
-> See [GPU presentation and timing definitions](PYROWAVE_GPU_PRESENTATION.md).
-
 # Validation and release evidence
+
+## Current live ARM64 owner result
+
+Owner-reported test: Surface Pro 11, Snapdragon X Plus, Qualcomm Adreno X1-85;
+Vibepollo host, 2560x1440, up to 120 Hz target, PyroWave SDR 8-bit 4:2:0.
+Negotiation, decoding, rendering, audio and input worked; the owner reported good
+visual quality and responsiveness. Workload FPS varied and was not always 120 FPS.
+
+Latest tested compute/CPU-I420 fallback timings were approximately:
+
+| Stage | Owner-observed time |
+| --- | --- |
+| Decode/readback | 3.20 ms |
+| Frame queue | 0.26 ms |
+| Render | 1.78 ms |
+| Frame assembly | 0.06 ms |
+| Parser/packet preparation | 1.29 ms |
+
+These are observations from this named workload/device, not universal benchmarks,
+an end-to-end latency measurement or a production-stability claim. The driver
+rejects shared-fence import with `PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE`;
+compute decode plus CPU I420 presentation works. Broader x64/hardware and shared
+GPU-path qualification remain separate. Earlier failures/timings below remain
+historical, superseded for the current named ARM64 fallback by this owner result.
+
+## Current state: preparing v0.2.0
+
+Live PyroWave SDR 8-bit 4:2:0 has been validated against Vibepollo on native
+Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 ARM64. It remains
+explicitly selected and **Experimental**; Automatic chooses standard codecs.
+Normal Windows x64 and ARM64 builds include the pinned API 0.6.0 runtime,
+bitstream `186f0393`, restricted loading and provenance metadata.
+Codec-aware bitrate QoL is integrated: standard codecs have a 500 Mbps UI ceiling,
+PyroWave a 3000 Mbps ceiling, and PyroWave automatic bitrate is approximately
+`width * height * fps * 1.6` bits/s. Manual overrides survive resolution/FPS changes.
+The codec selector remains in Basic Settings.
+
+The tested Qualcomm driver rejects the Vulkan/D3D11 shared-fence import with
+`PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE`. Fragment decode is preferred for
+the GPU interop probe; Asteria safely recreates the decoder for compute-path
+decode with CPU I420 readback/presentation. This working fallback does not imply
+that Adreno cannot decode PyroWave. See [current owner evidence](VALIDATION.md#current-live-arm64-owner-result).
+Broader hardware, GPU interop and performance qualification remain open.
+
+Moonlight PC v6.2.0 is the upstream baseline; weekly upstream/master proposals
+preserve history and require human review. See [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md).
+The public release is v0.1.0; v0.2.0 has not been tagged or released.
+
+## Historical P1a bring-up and validation
 
 ## M1B P1a live integration validation
 
@@ -173,14 +215,14 @@ Windows 10 x64 still needs its own declared minimum OS/runtime and hardware qual
 
 ## First public preview record (2026-09-25)
 
-[v0.1.0-preview.1](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0-preview.1) is an unsigned, portable Windows x64 and native ARM64 prerelease. Both packages came from main commit [`34dfd937528586babded200fafaee535e21d4a40`](https://github.com/Unitron07/Asteria-Windows/commit/34dfd937528586babded200fafaee535e21d4a40) in successful [CI run 36191650824](https://github.com/Unitron07/Asteria-Windows/actions/runs/36191650824). The tag resolves to that commit. The release job checked each original ZIP against its passing, hash-bound `package-architecture.json` and confirmed 69 x64 and 68 ARM64 EXE/DLL entries, including deployed runtimes and plugins. It also checked `portable.dat`, root license, and provenance notices before attaching the unchanged ZIPs.
+[v0.1.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0) is an unsigned, portable Windows x64 and native ARM64 prerelease. Both packages came from main commit [`34dfd937528586babded200fafaee535e21d4a40`](https://github.com/Unitron07/Asteria-Windows/commit/34dfd937528586babded200fafaee535e21d4a40) in successful [CI run 36191650824](https://github.com/Unitron07/Asteria-Windows/actions/runs/36191650824). The tag resolves to that commit. The release job checked each original ZIP against its passing, hash-bound `package-architecture.json` and confirmed 69 x64 and 68 ARM64 EXE/DLL entries, including deployed runtimes and plugins. It also checked `portable.dat`, root license, and provenance notices before attaching the unchanged ZIPs.
 
 | Portable release asset | SHA-256 |
 | --- | --- |
-| `Asteria-v0.1.0-preview.1-windows-x64-portable.zip` | `1b55c39006ec333716414c167031a71585921f1112cca634ac02e7e897d54a60` |
-| `Asteria-v0.1.0-preview.1-windows-arm64-portable.zip` | `0c7de9bf6a34ca1aef7fe7ef66b2fa15a3f01ef1d26eec615fcb7b7cf8efb05a` |
+| `Asteria-v0.1.0-windows-x64-portable.zip` | `1b55c39006ec333716414c167031a71585921f1112cca634ac02e7e897d54a60` |
+| `Asteria-v0.1.0-windows-arm64-portable.zip` | `0c7de9bf6a34ca1aef7fe7ef66b2fa15a3f01ef1d26eec615fcb7b7cf8efb05a` |
 
-The release includes `SHA256SUMS.txt`, symbols, recursive corresponding-source snapshots, and architecture/build evidence for each target. The owner confirmed the completed x64 and ARM64 CI builds work. The previously recorded Surface Pro 11th Edition native-process and repeated Apollo AV1 comparison remains evidence for that setup; exact artifact hashes and several host/client details for that earlier comparison were not recorded. No clean-machine or full functional-matrix result was supplied, so this preview does not claim broad qualification. The executable's inherited 6.1.0 metadata and bundled development-baseline provenance notice refer to the Moonlight-based build; `v0.1.0-preview.1` is Asteria's public preview version. No installer was shipped.
+The release includes `SHA256SUMS.txt`, symbols, recursive corresponding-source snapshots, and architecture/build evidence for each target. The owner confirmed the completed x64 and ARM64 CI builds work. The previously recorded Surface Pro 11th Edition native-process and repeated Apollo AV1 comparison remains evidence for that setup; exact artifact hashes and several host/client details for that earlier comparison were not recorded. No clean-machine or full functional-matrix result was supplied, so this preview does not claim broad qualification. The executable's inherited 6.1.0 metadata and bundled development-baseline provenance notice refer to the Moonlight-based build; `v0.1.0` is Asteria's public preview version. No installer was shipped.
 
 ## M1B P0-R Vibepollo validation
 
@@ -366,7 +408,7 @@ by this documentation update.
 groundwork from PR #14 and the P0 implementation merged in
 [PR #16](https://github.com/Unitron07/Asteria-Windows/pull/16) are complete. Final
 P0 head before merge: `a02902fb58ac66ae4820373dd3978d3087de7d24`. This post-release
-experiment is separate from v0.1.0-preview.1 at
+experiment is separate from v0.1.0 at
 `34dfd937528586babded200fafaee535e21d4a40` and changes no normal release behavior.
 
 | Final CI evidence at the P0 head | Result |

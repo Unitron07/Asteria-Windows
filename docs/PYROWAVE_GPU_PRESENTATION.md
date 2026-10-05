@@ -1,5 +1,31 @@
 # PyroWave P1a GPU presentation and stats
 
+## Current live ARM64 owner result
+
+Owner-reported test: Surface Pro 11, Snapdragon X Plus, Qualcomm Adreno X1-85;
+Vibepollo host, 2560x1440, up to 120 Hz target, PyroWave SDR 8-bit 4:2:0.
+Negotiation, decoding, rendering, audio and input worked; the owner reported good
+visual quality and responsiveness. Workload FPS varied and was not always 120 FPS.
+
+Latest tested compute/CPU-I420 fallback timings were approximately:
+
+| Stage | Owner-observed time |
+| --- | --- |
+| Decode/readback | 3.20 ms |
+| Frame queue | 0.26 ms |
+| Render | 1.78 ms |
+| Frame assembly | 0.06 ms |
+| Parser/packet preparation | 1.29 ms |
+
+These are observations from this named workload/device, not universal benchmarks,
+an end-to-end latency measurement or a production-stability claim. The driver
+rejects shared-fence import with `PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE`;
+compute decode plus CPU I420 presentation works. Broader x64/hardware and shared
+GPU-path qualification remain separate. Earlier failures/timings below remain
+historical, superseded for the current named ARM64 fallback by this owner result.
+
+## Historical bring-up measurements
+
 The owner reports the first successful live P1a video on Surface Pro 11,
 Snapdragon X Plus / Adreno X1-85: 2560x1440, target 120 FPS / 120 Hz. Video
 rendered, audio/input worked, and visual quality and responsiveness felt good.
@@ -14,7 +40,7 @@ and ~1.50 ms render. Native stages were ~1.98 ms/frame `iDWT fragment` and
 ~0.83 ms/frame `Dequant`. Conditions were not identical: fragment CPU output did
 not improve measured performance and appears worse on this tested device, not
 universally. This correction restores compute CPU fallback; its performance
-qualification remains **PENDING owner retest**.
+qualification was pending at that stage; the latest named ARM64 fallback result is recorded above.
 
 ## Chosen path and pinned API evidence
 
@@ -30,7 +56,7 @@ as documented by the API. Release transfers ownership to QUEUE_FAMILY_EXTERNAL.
 The implementation follows the pin's Windows interop direction: D3D11 creates
 shared NT-handle textures and a shared D3D11 fence; PyroWave imports both. D3D11
 fences use the D3D12_FENCE alias and TIMELINE type. Successful import transfers
-ownership of the NT handle to PyroWave. SDL3 in the pinned v15 dependency wraps
+ownership of the NT handle to PyroWave. SDL3 in the pinned v19 dependency wraps
 separate D3D11 Y/U/V texture pointers, with the same explicit BT.709 full/limited
 colorspace values as the CPU path. No new shader, swapchain, Vulkan loader import,
 or codec runtime import is required. Existing aspect fitting, linear scaling,
@@ -57,7 +83,7 @@ not replay host launch or silently continue with suspect GPU resources.
 
 A dedicated native Vulkan PyroWave presenter (GPU Y/U/V images, conversion shader
 and Vulkan swapchain) is **deferred until after v0.2.0**. It is not implemented.
-Unsupported interop continues to use synchronized CPU I420 output.
+Target architecture: `PyroWave Vulkan decode -> GPU-resident Y/U/V -> Vulkan presentation shader -> Vulkan swapchain`. This avoids Vulkan -> CPU -> D3D11 round-trips and dependence on unsupported external-fence sharing. Unsupported interop currently uses synchronized CPU I420 output. Other Moonlight forks have explored GPU-resident PyroWave interop, but they are not dependencies; Asteria is independently maintained with Vibepollo as its primary protocol target.
 
 ## Lifetime and latency
 

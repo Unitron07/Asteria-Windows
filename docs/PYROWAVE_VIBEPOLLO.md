@@ -1,12 +1,27 @@
 # P0-R Vibepollo compatibility contract
 
-## M1B P1a implementation / live qualification pending
+## Current state: preparing v0.2.0
 
-The explicit **PyroWave (Experimental)** live path is implemented behind
-`CONFIG+=pyrowave_experimental`. Live owner qualification remains **PENDING**;
-build/test evidence is recorded in [VALIDATION.md](VALIDATION.md). The implementation
-is **COMPLETE / READY FOR HARDWARE INTEROPERABILITY TEST**: both optional client
-builds and baseline CI pass as recorded there. P0-R and P0.5 qualification history is unchanged.
+Live PyroWave SDR 8-bit 4:2:0 has been validated against Vibepollo on native
+Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 ARM64. It remains
+explicitly selected and **Experimental**; Automatic chooses standard codecs.
+Normal Windows x64 and ARM64 builds include the pinned API 0.6.0 runtime,
+bitstream `186f0393`, restricted loading and provenance metadata.
+Codec-aware bitrate QoL is integrated: standard codecs have a 500 Mbps UI ceiling,
+PyroWave a 3000 Mbps ceiling, and PyroWave automatic bitrate is approximately
+`width * height * fps * 1.6` bits/s. Manual overrides survive resolution/FPS changes.
+The codec selector remains in Basic Settings.
+
+The tested Qualcomm driver rejects the Vulkan/D3D11 shared-fence import with
+`PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE`. Fragment decode is preferred for
+the GPU interop probe; Asteria safely recreates the decoder for compute-path
+decode with CPU I420 readback/presentation. This working fallback does not imply
+that Adreno cannot decode PyroWave. See [current owner evidence](VALIDATION.md#current-live-arm64-owner-result).
+Broader hardware, GPU interop and performance qualification remain open.
+
+Moonlight PC v6.2.0 is the upstream baseline; weekly upstream/master proposals
+preserve history and require human review. See [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md).
+The public release is v0.1.0; v0.2.0 has not been tagged or released.
 
 The contract is Vibepollo at `8a8c4b03a280ab9f567beb380110abb80f5220b8`, codec
 `186f0393b77f7755953b5ecde994bb1cec2e4155`, bitstream ID `186f0393`, C API 0.6.0.
@@ -47,7 +62,7 @@ count is independent of RTP count. Output is at most 12,441,600 CPU bytes/frame;
 one replaceable pending image bounds the render queue. Offline limits remain
 850,000 bytes / 1,024 packets. Only 1080p has prior offline hardware qualification.
 
-The first owner P1a test on Surface Pro 11 reached live video transport:
+Historical first owner P1a test (superseded by successful live validation above):
 negotiation, pinned runtime/API, Vulkan decoder on Adreno X1-85, SDL I420
 initialization, audio and live video packet receipt succeeded. Every frame was
 rejected because Asteria incorrectly required sequence bit 30 to indicate limited
@@ -61,8 +76,7 @@ are rejected before codec packet submission with a reconnect diagnostic. Malform
 frames cannot establish range. SDL3 texture properties explicitly select
 `SDL_COLORSPACE_BT709_FULL` or `SDL_COLORSPACE_BT709_LIMITED` on the pinned
 SDL2-compat renderer, without changing global conversion mode or FFmpeg rendering.
-The preflight black image does not establish live range. P1a owner qualification
-remains **PENDING** until a new hardware retest confirms decoded/rendered live video.
+The preflight black image does not establish live range. Decoded/rendered live video has since been owner-validated on ARM64; broad range/hardware qualification remains separate.
 
 Presentation retains aspect fit and linear scaling. Source chroma
 is CENTER; the SDL3 BT.709 colorspaces use LEFT. P0.5 found no visible issue on the
@@ -72,13 +86,12 @@ overlay receives VIDEO_STATS-derived rates, bytes, drops, timing and RTT.
 
 Optional CI builds separate x64 and native ARM64 experimental portable packages,
 with runtime provenance, matching PE types, import/CRT closure, source notices,
-an owner guide and log collection. Ordinary packages contain no PyroWave DLL,
-no startup Vulkan/codec imports and no PyroWave UI option. See
+an owner guide and log collection. Current ordinary packages also include the pinned PyroWave runtime/provenance and Experimental UI option. Neither ordinary nor optional builds have startup Vulkan/codec imports. See
 [the live owner guide](../tests/pyrowave/LIVE-OWNER-TEST.md) for launch/test steps.
 
 Deferred P1b/later: live records, record-start/lost-buffer metadata, critical
 packet handling, adaptive FEC, partial recovery, sideband readiness, bandwidth
-probing, bitrate usability tuning, 4:4:4, HDR and advanced pacing/latency work.
+probing, 4:4:4, HDR and advanced pacing/latency work. Bitrate QoL is already integrated.
 
 The earlier milestone descriptions below retain the P0/P0-R/P0.5 history;
 future P1a statements there are superseded by the implementation above.
@@ -231,7 +244,7 @@ No probe is implemented here, and bulk throughput would not prove UDP loss toler
    No visible chroma anomaly was observed; exact authored CENTER versus SDL3 LEFT
    sampling is formally unqualified. True physical GPU loss remains manual/unproven;
    full pacing, production latency, 4:4:4, HDR and live interoperability are unqualified.
-3. **P1a NEXT / FUTURE (not implemented):** explicit SDR 4:2:0 choice, complete runtime/presentation preflight,
+3. **Historical P1a plan (now implemented for live SDR 4:2:0):** explicit SDR 4:2:0 choice, complete runtime/presentation preflight,
    bitstream-ID check, reviewed SCM/RTSP/SDP negotiation, compatibility framing,
    safe standard-codec fallback/reconnect, H.264/HEVC/AV1 lifecycle/audio/input regressions.
 4. **P1b LATER:** live record framing, record-start and critical-count metadata,

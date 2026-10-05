@@ -1,4 +1,43 @@
-# Next step: qualify M1B P1a GPU presentation performance
+# Next step: verify v0.2.0, then native Vulkan presentation
+
+## Current state: preparing v0.2.0
+
+Live PyroWave SDR 8-bit 4:2:0 has been validated against Vibepollo on native
+Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 ARM64. It remains
+explicitly selected and **Experimental**; Automatic chooses standard codecs.
+Normal Windows x64 and ARM64 builds include the pinned API 0.6.0 runtime,
+bitstream `186f0393`, restricted loading and provenance metadata.
+Codec-aware bitrate QoL is integrated: standard codecs have a 500 Mbps UI ceiling,
+PyroWave a 3000 Mbps ceiling, and PyroWave automatic bitrate is approximately
+`width * height * fps * 1.6` bits/s. Manual overrides survive resolution/FPS changes.
+The codec selector remains in Basic Settings.
+
+The tested Qualcomm driver rejects the Vulkan/D3D11 shared-fence import with
+`PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE`. Fragment decode is preferred for
+the GPU interop probe; Asteria safely recreates the decoder for compute-path
+decode with CPU I420 readback/presentation. This working fallback does not imply
+that Adreno cannot decode PyroWave. See [current owner evidence](VALIDATION.md#current-live-arm64-owner-result).
+Broader hardware, GPU interop and performance qualification remain open.
+
+Moonlight PC v6.2.0 is the upstream baseline; weekly upstream/master proposals
+preserve history and require human review. See [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md).
+The public release is v0.1.0; v0.2.0 has not been tagged or released.
+
+
+Before v0.2.0 release, qualify this v6.2.0 merge with same-commit Windows x64 and
+native ARM64 Release builds/packages, settings/input regressions, PyroWave
+runtime/parser/offline checks and standard-codec smoke tests. Do not create the
+release until the reviewed PR is merged and verified.
+
+The next major PyroWave performance milestone is **post-v0.2.0**:
+`PyroWave Vulkan decode -> GPU-resident Y/U/V -> Vulkan presentation shader -> Vulkan swapchain`.
+It aims to avoid Vulkan -> CPU -> D3D11 readback and dependence on unsupported
+external-fence sharing on the tested Qualcomm driver. It is not implemented.
+P1b live records/FEC/partial recovery and bandwidth probing remain later work.
+M6 VR and M7 isolated sessions need a separate Vibepollo fork/host extension;
+see [the roadmap](PORTING_PLAN.md#host-dependent-roadmap-boundaries).
+
+## Historical P0/P0.5 evidence
 
 **P0-R is COMPLETE** on Windows x64 RTX 4070 Ti and native Windows ARM64
 Surface Pro 11th Edition / Snapdragon X Plus / Adreno X1-85. The exact codec is
@@ -30,47 +69,3 @@ or leak freedom. 4:4:4 and HDR remain unqualified. This offline milestone does n
 validate live RTP/UDP, SCM/RTSP/SDP, Vibepollo host interoperability, adaptive FEC,
 partial-frame recovery or bandwidth probing. Normal application/release behavior
 is unchanged.
-
-## P1a live ARM64 video succeeded: GPU performance qualification PENDING
-
-The experimental explicit live SDR 8-bit 4:2:0 path is implemented. Auto stays
-on standard codecs. Restricted runtime/API/build-metadata preflight and real SDL
-IYUV resource/upload checks occur before host launch; paired HTTPS SCM and strict
-DESCRIBE/bitstream-ID checks gate negotiation. Compatibility complete frames feed
-the existing runtime and live main-thread SDL decoder. See
-[the current contract](PYROWAVE_VIBEPOLLO.md) and [owner guide](../tests/pyrowave/LIVE-OWNER-TEST.md).
-
-The owner confirmed live PyroWave video, audio/input and good visual quality on
-Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 ARM64 at 2560x1440, target
-120 FPS. The CPU-output bring-up baseline was ~93.3 FPS, ~12.45 ms decode
-pipeline time, and ~1.24 ms render. Gated shared GPU planes, Qualcomm fragment
-preference, bounded frame slots and standard-layout stats are now implemented.
-See [presentation/timing definitions](PYROWAVE_GPU_PRESENTATION.md).
-
-Owner retest on RTX 4070 Ti x64 and Surface Pro 11 ARM64 must establish the
-actual improvement and verify resize/fullscreen, disconnect/reconnect and
-standard codecs afterward. Record each overlay metric and the selected GPU or
-CPU timing mode. Final P1a performance qualification remains **PENDING**; CI and
-an offline GPU proof do not establish live 120 FPS. Retry failures manually using
-a standard codec; no host launch/resume is automatically repeated.
-
-## P1b LATER: transport hardening
-
-Add live record framing, record-start/lost-buffer metadata, critical packet counts,
-parity recovery and adaptive FEC; then bounded partial recovery and sideband
-readiness with intact coarse data and more than 90% records. Preserve record
-straddling and alignment independence for complete frames. Bandwidth calibration
-is later usability work: host link metadata, 32 MiB probe, warmup, slowest of three
-and 20% reserve. No probe or HDR decoder is added now.
-
-## Baseline and preview qualification
-
-M0A native Windows ARM64 remains complete based on the owner's baseline-device
-validation. M1 identity is implemented. For M1A retain Moonlight's existing
-statistics and frame pacing; add instrumentation only for a concrete missing
-metric. The prior repeated Apollo AV1 2560x1440/~60 FPS runs are initial stream
-parity evidence, not a controlled benchmark. See [BASELINE.md](BASELINE.md).
-
-First-preview release gates remain same-commit x64/ARM64 smoke tests, host
-lifecycle/input/audio, clean-machine launch, package architecture/hashes and
-recorded Windows/driver/decoder/host versions. PyroWave is not release-blocking.

@@ -1,9 +1,32 @@
 # Source audit and feature matrix
 
-The historical audit below is separate from the new experimental P1a live path,
-whose implementation is ready for owner Vibepollo testing with live qualification
-**PENDING**. See [the current contract](PYROWAVE_VIBEPOLLO.md) and
-[build/test evidence](VALIDATION.md#m1b-p1a-live-integration-validation).
+## Current state: preparing v0.2.0
+
+Live PyroWave SDR 8-bit 4:2:0 has been validated against Vibepollo on native
+Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 ARM64. It remains
+explicitly selected and **Experimental**; Automatic chooses standard codecs.
+Normal Windows x64 and ARM64 builds include the pinned API 0.6.0 runtime,
+bitstream `186f0393`, restricted loading and provenance metadata.
+Codec-aware bitrate QoL is integrated: standard codecs have a 500 Mbps UI ceiling,
+PyroWave a 3000 Mbps ceiling, and PyroWave automatic bitrate is approximately
+`width * height * fps * 1.6` bits/s. Manual overrides survive resolution/FPS changes.
+The codec selector remains in Basic Settings.
+
+The tested Qualcomm driver rejects the Vulkan/D3D11 shared-fence import with
+`PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE`. Fragment decode is preferred for
+the GPU interop probe; Asteria safely recreates the decoder for compute-path
+decode with CPU I420 readback/presentation. This working fallback does not imply
+that Adreno cannot decode PyroWave. See [current owner evidence](VALIDATION.md#current-live-arm64-owner-result).
+Broader hardware, GPU interop and performance qualification remain open.
+
+Moonlight PC v6.2.0 is the upstream baseline; weekly upstream/master proposals
+preserve history and require human review. See [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md).
+The public release is v0.1.0; v0.2.0 has not been tagged or released.
+
+## Historical source audit
+
+Earlier future/PENDING PyroWave statements below describe the inspected snapshots;
+the current state above supersedes them.
 
 Source review: September 12, 2026. Findings below describe the inspected snapshots. Subsequent x64 builds passed and the owner confirmed the client works; those results and their limits are recorded in [BASELINE.md](BASELINE.md). Current Asteria identity and x64/ARM64 CI packaging are implemented; M0A real-device native ARM64 validation and M1B P0-R Vibepollo-compatible x64/ARM64 hardware qualification are complete; [P0.5 offline SDL visual qualification](VALIDATION.md#m1b-p05-offline-sdl-qualification) is complete on both named targets; [P1a](NEXT_STEP.md) is next and remains future work, with live PyroWave negotiation still unimplemented; initial M1A comparisons use Moonlight's existing statistics. This historical source audit is not a list of shipped Apollo extensions; see the [README](../README.md) for current preview scope.
 
@@ -99,3 +122,36 @@ Upstream `setup-deps.ps1` downloads the `v15` Windows dependency archives. The M
 - S12: [PC Windows dependency setup](https://github.com/moonlight-stream/moonlight-qt/blob/e3fd29e4d7dc5723d8d0da7d19e2698daec74456/setup-deps.ps1)
 - S14: [PC session and performance overlay](https://github.com/moonlight-stream/moonlight-qt/blob/e3fd29e4d7dc5723d8d0da7d19e2698daec74456/app/streaming/session.cpp)
 - S13: [PC Windows build/package script](https://github.com/moonlight-stream/moonlight-qt/blob/e3fd29e4d7dc5723d8d0da7d19e2698daec74456/scripts/build-arch.bat)
+
+## Host-dependent roadmap boundaries
+
+Asteria-Windows is the client repository. The following features require paired
+work in the client and a separately maintained Asteria-oriented Vibepollo fork
+or host extension; none is implemented here today.
+
+### M6 — Asteria VR responsibilities
+
+Remote PCVR requires host SteamVR/OpenXR and virtual HMD/runtime integration,
+pose/controller input ingestion, stereo frame capture, timing/metadata and session
+lifecycle. Asteria supplies the local headset/runtime backend, tracking/controller
+capture and upstream pose/input transport, stereo decoding, local headset
+presentation and timing/reprojection integration. PSVR2 with its PC adapter is
+one possible local configuration; the design remains headset-agnostic.
+VR is independent of PyroWave, which may be evaluated later but is not required.
+
+### M7 — Isolated Sessions / MultiSeat
+
+Future concept: one physical host remains locally usable while another user
+streams an isolated desktop/session. Candidate backends include separate Windows
+sessions/multiseat or a VM, virtual displays/audio and isolated keyboard, mouse
+and gamepad routing. This is primarily host-side implementation.
+
+| Asteria client | Vibepollo fork / host extension |
+| --- | --- |
+| UI, control requests and session status | Session/VM creation and cleanup/resource management |
+| Stream reception and isolated input transport | Display/audio lifecycle, isolated input routing |
+| Host-session selection | Application/session launch and stream binding |
+
+No implementation or equal-performance promise exists. Native-class performance
+may be a future target when hardware headroom allows; CPU/GPU contention determines
+real results.
