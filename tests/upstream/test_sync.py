@@ -59,14 +59,18 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(sync.git('status', '--porcelain').stdout, '')
 
     def test_existing_pr_is_updated(self):
+        Path('body.md').write_text('Review this range.\n')
         with patch.object(sync, 'find_pr', return_value=[{'number': 12}]), patch.object(sync, 'run') as run:
             sync.publish_pr(Path('body.md'))
-            self.assertEqual(run.call_args.args[:4], ('gh', 'pr', 'edit', '12'))
+            self.assertEqual(run.call_args.args[:5], ('gh', 'api', '--method', 'PATCH', 'repos/{owner}/{repo}/pulls/12'))
+            self.assertEqual(json.loads(Path('body.json').read_text()), {'body': 'Review this range.\n'})
 
     def test_missing_pr_is_created_once(self):
+        Path('body.md').write_text('Review this range.\n')
         with patch.object(sync, 'find_pr', return_value=[]), patch.object(sync, 'run') as run:
             sync.publish_pr(Path('body.md'))
-            self.assertEqual(run.call_args.args[:3], ('gh', 'pr', 'create'))
+            self.assertEqual(run.call_args.args[:5], ('gh', 'api', '--method', 'POST', 'repos/{owner}/{repo}/pulls'))
+            self.assertEqual(json.loads(Path('body.json').read_text())['head'], sync.BRANCH)
             self.assertEqual(run.call_count, 1)
 
     def test_no_upstream_change_exits_without_publication(self):

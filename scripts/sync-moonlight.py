@@ -33,17 +33,26 @@ def merge(target):
 
 
 def find_pr():
-    return json.loads(run('gh', 'pr', 'list', '--state', 'open', '--base', 'main',
-                          '--head', BRANCH, '--json', 'number').stdout)
+    owner = os.environ['GH_REPO'].split('/')[0]
+    return json.loads(run('gh', 'api', 'repos/{owner}/{repo}/pulls', '--method', 'GET',
+                          '-f', 'state=open', '-f', 'base=main', '-f', f'head={owner}:{BRANCH}').stdout)
+
+
+def github_write(method, endpoint, payload, body_path):
+    # REST avoids CLI project/org GraphQL queries requiring unrelated read:org scopes.
+    request = body_path.with_suffix('.json')
+    request.write_text(json.dumps(payload), encoding='utf-8')
+    run('gh', 'api', '--method', method, endpoint, '--input', str(request))
 
 
 def publish_pr(body_path):
     existing = find_pr()
+    payload = {'body': body_path.read_text(encoding='utf-8')}
     if existing:
-        run('gh', 'pr', 'edit', str(existing[0]['number']), '--body-file', str(body_path))
+        github_write('PATCH', f"repos/{{owner}}/{{repo}}/pulls/{existing[0]['number']}", payload, body_path)
     else:
-        run('gh', 'pr', 'create', '--base', 'main', '--head', BRANCH,
-            '--title', 'upstream: sync Moonlight PC', '--body-file', str(body_path))
+        payload.update(base='main', head=BRANCH, title='upstream: sync Moonlight PC')
+        github_write('POST', 'repos/{owner}/{repo}/pulls', payload, body_path)
 
 
 def notice(body_path):
@@ -53,9 +62,11 @@ def notice(body_path):
     matches = [i for page in issues for i in page
                if 'pull_request' not in i and i['title'] == ISSUE_TITLE]
     if matches:
-        run('gh', 'issue', 'edit', str(matches[0]['number']), '--body-file', str(body_path))
+        github_write('PATCH', f"repos/{{owner}}/{{repo}}/issues/{matches[0]['number']}",
+                     {'body': body_path.read_text(encoding='utf-8')}, body_path)
     else:
-        run('gh', 'issue', 'create', '--title', ISSUE_TITLE, '--body-file', str(body_path))
+        github_write('POST', 'repos/{owner}/{repo}/issues',
+                     {'title': ISSUE_TITLE, 'body': body_path.read_text(encoding='utf-8')}, body_path)
 
 
 def validate(base):
