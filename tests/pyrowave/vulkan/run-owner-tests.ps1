@@ -37,4 +37,3 @@ $okay = @($observations | Where-Object { !$_.visualConfirmed }).Count -eq 0
     os=[Environment]::OSVersion.VersionString;validation=$validation;observations=$observations;stage3Authorized=$false} |
     ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $EvidenceRoot 'owner-result.json')
 Write-Host "Evidence is in $EvidenceRoot. Return it for review. This does not authorize Stage 3."
-
