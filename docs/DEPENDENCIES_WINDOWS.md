@@ -1,17 +1,17 @@
 # Windows dependency inputs
 
-Both v15 archives were downloaded and SHA-256 verified during the M0A harness work. Pins live in `scripts/baseline-deps.json`. Setup inventories every extracted file's hash and available Windows version resources in `build/evidence/<architecture>/dependency-files.json`. A successful setup writes a completion marker; the build checks that marker and rehashes the inventory before invoking Qt/MSVC.
+Both current v19 archives were downloaded and their SHA-256 hashes verified against GitHub release metadata for the v6.2.0 sync. The original M0A v15 evidence remains historical in BASELINE.md. Pins live in `scripts/baseline-deps.json`. Setup inventories every extracted file's hash and available Windows version resources in `build/evidence/<architecture>/dependency-files.json`. A successful setup writes a completion marker; the build checks that marker and rehashes the inventory before invoking Qt/MSVC.
 
 | Target | Archive | SHA-256 |
 | --- | --- | --- |
-| x64 | Windows-x64.zip | `60003d5cf5147100352dede9836c1ba3c537dfff938fe0e3ef947bd4f51ca622` |
-| ARM64 | Windows-ARM64.zip | `db61462026107a3a60b1f00b7469e6ddc4f56ccfc424724e7884f0001fe7c55d` |
+| x64 | Windows-x64.zip | `65ff1bd439222e1e2750054f960dcd6fac46190027da16db7403e345c295f10f` |
+| ARM64 | Windows-ARM64.zip | `ac606be421c8bf14e94128ea2116d3257a425c3d6fa102cd92bbd017f56647e2` |
 
-[Release assets](https://github.com/moonlight-stream/moonlight-qt-deps/releases/tag/v15) are pinned by content hash. [Build recipes and source submodule revisions](https://github.com/moonlight-stream/moonlight-qt-deps/tree/2ab26b8cd5c42899ffd97c573ff2c678738f41b1) are fixed at `2ab26b8cd5c42899ffd97c573ff2c678738f41b1`. Follow each submodule at that revision for its source and license texts, including transitive dependencies selected by the build recipes. The archive is consumed as published; this harness does not rebuild those libraries.
+[Release assets](https://github.com/moonlight-stream/moonlight-qt-deps/releases/tag/v19) are pinned by content hash. [Build recipes and source submodule revisions](https://github.com/moonlight-stream/moonlight-qt-deps/tree/79621271459ebb945343f58d7acd6ad24d402c38) are fixed at `79621271459ebb945343f58d7acd6ad24d402c38`. Follow each submodule at that revision for its source and license texts, including transitive dependencies selected by the build recipes. The archive is consumed as published; this harness does not rebuild those libraries.
 
-## ARM64 runtime inventory
+## Historical v15 ARM64 runtime inventory
 
-Versions below come from the downloaded DLL resources. Missing version resources are identified by the source pin instead of guessing a release version.
+Versions below describe the earlier v15 download, not the current v19 package. Current setup records actual v19 per-file versions/hashes; consult the build evidence instead of applying this historical table to v19. Missing version resources are identified by the source pin instead of guessing a release version.
 
 | Runtime | Observed version | Source at the pinned dependency revision; license location |
 | --- | --- | --- |

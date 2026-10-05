@@ -9,8 +9,8 @@ SDL_Texture* createLiveTexture(SDL_Renderer* renderer, int width, int height, Yu
     // module; do not import SDL3 symbols under the colliding SDL2 API names.
     SDL_version version{};
     SDL_GetVersion(&version);
-    if (version.major != 2 || version.minor != 32 || version.patch != 70) {
-        SDL_SetError("PyroWave colorspace requires the pinned v15 SDL2-compat build");
+    if (version.major != 2 || version.minor != 32 || version.patch != 74) {
+        SDL_SetError("PyroWave colorspace requires the pinned v19 SDL2-compat build");
         return nullptr;
     }
     const auto module = GetModuleHandleW(L"SDL3.dll");
@@ -29,7 +29,7 @@ SDL_Texture* createLiveTexture(SDL_Renderer* renderer, int width, int height, Yu
         SDL_SetError("PyroWave SDL3 texture/colorspace API unavailable"); return nullptr;
     }
     // Exact SDL_Colorspace values and property names from pinned SDL3 commit
-    // fa2c02bb6e21974a89ea9824bc53c9932abe5f9c, SDL_pixels.h / SDL_render.h.
+    // 829a65d769d935c4852f8159e964312c0957260a, SDL_pixels.h / SDL_render.h.
     constexpr Sint64 Bt709Limited = 0x21100421u, Bt709Full = 0x22100421u;
     const auto props = create();
     if (!props) return nullptr;

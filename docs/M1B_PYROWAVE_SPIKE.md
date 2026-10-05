@@ -1,3 +1,9 @@
+> Historical engineering chronology: P0/P0-R/P0.5 and earlier P1a notes below
+> retain their original stage status. Current main includes live Experimental
+> PyroWave in normal x64/ARM64 packages with bitrate QoL; live Vibepollo ARM64
+> fallback is owner-validated. See [current evidence](VALIDATION.md#current-live-arm64-owner-result).
+> Earlier live-not-implemented, separate-package and pending ARM64 fallback notes are superseded.
+
 > Owner update: live P1a video succeeded on Surface Pro 11 / Snapdragon X Plus /
 > Adreno X1-85 at 2560x1440, target 120 FPS, with audio/input working. The CPU
 > bring-up path measured ~93.3 FPS, ~12.45 ms decode pipeline, ~1.24 ms render.

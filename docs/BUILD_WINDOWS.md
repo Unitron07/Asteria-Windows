@@ -2,6 +2,8 @@
 
 Moonlight PC at `e3fd29e4d7dc5723d8d0da7d19e2698daec74456` was imported through PR #1 and merged into `main`. The candidate now identifies as Asteria; the unmodified upstream comparison remains Moonlight. The harness accepts `-Architecture x64` (default) or `-Architecture arm64`. Upstream and candidate builds passed for both targets in [run 34790903403](https://github.com/Unitron07/Asteria-Windows/actions/runs/34790903403). Owner-verified native ARM64 process execution and Apollo AV1 streaming on a Surface Pro 11th Edition complete M0A; see [BASELINE.md](BASELINE.md).
 
+Current upstream baseline is Moonlight v6.2.0 (`de2467e433...`) with dependency bundle v19. The original-import runs above remain historical. Asteria’s native baseline harness retains its working Qt 6.11.2 x64/ARM64 kits; the inherited general upstream workflow now follows Qt 6.12. Changing the native harness kits is a separate qualification decision.
+
 ## Prerequisites
 
 - A complete Git for Windows installation, PowerShell, and a checkout path without spaces or shell metacharacters, such as `C:\src\Asteria`. Upstream batch scripts do not consistently quote paths.
@@ -22,7 +24,7 @@ $env:PATH = 'C:\Qt\6.11.2\msvc2022_64\bin;C:\Program Files\7-Zip;' + $env:PATH
 ./scripts/build-baseline.ps1
 ```
 
-Dependency setup downloads the selected upstream v15 archive, verifies its checked-in SHA-256 before extraction, and records per-file hashes and available version metadata. It refuses an existing `libs/windows` directory. Use a separate fresh checkout per architecture: this isolates upstream's shared headers without modifying its source layout. A completion marker binds each checkout to one target; builds reject the wrong target, changed files, and extra files. Subsequent builds reuse these verified dependencies. See [dependency provenance](DEPENDENCIES_WINDOWS.md).
+Dependency setup downloads the selected upstream v19 archive, verifies its checked-in SHA-256 before extraction, and records per-file hashes and available version metadata. It refuses an existing `libs/windows` directory. Use a separate fresh checkout per architecture: this isolates upstream's shared headers without modifying its source layout. A completion marker binds each checkout to one target; builds reject the wrong target, changed files, and extra files. Subsequent builds reuse these verified dependencies. See [dependency provenance](DEPENDENCIES_WINDOWS.md).
 
 The wrapper calls the candidate's `scripts/build-arch.bat Release`, which configures qmake, compiles using jom or nmake, deploys runtime DLLs, builds the MSI internally, and produces the portable ZIP and symbol ZIP. No signing or release credentials are required. Normal Windows packages now include PyroWave (Experimental), still explicit-only. The build prepares the pinned API 0.6.0/bitstream `186f0393` runtime with CMake >= 3.27, verifies its architecture/hash, and stages the restricted-loader dependency closure, metadata and notices before MSI/ZIP generation. The app has no codec/Vulkan startup imports. Outputs:
 

@@ -71,18 +71,30 @@ jobs:
         timeout-minutes: 8
         shell: pwsh
         run: ./harness/scripts/test-settings.ps1 -SourceRoot ./source -Architecture '${{ inputs.architecture }}' -QtRoot '${{ runner.workspace }}/Qt/6.11.2'
+      - name: Test keyboard mapping and extended-key release state
+        if: inputs.label == 'asteria'
+        shell: pwsh
+        run: |
+          $platform = if ('${{ inputs.architecture }}' -eq 'arm64') { 'ARM64' } else { 'x64' }
+          cmake -S source/tests/input -B source/build/input-tests -A $platform -DSDL_ARCH=${{ inputs.architecture }}
+          if ($LASTEXITCODE) { throw 'Input test configuration failed' }
+          cmake --build source/build/input-tests --config Release --parallel 2
+          if ($LASTEXITCODE) { throw 'Input test build failed' }
+          ctest --test-dir source/build/input-tests -C Release --output-on-failure
+          if ($LASTEXITCODE) { throw 'Input regressions failed' }
       - name: Build unsigned Release and collect evidence
         shell: pwsh
         env:
           TARGET_ARCH: ${{ inputs.architecture }}
           QT_ROOT: ${{ runner.workspace }}/Qt/6.11.2
+          CLIENT_EXECUTABLE: ${{ inputs.label == 'asteria' && 'Asteria.exe' || 'Moonlight.exe' }}
         run: |
           $kit = switch ($env:TARGET_ARCH) {
             'x64' { 'msvc2022_64' }
             'arm64' { 'msvc2022_arm64' }
             default { throw "Unsupported target: $env:TARGET_ARCH" }
           }
-          ./harness/scripts/build-baseline.ps1 -SourceRoot ./source -Architecture $env:TARGET_ARCH -QtBin "$env:QT_ROOT/$kit/bin"
+          ./harness/scripts/build-baseline.ps1 -SourceRoot ./source -Architecture $env:TARGET_ARCH -QtBin "$env:QT_ROOT/$kit/bin" -ClientExecutable $env:CLIENT_EXECUTABLE
       - name: Verify normal package includes pinned PyroWave without startup imports
         if: inputs.label == 'asteria'
         shell: pwsh

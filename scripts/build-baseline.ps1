@@ -2,13 +2,19 @@
 param(
     [string]$SourceRoot = (Split-Path $PSScriptRoot -Parent),
     [ValidateSet('x64', 'arm64')][string]$Architecture = 'x64',
-    [string]$QtBin
+    [string]$QtBin,
+    [ValidateSet('Asteria.exe', 'Moonlight.exe')][string]$ClientExecutable = 'Asteria.exe'
 )
 $ErrorActionPreference = 'Stop'
 $SourceRoot = (Resolve-Path -LiteralPath $SourceRoot).Path
 # Upstream build-arch.bat uses unquoted source paths.
 if ($SourceRoot -match '[\s!&()%\^]') { throw 'Use a checkout path without spaces or shell metacharacters, for example C:\src\Asteria.' }
 $Architecture = $Architecture.ToLowerInvariant()
+$dependencyPins = Get-Content (Join-Path $PSScriptRoot 'baseline-deps.json') -Raw | ConvertFrom-Json
+$dependencySourceCommit = $dependencyPins.$Architecture.sourceCommit
+$sourceRepository = if ($ClientExecutable -eq 'Moonlight.exe') {
+    'https://github.com/moonlight-stream/moonlight-qt'
+} else { 'https://github.com/Unitron07/Asteria-Windows' }
 . (Join-Path $PSScriptRoot 'baseline-preflight.ps1')
 Assert-BaselineDependencies -SourceRoot $SourceRoot -Architecture $Architecture
 $QtBin = Resolve-BaselineQt -Architecture $Architecture -QtBin $QtBin
@@ -113,9 +119,9 @@ exit /b 0
         Copy-Item -LiteralPath (Join-Path $SourceRoot $license) -Destination $destination
     }
     @"
-Development baseline from https://github.com/moonlight-stream/moonlight-qt at $sha.
+Development baseline from $sourceRepository at $sha.
 Source snapshot including pinned submodules is in the accompanying evidence artifact.
-Dependency source/build recipes: https://github.com/moonlight-stream/moonlight-qt-deps/tree/2ab26b8cd5c42899ffd97c573ff2c678738f41b1
+Dependency source/build recipes: https://github.com/moonlight-stream/moonlight-qt-deps/tree/$dependencySourceCommit
 Qt source archives: https://download.qt.io/archive/qt/6.11/6.11.2/submodules/
 This unsigned development baseline is not a qualified Asteria release.
 "@ | Set-Content (Join-Path $notices 'PROVENANCE.txt') -Encoding utf8
@@ -124,7 +130,6 @@ This unsigned development baseline is not a qualified Asteria release.
     if ($package.Count -ne 1) { throw 'Expected exactly one portable ZIP' }
     7z a $package[0].FullName "$deploy\source-notices"
     if ($LASTEXITCODE -ne 0) { throw 'Unable to include source notices' }
-    $clientExecutable = if ($sha -eq 'e3fd29e4d7dc5723d8d0da7d19e2698daec74456') { 'Moonlight.exe' } else { 'Asteria.exe' }
     if ($Architecture -eq 'arm64') {
         $dumpbinPath = Get-Content (Join-Path $evidence 'dumpbin-path.txt') | Select-Object -First 1
         & (Join-Path $PSScriptRoot 'repair-arm64-package.ps1') `

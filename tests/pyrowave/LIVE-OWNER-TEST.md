@@ -1,3 +1,9 @@
+> Current state: normal x64/ARM64 builds include explicitly selected Experimental PyroWave.
+> The latest named ARM64 compute/CPU-I420 fallback result succeeds; see the
+> [current owner record](../../docs/VALIDATION.md#current-live-arm64-owner-result).
+> Broader GPU interop and performance qualification remain open. The measurements
+> and pending retest notes below describe earlier stages, not a pending live implementation.
+
 > Owner update: live P1a video succeeded on Surface Pro 11 / Snapdragon X Plus /
 > Adreno X1-85 at 2560x1440, target 120 FPS, with audio/input working. Latest
 > fragment CPU fallback: ~101.7 FPS, ~4.31 ms decode/readback, ~2.19 ms decoder

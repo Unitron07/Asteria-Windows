@@ -18,8 +18,8 @@ Copy-Item -LiteralPath (Join-Path $DependencyRoot 'install/source-notices') -Des
 Copy-Item -Path (Join-Path $DependencyRoot 'evidence/*') -Destination $evidence -Recurse
 Copy-Item -LiteralPath (Join-Path $sourceRoot 'scripts/pyrowave/common-c-p1a.patch') -Destination (Join-Path $stage 'source-notices')
 foreach ($notice in @(
-    @{name='SDL2-compat-LICENSE.txt'; url='https://raw.githubusercontent.com/libsdl-org/sdl2-compat/a53b6ad90ecd2d0ccfe01d5cfd2059793acf8c12/LICENSE.txt'},
-    @{name='SDL3-LICENSE.txt'; url='https://raw.githubusercontent.com/libsdl-org/SDL/fa2c02bb6e21974a89ea9824bc53c9932abe5f9c/LICENSE.txt'}
+    @{name='SDL2-compat-LICENSE.txt'; url='https://raw.githubusercontent.com/libsdl-org/sdl2-compat/e4df8a55f20da762290a78c2bbe8f8d89d01486a/LICENSE.txt'},
+    @{name='SDL3-LICENSE.txt'; url='https://raw.githubusercontent.com/libsdl-org/SDL/829a65d769d935c4852f8159e964312c0957260a/LICENSE.txt'}
 )) {
     Invoke-WebRequest -Uri $notice.url -OutFile (Join-Path $stage "source-notices/$($notice.name)")
 }

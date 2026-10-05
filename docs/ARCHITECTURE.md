@@ -1,23 +1,27 @@
 # Architecture
 
-## M1B P1a implementation / live qualification pending
+## Current state: preparing v0.2.0
 
-The explicit experimental PyroWave path now uses a dedicated `IVideoDecoder`
-with the existing runtime/parser, common-c complete decode units and main-thread
-SDL IYUV presentation. Session gates host launch on runtime/API/provenance,
-Vulkan/device/decoder and SDL preflight; paired pinned HTTPS SCM plus strict
-DESCRIBE/bitstream-ID checks gate negotiation. Audio/input remain on existing
-Moonlight paths. Auto and standard codec selection are unchanged.
+Live PyroWave SDR 8-bit 4:2:0 has been validated against Vibepollo on native
+Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 ARM64. It remains
+explicitly selected and **Experimental**; Automatic chooses standard codecs.
+Normal Windows x64 and ARM64 builds include the pinned API 0.6.0 runtime,
+bitstream `186f0393`, restricted loading and provenance metadata.
+Codec-aware bitrate QoL is integrated: standard codecs have a 500 Mbps UI ceiling,
+PyroWave a 3000 Mbps ceiling, and PyroWave automatic bitrate is approximately
+`width * height * fps * 1.6` bits/s. Manual overrides survive resolution/FPS changes.
+The codec selector remains in Basic Settings.
 
-Only SDR 8-bit I420 BT.709 limited is accepted. The render queue contains one
-replaceable pending image; the existing statistics overlay receives decoder
-rates, bytes, loss, timing and RTT. Failures clean up normally and require manual
-retry with a standard codec, avoiding automatic launch/resume replay. The
-maintained common-c patch keeps the upstream gitlink and submodule layout intact.
-Optional x64/ARM64 packages stage runtime/CRT closure and provenance separately
-from ordinary builds. See [the current contract](PYROWAVE_VIBEPOLLO.md) for bounds,
-strict parsing, chroma caveat and P1b/later exclusions. Live owner qualification
-is **PENDING**; build success alone does not establish interoperability.
+The tested Qualcomm driver rejects the Vulkan/D3D11 shared-fence import with
+`PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE`. Fragment decode is preferred for
+the GPU interop probe; Asteria safely recreates the decoder for compute-path
+decode with CPU I420 readback/presentation. This working fallback does not imply
+that Adreno cannot decode PyroWave. See [current owner evidence](VALIDATION.md#current-live-arm64-owner-result).
+Broader hardware, GPU interop and performance qualification remain open.
+
+Moonlight PC v6.2.0 is the upstream baseline; weekly upstream/master proposals
+preserve history and require human review. See [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md).
+The public release is v0.1.0; v0.2.0 has not been tagged or released.
 
 The earlier milestone descriptions below retain the P0/P0-R/P0.5 history;
 future P1a statements there are superseded by the implementation above.
@@ -86,7 +90,7 @@ on both named hardware targets: API 0.6.0, both formats, three decoder lifetimes
 malformed rejection/recovery and expected I420 output. The isolated P0.5 probe
 adds raw/codec I420 patterns, SDL2 IYUV upload, explicit BT.709 limited conversion,
 aspect fit, nearest/linear scaling, recreation and reset-event handling. It uses
-the existing v15 SDL2 compatibility runtime backed by SDL3, with no Session
+the current v19 SDL2 compatibility runtime backed by SDL3, with no Session
 coupling. **P0.5 is complete**: owner visual inspection passed on RTX 4070 Ti x64
 and native Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 ARM64 for raw,
 compatibility and record modes, all five patterns, resize/scaling,
@@ -123,3 +127,36 @@ The reviewed Android repository uses a different `moonlight-common-c` fork. Do n
 Extension work follows the existing session: disconnected → connecting → streaming → stopping → disconnected. Cancel requests and discard stale responses when the session generation changes. Network failure, focus loss, sleep/resume, and application shutdown must converge on the same cleanup behavior.
 
 A failed optional extension reports a useful status and leaves ordinary streaming usable. Do not silently terminate a running host application, retry a side-effecting command, or overwrite unrelated display state as a recovery step.
+
+## Host-dependent roadmap boundaries
+
+Asteria-Windows is the client repository. The following features require paired
+work in the client and a separately maintained Asteria-oriented Vibepollo fork
+or host extension; none is implemented here today.
+
+### M6 — Asteria VR responsibilities
+
+Remote PCVR requires host SteamVR/OpenXR and virtual HMD/runtime integration,
+pose/controller input ingestion, stereo frame capture, timing/metadata and session
+lifecycle. Asteria supplies the local headset/runtime backend, tracking/controller
+capture and upstream pose/input transport, stereo decoding, local headset
+presentation and timing/reprojection integration. PSVR2 with its PC adapter is
+one possible local configuration; the design remains headset-agnostic.
+VR is independent of PyroWave, which may be evaluated later but is not required.
+
+### M7 — Isolated Sessions / MultiSeat
+
+Future concept: one physical host remains locally usable while another user
+streams an isolated desktop/session. Candidate backends include separate Windows
+sessions/multiseat or a VM, virtual displays/audio and isolated keyboard, mouse
+and gamepad routing. This is primarily host-side implementation.
+
+| Asteria client | Vibepollo fork / host extension |
+| --- | --- |
+| UI, control requests and session status | Session/VM creation and cleanup/resource management |
+| Stream reception and isolated input transport | Display/audio lifecycle, isolated input routing |
+| Host-session selection | Application/session launch and stream binding |
+
+No implementation or equal-performance promise exists. Native-class performance
+may be a future target when hardware headroom allows; CPU/GPU contention determines
+real results.

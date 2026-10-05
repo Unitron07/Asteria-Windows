@@ -1,10 +1,32 @@
 # M0 baseline report and provenance
 
-Current milestone: experimental P1a live SDR 4:2:0 implementation is ready for
-owner Vibepollo testing; live qualification is **PENDING**. See
-[current results](VALIDATION.md#m1b-p1a-live-integration-validation) and
-[NEXT_STEP.md](NEXT_STEP.md). The M0/P0-era observations below retain their
-historical scope and do not qualify this new live path.
+## Current state: preparing v0.2.0
+
+Live PyroWave SDR 8-bit 4:2:0 has been validated against Vibepollo on native
+Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 ARM64. It remains
+explicitly selected and **Experimental**; Automatic chooses standard codecs.
+Normal Windows x64 and ARM64 builds include the pinned API 0.6.0 runtime,
+bitstream `186f0393`, restricted loading and provenance metadata.
+Codec-aware bitrate QoL is integrated: standard codecs have a 500 Mbps UI ceiling,
+PyroWave a 3000 Mbps ceiling, and PyroWave automatic bitrate is approximately
+`width * height * fps * 1.6` bits/s. Manual overrides survive resolution/FPS changes.
+The codec selector remains in Basic Settings.
+
+The tested Qualcomm driver rejects the Vulkan/D3D11 shared-fence import with
+`PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE`. Fragment decode is preferred for
+the GPU interop probe; Asteria safely recreates the decoder for compute-path
+decode with CPU I420 readback/presentation. This working fallback does not imply
+that Adreno cannot decode PyroWave. See [current owner evidence](VALIDATION.md#current-live-arm64-owner-result).
+Broader hardware, GPU interop and performance qualification remain open.
+
+Moonlight PC v6.2.0 is the upstream baseline; weekly upstream/master proposals
+preserve history and require human review. See [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md).
+The public release is v0.1.0; v0.2.0 has not been tagged or released.
+
+## Historical baseline / source audit
+
+The following observations describe their original stages. Earlier pending live
+qualification and future P1a statements are superseded by the current state above.
 
 M0 baseline integration is **merged and accepted as the starting point for further development**. Both Windows x64 CI builds passed and the project owner confirmed that the tested client works. Detailed hardware and interoperability qualification is not yet fully recorded. Asteria identity and x64/ARM64 CI packaging are implemented; M0A native ARM64 is complete from the owner's real-device validation below, and M1B P0-R Vibepollo-compatible GPU decode is hardware-qualified on x64 and native ARM64. [M1B P0.5 offline SDL visual qualification](VALIDATION.md#m1b-p05-offline-sdl-qualification) is complete on both named targets; [P1a live SDR 4:2:0 integration](NEXT_STEP.md) is the next future milestone, with existing Moonlight statistics as the initial M1A measurement source. The separate [current PyroWave validation record](VALIDATION.md#m1b-p0-r-vibepollo-validation) does not expand the earlier Apollo AV1 baseline or qualify live PyroWave streaming. Historical M0 observations below retain their original scope.
 
@@ -89,4 +111,4 @@ The owner used a Surface Pro 11th Edition with Snapdragon X Plus and 16 GB RAM, 
 
 **Qualitative UI observation:** native Asteria felt noticeably smoother and snappier in menus and settings than emulated x64 Moonlight. This is subjective and was not instrumented. It should not be presented as a measured launch, CPU, or frame-pacing improvement.
 
-**Scope and remaining release records:** there is no official native ARM64 upstream Moonlight release, so the official x64 build under emulation is the practical same-device user comparison. CI-built unmodified upstream ARM64 artifacts are internal engineering references, not official upstream releases. The exact Asteria artifact/commit and ZIP hash, GPU driver, Windows build, selected decoder, Apollo version, bitrate, network path, run durations, and raw test log were not recorded. This owner-reported result completes M0A for the Apollo-based project/preview; it does not establish a controlled benchmark, hardware decoder selection, H.264 1080p60 SDR, audio/input, clean-machine launch, DPI/sleep-resume, or the 30-minute soak and reconnect cases. Record those applicable details during release validation. Sunshine is not a required qualification target.
+**Scope and remaining release records:** the recorded comparison used the official x64 build under emulation. Moonlight v6.2.0 now provides an official ARM64 portable release; future comparisons should record which native or emulated reference was used. CI-built unmodified upstream ARM64 artifacts are internal engineering references, not official upstream releases. The exact Asteria artifact/commit and ZIP hash, GPU driver, Windows build, selected decoder, Apollo version, bitrate, network path, run durations, and raw test log were not recorded. This owner-reported result completes M0A for the Apollo-based project/preview; it does not establish a controlled benchmark, hardware decoder selection, H.264 1080p60 SDR, audio/input, clean-machine launch, DPI/sleep-resume, or the 30-minute soak and reconnect cases. Record those applicable details during release validation. Sunshine is not a required qualification target.
