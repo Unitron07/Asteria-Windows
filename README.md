@@ -4,16 +4,16 @@
 
 # Asteria
 
-**Preparing v0.2.0:** Moonlight PC v6.2.0 baseline, native Windows x64/ARM64,
+**[Asteria v0.2.0 is released](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0):** Moonlight PC v6.2.0 baseline, native Windows x64/ARM64,
 and explicitly selected **PyroWave (Experimental)** in normal builds, with pinned
 runtime/provenance and codec-aware bitrate controls. Automatic uses standard codecs.
 Live Vibepollo SDR 8-bit 4:2:0 is owner-validated on Surface Pro 11 / Snapdragon X
 Plus / Adreno X1-85; this is not production-stable or universal hardware qualification.
 See [validation](docs/VALIDATION.md#current-live-arm64-owner-result).
 
-**Asteria** is an early-preview native Windows game-streaming client derived from [Moonlight PC](https://github.com/moonlight-stream/moonlight-qt). Its active direction is codec experimentation and low-latency presentation on native Windows x64/ARM64, followed by isolated remote sessions and future remote PCVR.
+**Asteria** is a native Windows game-streaming client derived from [Moonlight PC](https://github.com/moonlight-stream/moonlight-qt). Its active direction is codec experimentation and low-latency presentation on native Windows x64/ARM64, followed by isolated remote sessions and future remote PCVR.
 
-> **Release status:** [v0.1.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0) is released for Windows x64 and native ARM64 as unsigned portable ZIPs. Expect bugs and incomplete Asteria-specific functionality. The owner verified both CI builds work and previously validated native ARM64 execution on a Surface Pro 11th Edition; see the [release notes](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0) and [validation record](docs/VALIDATION.md) for the tested scope and evidence limits. Report reproducible problems in [GitHub issues](https://github.com/Unitron07/Asteria-Windows/issues).
+> **Release status:** [v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0) is the current normal release for Windows x64 and native ARM64, distributed as unsigned portable ZIPs. PyroWave remains Experimental and explicitly selected. See the [release notes](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0) and [validation record](docs/VALIDATION.md#asteria-v020-release-record) for tested scope and limitations. [v0.1.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0) and its evidence remain available as history.
 
 ## Available now
 
@@ -23,13 +23,13 @@ See [validation](docs/VALIDATION.md#current-live-arm64-owner-result).
 - Separate x64 and native ARM64 CI builds and portable ZIPs. The owner reported a successful x64 baseline test; detailed hardware/host coverage remains recorded as incomplete in the [baseline report](docs/BASELINE.md).
 - **M0A owner validation:** Surface Pro 11th Edition, Snapdragon X Plus, 16 GB RAM; the Asteria process was verified as native ARM64. Against the official x64 Moonlight release running under Windows ARM64 emulation on the same device, repeated same-game 2560×1440, approximately 60 FPS AV1 streams on Apollo were effectively identical, with no meaningful decode, render, or frame-queue regression. Asteria's menus/settings felt noticeably smoother and snappier (qualitative, not timed). The Windows build, GPU driver, decoder, Apollo version, artifact hash, and run durations were not recorded; this is not a broad compatibility or measured latency claim. Moonlight v6.2.0 now provides an official ARM64 portable release. The earlier comparison above used emulated x64; CI-built upstream artifacts remain internal reference builds.
 
-The owner uses Nonary/Vibepollo (the Apollo-derived host service) for this project; Vibepollo is the primary PyroWave protocol target. The original preview baseline used Apollo. Sunshine is not a required qualification target. Apollo-specific capability handling, clipboard transfer, virtual-display controls, and server commands are deprioritized possible future integrations, not included preview features.
+The owner uses Nonary/Vibepollo (the Apollo-derived host service) for this project; Vibepollo is the primary PyroWave protocol target. The original preview baseline used Apollo. Sunshine is not a required qualification target. Apollo-specific capability handling, clipboard transfer, virtual-display controls, and server commands are deprioritized possible future integrations, not included release features.
 
 ## Current public release
 
-**[v0.1.0 is available now](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0)** for Windows x64 and native ARM64 as portable ZIPs. Both packages were built from commit `34dfd937528586babded200fafaee535e21d4a40` in the same successful [CI run](https://github.com/Unitron07/Asteria-Windows/actions/runs/36191650824). The release includes SHA-256 checksums, symbols, corresponding source, and architecture/build evidence. Extract the ZIP into a writable folder and keep `portable.dat` next to `Asteria.exe`. No installer is offered in this preview.
+**[Asteria v0.2.0 is available now](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0)** for Windows x64 and native ARM64 as unsigned portable ZIPs. Both packages were built from commit `42f756e465288157608fe894e3a3dfe800b05344` in the same successful [Windows qualification run](https://github.com/Unitron07/Asteria-Windows/actions/runs/37262907765), with both-target [PyroWave qualification](https://github.com/Unitron07/Asteria-Windows/actions/runs/37263855400). The release includes SHA-256 checksums, symbols, corresponding source and build/architecture evidence. Extract into a writable folder and keep `portable.dat` beside `Asteria.exe`. No installer is offered.
 
-The owner confirmed the completed x64 and ARM64 builds work. Earlier native ARM64 Apollo AV1 testing is described above; exact Windows, driver, decoder, host-version, and artifact-hash details were not recorded for that comparison. Broad hardware and functional qualification remains open in the [validation checklist](docs/VALIDATION.md).
+Normal packages include PyroWave (Experimental), still explicit-only; Automatic uses standard codecs. The inherited application version is 6.2.0 and the project release tag is v0.2.0. Broad GPU/hardware qualification remains open; see the [release record](docs/VALIDATION.md#asteria-v020-release-record). Release-status changes after the tag are documentation-only; binaries/source correspond to the tagged commit above.
 
 ## Roadmap
 
@@ -58,7 +58,7 @@ The old M2–M4 Apollo convenience milestones are deprioritized. Capability pars
 clipboard, virtual-display requests and server commands may return as supporting
 integrations. Historical identifiers, technical notes and release-qualification
 gates remain in the [porting plan](docs/PORTING_PLAN.md).
-v0.2.0 is still being prepared; this roadmap does not change release state.
+v0.2.0 is released; native Vulkan presentation, isolated sessions and VR remain future work.
 
 ### Planned Asteria VR
 
@@ -72,7 +72,7 @@ See the detailed [porting plan](docs/PORTING_PLAN.md), [architecture](docs/ARCHI
 
 ## Upstream maintenance
 
-Moonlight history is preserved. The explicit baseline is v6.2.0; weekly automation watches upstream `master`, proposes clean merges as PRs and reports conflicts for human integration. Upstream changes are never auto-merged. See [maintainer instructions](docs/UPSTREAM_SYNC.md). v0.2.0 is being prepared and is not released.
+Moonlight history is preserved. The explicit baseline is v6.2.0; weekly automation watches upstream `master`, proposes clean merges as PRs and reports conflicts for human integration. Upstream changes are never auto-merged. See [maintainer instructions](docs/UPSTREAM_SYNC.md). v0.2.0 is the current release.
 
 ## Naming and provenance
 

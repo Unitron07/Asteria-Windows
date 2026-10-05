@@ -62,4 +62,4 @@ Local workflow tests: `python -m unittest discover -s tests/upstream -v`.
 They cover no-change exit, actual clean two-parent merge, conflict abort and
 create-versus-update PR routing. They do not live-test scheduled GitHub behavior.
 
-This work prepares Asteria v0.2.0; it creates no release, tag or release assets.
+[Asteria v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0) is released. This upstream-tracking workflow only proposes reviewed maintenance changes; it does not create releases, tags or release assets.

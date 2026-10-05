@@ -1,6 +1,6 @@
-# Next step: verify v0.2.0, then native Vulkan presentation
+# Next step: post-v0.2.0 native Vulkan presentation
 
-## Current state: preparing v0.2.0
+## Current state: v0.2.0 released
 
 Live PyroWave SDR 8-bit 4:2:0 has been validated against Vibepollo on native
 Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 ARM64. It remains
@@ -21,13 +21,16 @@ Broader hardware, GPU interop and performance qualification remain open.
 
 Moonlight PC v6.2.0 is the upstream baseline; weekly upstream/master proposals
 preserve history and require human review. See [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md).
-The public release is v0.1.0; v0.2.0 has not been tagged or released.
+The current release is [Asteria v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0), an unsigned Windows
+x64/native ARM64 portable release. Its binaries and corresponding source are
+from `42f756e465288157608fe894e3a3dfe800b05344`; subsequent release-status
+updates are documentation-only. v0.1.0 evidence below remains historical.
 
 
-Before v0.2.0 release, qualify this v6.2.0 merge with same-commit Windows x64 and
-native ARM64 Release builds/packages, settings/input regressions, PyroWave
-runtime/parser/offline checks and standard-codec smoke tests. Do not create the
-release until the reviewed PR is merged and verified.
+v0.2.0 is published with same-commit Windows x64/native ARM64 qualification and
+PyroWave CI. See the [release record](VALIDATION.md#asteria-v020-release-record)
+for commit, run IDs, checksums and hardware-validation limits. Future releases
+repeat their own qualification; this evidence is specific to v0.2.0.
 
 The next major PyroWave performance milestone is **post-v0.2.0**:
 `PyroWave Vulkan decode -> GPU-resident Y/U/V -> Vulkan presentation shader -> Vulkan swapchain`.

@@ -2,7 +2,7 @@
 
 Moonlight PC at `e3fd29e4d7dc5723d8d0da7d19e2698daec74456` was imported through PR #1 and merged into `main`. The candidate now identifies as Asteria; the unmodified upstream comparison remains Moonlight. The harness accepts `-Architecture x64` (default) or `-Architecture arm64`. Upstream and candidate builds passed for both targets in [run 34790903403](https://github.com/Unitron07/Asteria-Windows/actions/runs/34790903403). Owner-verified native ARM64 process execution and Apollo AV1 streaming on a Surface Pro 11th Edition complete M0A; see [BASELINE.md](BASELINE.md).
 
-Current upstream baseline is Moonlight v6.2.0 (`de2467e433...`) with dependency bundle v19. The original-import runs above remain historical. Asteria’s native baseline harness retains its working Qt 6.11.2 x64/ARM64 kits; the inherited general upstream workflow now follows Qt 6.12. Changing the native harness kits is a separate qualification decision.
+Current upstream baseline is Moonlight v6.2.0 (`de2467e433...`) with dependency bundle v19. The original-import runs above remain historical. Asteriaï¿½s native baseline harness retains its working Qt 6.11.2 x64/ARM64 kits; the inherited general upstream workflow now follows Qt 6.12. Changing the native harness kits is a separate qualification decision.
 
 ## Prerequisites
 
@@ -59,11 +59,11 @@ Set-Location C:\src\Asteria-arm64
 ./scripts/build-baseline.ps1 -Architecture arm64 -QtBin C:\Qt\6.11.2\msvc2022_arm64\bin
 ```
 
-CI exercises these build arguments for both ARM64 upstream and candidate. Use the same arguments with `-SourceRoot` for a separate pinned upstream ARM64 checkout. `-QtBin` is optional when PATH contains exactly one supported kit. Keep 7-Zip on PATH as for x64. The package gate passes in [run 34797782854](https://github.com/Unitron07/Asteria-Windows/actions/runs/34797782854); M0A real-device validation is complete; the [next development task](NEXT_STEP.md) is M1A instrumentation. Run `pwsh -File scripts/test-baseline-preflight.ps1` to test the dependency and kit guards without Qt/MSVC.
+CI exercises these build arguments for both ARM64 upstream and candidate. Use the same arguments with `-SourceRoot` for a separate pinned upstream ARM64 checkout. `-QtBin` is optional when PATH contains exactly one supported kit. Keep 7-Zip on PATH as for x64. The package gate passes in [run 34797782854](https://github.com/Unitron07/Asteria-Windows/actions/runs/34797782854); M0A real-device validation is complete; the [next development task](NEXT_STEP.md) is post-v0.2.0 native Vulkan presentation. Run `pwsh -File scripts/test-baseline-preflight.ps1` to test the dependency and kit guards without Qt/MSVC.
 
 ## Final ZIP architecture gate
 
-On ARM64, the wrapper first inspects the known surplus root `vcruntime140_1.dll` using `repair-arm64-package.ps1`. If it is x64, the wrapper removes it only after the selected MSVC `dumpbin /dependents` successfully inspects every other packaged EXE/DLL and finds no normal or delay-load imports of it. Native ARM64 versions are retained. `arm64-runtime-cleanup.json` contains the decision, per-binary dependency output, and before/after ZIP hashes. The deployed staging directory and MSI are not rewritten; the final portable ZIP is the validated preview artifact. See [the failure and correction record](BASELINE.md#arm64-crt-packaging-correction).
+On ARM64, the wrapper first inspects the known surplus root `vcruntime140_1.dll` using `repair-arm64-package.ps1`. If it is x64, the wrapper removes it only after the selected MSVC `dumpbin /dependents` successfully inspects every other packaged EXE/DLL and finds no normal or delay-load imports of it. Native ARM64 versions are retained. `arm64-runtime-cleanup.json` contains the decision, per-binary dependency output, and before/after ZIP hashes. The deployed staging directory and MSI are not rewritten; the final portable ZIP is the architecture-validated artifact. See [the failure and correction record](BASELINE.md#arm64-crt-packaging-correction).
 
 The wrapper validates the final portable ZIP after adding source notices and before CI uploads. `scripts/test-package-architecture.ps1` inspects every EXE/DLL entry recursively, including nested Qt plugins, and requires exact ARM64 (`0xAA64`) or x64 (`0x8664`) PE machine type and a PE32+ header. It rejects a missing client executable (`Asteria.exe` for the candidate, `Moonlight.exe` for the upstream comparison), missing runtime DLLs, malformed headers, and foreign architectures. It does not execute binaries or establish complete runtime dependency resolution.
 
@@ -84,7 +84,7 @@ The suite covers clean x64/ARM64 packages, nested plugins, deliberately injected
 
 The x64 upstream and candidate builds passed in [run 34736992552](https://github.com/Unitron07/Asteria-Windows/actions/runs/34736992552). The owner reported a successful manual test before merging PR #1; detailed client/host records remain in the qualification backlog.
 
-Hosted builds do not validate GPU decoding, pairing, performance, or OS compatibility. Complete applicable [release validation records](VALIDATION.md) on real x64 and ARM64 Windows machines against a recorded Apollo version. These CI packages are development evidence, not a qualified Asteria release. M0A ARM64 validation is complete; first-preview release checks and Windows 10 x64 compatibility remain separate.
+Hosted builds do not validate GPU decoding, pairing, performance, or OS compatibility. Complete applicable [release validation records](VALIDATION.md) on real x64 and ARM64 Windows machines against a recorded Apollo version. Development CI packages are evidence until selected for a release. [Asteria v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0) publishes the exact qualified x64/native ARM64 outputs from commit `42f756e465288157608fe894e3a3dfe800b05344`; see the [release record](VALIDATION.md#asteria-v020-release-record) for run IDs, hashes and hardware limits. M0A ARM64 validation remains historical; Windows 10 x64 compatibility remains unqualified.
 
 ### CI artifact names
 

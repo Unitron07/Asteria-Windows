@@ -1,6 +1,6 @@
 # P0-R Vibepollo compatibility contract
 
-## Current state: preparing v0.2.0
+## Current state: v0.2.0 released
 
 Live PyroWave SDR 8-bit 4:2:0 has been validated against Vibepollo on native
 Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 ARM64. It remains
@@ -21,7 +21,10 @@ Broader hardware, GPU interop and performance qualification remain open.
 
 Moonlight PC v6.2.0 is the upstream baseline; weekly upstream/master proposals
 preserve history and require human review. See [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md).
-The public release is v0.1.0; v0.2.0 has not been tagged or released.
+The current release is [Asteria v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0), an unsigned Windows
+x64/native ARM64 portable release. Its binaries and corresponding source are
+from `42f756e465288157608fe894e3a3dfe800b05344`; subsequent release-status
+updates are documentation-only. v0.1.0 evidence below remains historical.
 
 The contract is Vibepollo at `8a8c4b03a280ab9f567beb380110abb80f5220b8`, codec
 `186f0393b77f7755953b5ecde994bb1cec2e4155`, bitstream ID `186f0393`, C API 0.6.0.

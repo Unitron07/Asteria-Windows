@@ -1,6 +1,6 @@
 # Porting plan
 
-## Current state: preparing v0.2.0
+## Current state: v0.2.0 released
 
 Live PyroWave SDR 8-bit 4:2:0 has been validated against Vibepollo on native
 Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 ARM64. It remains
@@ -21,7 +21,10 @@ Broader hardware, GPU interop and performance qualification remain open.
 
 Moonlight PC v6.2.0 is the upstream baseline; weekly upstream/master proposals
 preserve history and require human review. See [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md).
-The public release is v0.1.0; v0.2.0 has not been tagged or released.
+The current release is [Asteria v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0), an unsigned Windows
+x64/native ARM64 portable release. Its binaries and corresponding source are
+from `42f756e465288157608fe894e3a3dfe800b05344`; subsequent release-status
+updates are documentation-only. v0.1.0 evidence below remains historical.
 
 The earlier milestone descriptions below retain the P0/P0-R/P0.5 history;
 future P1a statements there are superseded by the implementation above.
@@ -60,7 +63,7 @@ sessions) are retained only as historical identifiers, not execution order.
 M5 is a recurring release-qualification gate, not a prerequisite feature sequence.
 Profiles and desktop shortcuts remain foundation follow-ups, not the next major
 phase. Neither clipboard nor the old M2–M4 sequence gates isolated sessions or VR.
-v0.2.0 is still being prepared; this roadmap edit changes no release state.
+v0.2.0 is released; the future phases above are not included in that release.
 
 Primary targets: **Windows 11 x64 and native ARM64**, both included in v0.1.0. Native ARM64 means the client and its process-loaded runtime DLLs run as ARM64, without x64 emulation; cross-compiling on an x64 build host is acceptable. Windows 10 x64 remains a separate compatibility target pending runtime documentation and real-machine tests. Record exact minimum OS builds before publishing qualified binaries. M0A completion is specific to the recorded device and workload, not a broad ARM64 support matrix.
 

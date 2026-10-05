@@ -24,7 +24,7 @@ compute decode plus CPU I420 presentation works. Broader x64/hardware and shared
 GPU-path qualification remain separate. Earlier failures/timings below remain
 historical, superseded for the current named ARM64 fallback by this owner result.
 
-## Current state: preparing v0.2.0
+## Current state: v0.2.0 released
 
 Live PyroWave SDR 8-bit 4:2:0 has been validated against Vibepollo on native
 Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 ARM64. It remains
@@ -45,7 +45,46 @@ Broader hardware, GPU interop and performance qualification remain open.
 
 Moonlight PC v6.2.0 is the upstream baseline; weekly upstream/master proposals
 preserve history and require human review. See [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md).
-The public release is v0.1.0; v0.2.0 has not been tagged or released.
+The current release is [Asteria v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0), an unsigned Windows
+x64/native ARM64 portable release. Its binaries and corresponding source are
+from `42f756e465288157608fe894e3a3dfe800b05344`; subsequent release-status
+updates are documentation-only. v0.1.0 evidence below remains historical.
+
+## Asteria v0.2.0 release record
+
+[Asteria v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0) is a normal GitHub release
+(`prerelease=false`, `draft=false`), with unsigned portable packages.
+
+- Release commit and lightweight tag `v0.2.0`: `42f756e465288157608fe894e3a3dfe800b05344`.
+- Windows baseline qualification: [run 37262907765](https://github.com/Unitron07/Asteria-Windows/actions/runs/37262907765), exact release commit; candidate x64 and native ARM64 PASS. Upstream comparison jobs also PASS.
+- PyroWave qualification: [run 37263855400](https://github.com/Unitron07/Asteria-Windows/actions/runs/37263855400), exact release commit; x64 and native ARM64 PASS. The qualification branch points to the tagged commit without source changes.
+- Normal-package architecture, branding/icon, settings/UI, keyboard/input, bundled runtime/provenance, startup and forbidden PyroWave/Vulkan import checks PASS. Architecture checks inspect all packaged EXE/DLL entries, including nested plugins: 73 x64 binaries (`0x8664`) and 71 ARM64 binaries (`0xAA64`).
+- Pinned PyroWave codec/runtime: `186f0393b77f7755953b5ecde994bb1cec2e4155`, bitstream `186f0393`, API `0.6.0`; explicitly selected Experimental only. Automatic uses standard codecs.
+
+| Portable package | SHA-256 |
+| --- | --- |
+| `Asteria-v0.2.0-windows-x64-portable.zip` | `50977afd156f0fca6c216ce120e6b2e84a0442e0377828ba09c71f8f8a2ad5b0` |
+| `Asteria-v0.2.0-windows-arm64-portable.zip` | `65c1538c327e2358b7f74dc5353c73848ad95c007a93cbc49ef688fd92e7b53c` |
+
+Both architectures have matching symbol ZIPs, corresponding source tarballs
+including recursive submodule contents, and build/architecture evidence ZIPs.
+`SHA256SUMS.txt` covers all eight archives. Assets are renamed copies of the exact
+qualified CI outputs; portable/symbol/source bytes were not rebuilt or modified.
+The evidence package hash binds each original CI ZIP to its renamed release ZIP.
+Source snapshots and build manifests identify the release commit; maintained
+common-c/PyroWave patch provenance remains included.
+
+Hosted architecture/startup and regression tests do not qualify every GPU/driver,
+clean-machine configuration or full live-streaming workload. Live PyroWave owner
+evidence is limited to the named Surface Pro 11 / Snapdragon X Plus / Adreno X1-85
+ARM64 workload above, using compute + CPU I420 fallback after unsupported shared
+fence import. Broad x64/shared-GPU performance, physical device loss and production
+latency remain unqualified. PyroWave HDR/4:4:4, native Vulkan presentation,
+isolated sessions and VR are not implemented in v0.2.0.
+
+Release-status documentation was updated after publication in a documentation-only
+follow-up. The tagged binaries/source remain on the release commit above, with
+inherited application version 6.2.0. The v0.1.0 release and its evidence are retained.
 
 ## Historical P1a bring-up and validation
 
