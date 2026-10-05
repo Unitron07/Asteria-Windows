@@ -227,7 +227,7 @@ private slots:
         QCOMPARE(prefs->videoCodecConfig,Prefs::VCC_FORCE_PYROWAVE);
         QCOMPARE(slider->property("to").toInt(),3000000);
         QVERIFY(prefs->autoAdjustBitrate);
-        QCOMPARE(slider->property("value").toInt(),88500);
+        QCOMPARE(slider->property("value").toInt(),199000);
         slider->setProperty("value",750000); QVERIFY(QMetaObject::invokeMethod(slider,"moved"));
         QCOMPARE(prefs->bitrateKbps,750000); QVERIFY(!prefs->autoAdjustBitrate);
         expression("resolutionComboBox.currentIndex = 2; resolutionComboBox.activated(2)");
