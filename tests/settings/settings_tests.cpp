@@ -2,6 +2,7 @@
 #include "utils.h"
 #include <QtTest>
 #include <QGuiApplication>
+#include <QFontDatabase>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QProcess>
@@ -82,6 +83,7 @@ class SettingsTests : public QObject {
 private slots:
     void initTestCase() {
         QVERIFY(directory.isValid());
+        QVERIFY(!QFontDatabase::applicationFontFamilies(0).isEmpty());
         QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,directory.path());
         prefs = Prefs::get();
     }
@@ -248,6 +250,11 @@ private slots:
 };
 int main(int argc,char** argv) {
     QGuiApplication app(argc,argv);
+    // The offscreen platform does not discover Windows system fonts. Load the
+    // installed UI font explicitly so layout measurements and captures are real.
+    const int fontId = QFontDatabase::addApplicationFont(qEnvironmentVariable("WINDIR") + "/Fonts/segoeui.ttf");
+    if (fontId < 0) { qCritical("Cannot load the installed Segoe UI font"); return 1; }
+    app.setFont(QFont(QFontDatabase::applicationFontFamilies(fontId).value(0),9));
     QCoreApplication::setOrganizationName("AsteriaSettingsTests");
     QCoreApplication::setApplicationName("Preferences");
     QSettings::setDefaultFormat(QSettings::IniFormat);
