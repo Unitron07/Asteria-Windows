@@ -17,6 +17,11 @@ class SyncTests(unittest.TestCase):
         self.original = Path.cwd()
         self.temp = tempfile.TemporaryDirectory()
         os.chdir(self.temp.name)
+        # GitHub sets this variable even for the test step. Keep summaries in
+        # the isolated fixture rather than writing into the runner's live summary.
+        self.summary_env = patch.dict(os.environ, {
+            'GITHUB_STEP_SUMMARY': str(Path(self.temp.name) / 'build/upstream-summary.md')})
+        self.summary_env.start()
         sync.git('init', '-b', 'main')
         sync.git('config', 'user.name', 'Test')
         sync.git('config', 'user.email', 'test@example.invalid')
@@ -26,6 +31,7 @@ class SyncTests(unittest.TestCase):
         self.base = sync.git('rev-parse', 'HEAD').stdout.strip()
 
     def tearDown(self):
+        self.summary_env.stop()
         os.chdir(self.original)
         self.temp.cleanup()
 
