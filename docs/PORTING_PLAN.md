@@ -33,15 +33,38 @@ Updated after owner validation: Asteria identity and x64/ARM64 CI packaging are 
 
 The original choice to reuse Moonlight's Windows streaming stack is sound. The revised plan makes the fork decision explicit, removes a redundant new application shell, separates existing upstream features from porting work, and gives every milestone an observable completion gate.
 
-**Chosen approach: extend the merged Moonlight PC fork, establish native Windows x64 and ARM64 baselines, then add selected Artemis-inspired features incrementally.** Preserve upstream history and layout. See [the feature audit](FEATURE_AUDIT.md) and [architecture](ARCHITECTURE.md).
+**Chosen approach: extend the merged Moonlight PC fork as a Windows game-streaming client focused on codec experimentation, low-latency presentation, isolated remote sessions and future remote PCVR.** Native x64/ARM64 support and Experimental PyroWave are the current foundation. The old Apollo convenience-feature sequence is deprioritized in favor of measured codec/performance work and native GPU-resident presentation, followed by isolated sessions and VR. Preserve upstream history and layout. See [the feature audit](FEATURE_AUDIT.md) and [architecture](ARCHITECTURE.md).
 
 ## Scope and dependency order
 
-M0 is merged and M0A native ARM64 is complete based on owner-verified process architecture and Apollo AV1 streaming on real hardware. M1 identity is implemented; its profiles/session work, M1A performance work, and M2–M4 remain planned. M1B has historical source-diff/P0 evidence; P0-R Vibepollo compatibility and hardware requalification are complete. P0.5 offline SDL visual qualification is complete on both named targets; P1a/P1b live work remains future work. Apply M5 qualification to the initial preview's inherited streaming and identity scope; later feature milestones are not prerequisites for that preview. Clipboard (M3) depends on capability work in M2. Performance changes must follow measurements, and a cross-build alone does not complete M0A. M6 Asteria VR follows the core streaming and performance baselines as a separate later feature; it does not depend on M1B PyroWave or the M2–M4 Apollo extensions.
+M0 baseline import is merged; M0A native ARM64 is complete on the recorded device;
+M1 identity/desktop foundation is implemented in part. M1A remains measurement-first,
+and M1B Experimental PyroWave includes owner-validated live ARM64 SDR 4:2:0.
+Broader hardware/performance qualification remains open. Standard codecs and
+Moonlight behavior remain the baseline; do not add complexity merely to optimize.
+
+The active sequence is:
+
+1. **Historical/current foundation — M0, M0A, M1, M1A, M1B:** baseline import,
+   native ARM64, identity/desktop foundation, measured Windows performance work
+   and Experimental PyroWave.
+2. **Native Vulkan PyroWave presentation:** the next major technical milestone,
+   explicitly post-v0.2.0; GPU-resident presentation is not implemented.
+3. **Isolated sessions / MultiSeat:** the next major feature phase after performance,
+   with paired client and host work.
+4. **Asteria VR:** paired client/host remote PCVR after isolated sessions.
+
+Descriptive phase names define this order. M2–M4 remain historical, inactive labels
+under “Deprioritized / Possible Future Integrations”; M6 (VR) and M7 (isolated
+sessions) are retained only as historical identifiers, not execution order.
+M5 is a recurring release-qualification gate, not a prerequisite feature sequence.
+Profiles and desktop shortcuts remain foundation follow-ups, not the next major
+phase. Neither clipboard nor the old M2–M4 sequence gates isolated sessions or VR.
+v0.2.0 is still being prepared; this roadmap edit changes no release state.
 
 Primary targets: **Windows 11 x64 and native ARM64**, both included in v0.1.0. Native ARM64 means the client and its process-loaded runtime DLLs run as ARM64, without x64 emulation; cross-compiling on an x64 build host is acceptable. Windows 10 x64 remains a separate compatibility target pending runtime documentation and real-machine tests. Record exact minimum OS builds before publishing qualified binaries. M0A completion is specific to the recorded device and workload, not a broad ARM64 support matrix.
 
-The first public preview covers inherited Moonlight streaming and the implemented Asteria identity, delivered as x64 and native ARM64 portable ZIPs after release-specific validation. Desktop profiles, additional session actions, measured frame-pacing changes, Apollo clipboard, virtual-display controls, and host commands remain later roadmap work. Touch overlays, file transfer, simultaneous multiple streams, and a host companion service are outside the first release.
+The first public preview covers inherited Moonlight streaming and the implemented Asteria identity, delivered as x64 and native ARM64 portable ZIPs after release-specific validation. Desktop profiles and session actions remain foundation follow-ups; performance changes require measurements. Apollo clipboard, virtual-display convenience requests and host commands are deprioritized possible future integrations. Touch overlays, file transfer, simultaneous multiple streams, and a host companion service are outside the first release.
 
 ## M0 — Establish the Moonlight fork and reproducible baseline
 
@@ -85,7 +108,7 @@ Additional codec, input/audio, lifecycle, clean-machine, decoder, and exact host
 - [ ] Add configurable session shortcuts and distinct actions for disconnecting the client, quitting the remote application, and closing the local app. Preserve a local capture-release shortcut.
 - [ ] Extend existing diagnostics only for missing data; retain upstream stats and avoid adding per-frame logging.
 
-**Exit gate on x64 and ARM64:** profiles survive restart and invalid data fails safely; settings/credentials remain isolated; 20 connect/disconnect cycles leave no stuck input or active extension tasks; disconnect leaves the host application running while an explicitly selected quit action has the documented host effect. M1A–M4 changes also retain both architecture builds and run affected checks on each target.
+**Exit gate on x64 and ARM64:** profiles survive restart and invalid data fails safely; settings/credentials remain isolated; 20 connect/disconnect cycles leave no stuck input or active extension tasks; disconnect leaves the host application running while an explicitly selected quit action has the documented host effect. All subsequent changes retain both architecture builds and run affected checks on each target.
 
 ## M1A — Windows streaming performance and frame pacing
 
@@ -167,33 +190,6 @@ probing remain future work.
 
 **Deliverables:** completed Vibepollo-compatible P0-R offline source/build/parser and hardware evidence, plus completed P0.5 offline SDL presentation qualification on both named targets; owner-validated P1a live ARM64 integration and normal-build bitrate QoL; P1b transport hardening remains later.
 
-## M2 — Pointer/scaling correctness and Apollo capability foundation
-
-- [ ] Validate upstream direct/relative mouse modes, wheel input, keyboard layouts, focus behavior, and mixed-DPI monitor moves before changing them.
-- [ ] Implement only verified gaps in fit/fill/stretch, pointer-mode switching, and session controls. Keep pan/zoom and touchpad overlays as later work unless a specific desktop requirement needs them.
-- [ ] Parse authenticated host extension fields, permission bits, driver readiness, and command names; keep absence, denial, and transient failure distinct.
-- [ ] Add fixtures for a standard host, Apollo with permissions, Apollo with denied permissions, malformed/missing fields, and changed capabilities after reconnect.
-
-**Exit gate:** direct-pointer corner/center mapping stays correct under every implemented scaling mode, 100/150/200% DPI, and monitor switching; focus loss releases input. Ordinary Apollo streaming works with extension fields absent and no unsolicited extension actions. A denied or failed extension does not stop the stream.
-
-## M3 — Apollo text clipboard, then virtual-display requests
-
-- [ ] Implement manual Send/Receive using the audited HTTPS contract and existing pairing trust. Add bounded requests, Unicode handling, echo suppression, cancellation, and explicit error states.
-- [ ] Start with a proposed 1 MiB UTF-8 text limit and a 5-second request timeout; validate them during the spike. Limit response accumulation as well as outgoing data.
-- [ ] Add automatic per-host synchronization only after manual behavior passes; default it off and document its triggers. Exclude file/image clipboard formats.
-- [ ] Request Apollo virtual displays only after authenticated capability/readiness checks. Validate launch and resume separately; do not assume their behavior is identical.
-- [ ] Exercise driver-missing, permission-denied, launch-failure, disconnect, client-crash, and reconnect cases. Document host-owned cleanup and recovery rather than attempting to restore the host's entire display configuration from the client.
-
-**Exit gate:** plain text transfers both ways only with an active authorized session; failures preserve the local clipboard and do not leak content to another host. Unsupported responses, including an HTTP-200 error document, are not treated as clipboard text or successful writes. Apollo display requests succeed on the recorded host build or give an actionable reason; ordinary Apollo launch remains unchanged.
-
-## M4 — Apollo server commands
-
-- [ ] Audit the Android JNI/native path against the chosen PC core and host revision. Implement a minimal native extension; preserve modern PC protocol fixes.
-- [ ] Map host-advertised command names to their original indexes; enforce the native range and permissions, and handle missing/changed command lists.
-- [ ] Add explicit action confirmation as described in the architecture. Do not retry commands automatically or present a transport send as confirmed execution.
-
-**Exit gate:** a harmless configured command reaches the intended action on the test host, invalid/denied commands are blocked, reconnect does not replay actions, and standard Apollo streaming still passes. Include packet/API tests for the native patch and record provenance.
-
 ## M5 — Qualify and release
 
 - [ ] When M1B PyroWave support is included, qualify the host/client/GPU support matrix, runtime packaging, codec fallback, and comparisons; keep it experimental until evidenced.
@@ -205,9 +201,59 @@ probing remain future work.
 
 **Exit gate:** all required checks for the advertised release scope pass, unsupported hardware/OS combinations are listed honestly, artifacts can be reproduced from the published inputs, and no unresolved regression defeats an included feature.
 
-## M6 — Asteria VR (remote PCVR)
+## Native Vulkan PyroWave presentation — next performance phase
 
-**Status:** planned for after the core Windows streaming and M1A performance work. Asteria VR is PC-to-PC: the host PC runs SteamVR and renders the game; the VR headset is physically connected to the Windows client PC. This milestone is separate from the phone/wearable PSVR2 wireless-adapter project. PSVR2 plus its PC adapter may eventually be one qualified client-side headset configuration, but the architecture must remain headset-agnostic. M6 may reuse suitable codec/transport work from M1B, but PyroWave is neither required nor the default design.
+**Status:** planned, explicitly post-v0.2.0; not implemented. The next major PyroWave
+performance work is architectural, rather than more CPU-fallback micro-optimization.
+
+Current architecture attempts GPU decode with D3D11/Vulkan interop where supported.
+On the tested Qualcomm driver, interop is unavailable and the working path is
+compute decoder -> CPU I420 fallback. This is device-specific evidence, not a
+universal performance claim or a claim that Qualcomm cannot decode PyroWave.
+
+Conceptual target:
+
+```text
+PyroWave Vulkan decode
+    -> GPU-resident Y/U/V
+    -> Vulkan presentation shader
+    -> Vulkan swapchain
+```
+
+- [ ] Avoid Vulkan -> CPU -> D3D11 readback/re-upload.
+- [ ] Remove dependence on Vulkan/D3D11 external fence sharing for this path.
+- [ ] Reduce presentation overhead and improve ARM64/Qualcomm viability.
+- [ ] Retain safe fallback paths and standard-codec behavior.
+- [ ] Compare decode/present time, latency, drops and GPU use against current
+      fallback and standard codecs on named x64/ARM64 hardware under matched conditions.
+
+**Exit gate:** demonstrate GPU-resident presentation and a measured benefit on
+named hardware, with fallback, lifecycle and standard-codec regressions checked.
+No universal speedup is promised.
+
+## Isolated sessions / MultiSeat — next feature phase (historical M7)
+
+**Status:** planned after the performance phase; not implemented. One physical
+host remains usable locally while a remote user receives an isolated desktop/session.
+This is primarily host-side work in a separate Asteria-oriented Vibepollo fork/host
+extension. See [responsibilities](#host-dependent-roadmap-boundaries) for candidate
+backends and client/host ownership.
+
+- [ ] Evaluate separate Windows sessions/multiseat and VM-backed sessions with
+      virtual display/audio and isolated keyboard/mouse/gamepad routing.
+- [ ] Define session-mode selection, control/status, stream binding and isolated
+      input transport across the paired client/host contract.
+- [ ] Qualify local/remote coexistence, reconnect/disconnect, launch failure and
+      host resource cleanup on named hardware.
+
+**Exit gate:** prove local usability alongside an isolated remote session, input
+and display/audio isolation, lifecycle recovery and measured resource/performance
+limits. Native-class performance is a possible target only with hardware headroom;
+equal performance is not promised.
+
+## Asteria VR — after isolated sessions (historical M6)
+
+**Status:** planned after isolated sessions / MultiSeat. Their host-control/session-lifecycle infrastructure may benefit VR, but is not a hard technical dependency. Asteria VR is PC-to-PC: the host PC runs SteamVR and renders the game; the VR headset is physically connected to the Windows client PC. This milestone is separate from the phone/wearable PSVR2 wireless-adapter project. PSVR2 plus its PC adapter may eventually be one qualified client-side headset configuration, but the architecture must remain headset-agnostic. M6 may reuse suitable codec/transport work from M1B, but PyroWave is neither required nor the default design.
 
 - [ ] Prove a host SteamVR driver/protocol path and client headset/runtime backend. Define device capabilities, coordinate spaces, timestamps, and a clock-synchronization method; transport head/controller/tracker poses to the host and measure pose age and jitter.
 - [ ] Deliver stereoscopic, low-latency frames from the host renderer to the client headset. Measure encode, network, decode, presentation, and motion-to-photon timing with a supported test headset.
@@ -227,42 +273,95 @@ Keep feature PRs small and avoid mass renames of upstream source directories. Re
 
 - Exact Windows 11 ARM64 minimum build, GPU driver, selected decoder, and Apollo version: record for first-preview release qualification; M0A device/SoC/RAM and native process architecture are recorded.
 - Exact Windows 10 x64 minimum build and runtime support: resolve before advertising compatibility.
-- Tested Apollo version and the original manual test's client/host details: record for release qualification; extension-specific support boundaries follow in M2. Sunshine is not a required project/preview qualification target.
+- Tested Apollo version and the original manual test's client/host details: record for release qualification; extension-specific support boundaries are retained in the deprioritized M2 notes and revisited only as needed. Sunshine is not a required project/preview qualification target.
 - Default frame-pacing policy and whether adaptive buffering/VRR modes graduate from experimental status: resolve from M1A measurements, not Android behavior alone.
 - Overlay rendering approach: choose only after testing the existing video-window integration and latency impact.
 - Touch-device qualification beyond the baseline keyboard/mouse/gamepad cases remains later work.
 
-Do not attach calendar estimates until the ARM64 baseline, Windows performance experiments, and Apollo protocol spikes identify actual effort. P0-R and P0.5 offline presentation/color qualification are complete on both named targets. P1a live integration is implemented and owner-validated on ARM64. The major post-v0.2.0 performance milestone is native Vulkan PyroWave presentation. M1A initial comparisons use Moonlight's existing statistics; new instrumentation or frame-pacing changes require a measured reason. Same-commit x64 smoke testing and detailed Apollo/hardware records remain first-preview release checks. M1 identity/storage isolation is implemented; profiles, session workflows, M1A performance work, M1B transport hardening/native Vulkan presentation, M2–M4, M6 VR and M7 isolated sessions remain future work.
+Do not attach calendar estimates before measurements and client/host contract
+spikes establish effort. M1A starts with existing Moonlight statistics; new
+instrumentation or pacing changes require a measured reason. P0-R and P0.5 are
+complete on the named targets; live P1a is owner-validated on ARM64, with broader
+qualification open. Decide the native Vulkan device/lifecycle/fallback design
+from evidence, then evaluate isolated-session backends and their host contract.
+VR runtime/headset qualification follows isolated-session work. Profiles, P1b
+transport hardening and the old Apollo integrations do not define the active order.
 
 ## Host-dependent roadmap boundaries
 
-Asteria-Windows is the client repository. The following features require paired
-work in the client and a separately maintained Asteria-oriented Vibepollo fork
-or host extension; none is implemented here today.
+Asteria-Windows is the client repository. Isolated sessions and remote PCVR require
+substantial host-side work in a separately maintained Asteria-oriented Vibepollo
+fork/host extension, outside this repository. Neither feature is implemented here.
+The active order is native Vulkan presentation, isolated sessions, then VR.
 
-### M6 — Asteria VR responsibilities
+### Isolated sessions / MultiSeat (historical M7)
 
-Remote PCVR requires host SteamVR/OpenXR and virtual HMD/runtime integration,
-pose/controller input ingestion, stereo frame capture, timing/metadata and session
-lifecycle. Asteria supplies the local headset/runtime backend, tracking/controller
-capture and upstream pose/input transport, stereo decoding, local headset
-presentation and timing/reprojection integration. PSVR2 with its PC adapter is
-one possible local configuration; the design remains headset-agnostic.
-VR is independent of PyroWave, which may be evaluated later but is not required.
-
-### M7 — Isolated Sessions / MultiSeat
-
-Future concept: one physical host remains locally usable while another user
-streams an isolated desktop/session. Candidate backends include separate Windows
-sessions/multiseat or a VM, virtual displays/audio and isolated keyboard, mouse
-and gamepad routing. This is primarily host-side implementation.
+The concept is one physical host PC remaining usable locally while a remote user
+receives an isolated desktop/session. Candidate backends include separate Windows
+sessions/multiseat or a VM, virtual displays, virtual audio, and isolated keyboard,
+mouse and gamepad routing. Most implementation belongs on the host.
 
 | Asteria client | Vibepollo fork / host extension |
 | --- | --- |
-| UI, control requests and session status | Session/VM creation and cleanup/resource management |
-| Stream reception and isolated input transport | Display/audio lifecycle, isolated input routing |
-| Host-session selection | Application/session launch and stream binding |
+| Session-mode selection, UI/control requests and session state/status | Session/VM creation and cleanup/resource management |
+| Stream reception and isolated input transport | Virtual display/audio lifecycle and isolated input routing |
+| Reconnect/disconnect UX | Application/session launch and stream binding |
 
-No implementation or equal-performance promise exists. Native-class performance
-may be a future target when hardware headroom allows; CPU/GPU contention determines
-real results.
+There is no equal-performance promise. Native-class performance is a possible
+target only when hardware headroom permits; CPU/GPU contention determines results.
+
+### Asteria VR responsibilities (historical M6)
+
+Remote PCVR follows isolated-session work because host-control and session-lifecycle
+infrastructure may be reusable; this ordering is not a hard technical dependency.
+The host extension would own SteamVR/OpenXR and virtual HMD/runtime integration,
+pose/controller ingestion, stereo frame capture, timing metadata and session
+lifecycle. Asteria would own local headset/runtime integration, pose/controller
+capture, upstream tracking/input transport, stereo decode, headset presentation
+and timing/reprojection.
+
+PSVR2 with its PC adapter is one possible future local headset configuration;
+the design remains headset-agnostic. PyroWave may be evaluated later for VR but
+is not a prerequisite.
+
+## Deprioritized / Possible Future Integrations
+
+The old M2–M4 sequence is inactive and is no longer the near-term roadmap.
+The original technical checklists and gates below are retained as design notes
+for possible future work, not implementation commitments. This includes standalone
+pointer/scaling work, Apollo capability parsing, clipboard integration,
+virtual-display convenience requests and server commands. Correctness bugs should
+still be fixed when found; this status concerns the standalone feature sequence.
+
+Some pieces may return as supporting plumbing: capability parsing could detect
+isolated-session or VR support, virtual-display control could serve session
+workflows, and host-command plumbing could support session lifecycle control.
+Any clipboard work would still need authenticated capability/permission checks;
+that safety requirement is not an active milestone dependency.
+
+### M2 — Pointer/scaling correctness and Apollo capability foundation
+
+- [ ] Validate upstream direct/relative mouse modes, wheel input, keyboard layouts, focus behavior, and mixed-DPI monitor moves before changing them.
+- [ ] Implement only verified gaps in fit/fill/stretch, pointer-mode switching, and session controls. Keep pan/zoom and touchpad overlays as later work unless a specific desktop requirement needs them.
+- [ ] Parse authenticated host extension fields, permission bits, driver readiness, and command names; keep absence, denial, and transient failure distinct.
+- [ ] Add fixtures for a standard host, Apollo with permissions, Apollo with denied permissions, malformed/missing fields, and changed capabilities after reconnect.
+
+**Exit gate:** direct-pointer corner/center mapping stays correct under every implemented scaling mode, 100/150/200% DPI, and monitor switching; focus loss releases input. Ordinary Apollo streaming works with extension fields absent and no unsolicited extension actions. A denied or failed extension does not stop the stream.
+
+### M3 — Apollo text clipboard, then virtual-display requests
+
+- [ ] Implement manual Send/Receive using the audited HTTPS contract and existing pairing trust. Add bounded requests, Unicode handling, echo suppression, cancellation, and explicit error states.
+- [ ] Start with a proposed 1 MiB UTF-8 text limit and a 5-second request timeout; validate them during the spike. Limit response accumulation as well as outgoing data.
+- [ ] Add automatic per-host synchronization only after manual behavior passes; default it off and document its triggers. Exclude file/image clipboard formats.
+- [ ] Request Apollo virtual displays only after authenticated capability/readiness checks. Validate launch and resume separately; do not assume their behavior is identical.
+- [ ] Exercise driver-missing, permission-denied, launch-failure, disconnect, client-crash, and reconnect cases. Document host-owned cleanup and recovery rather than attempting to restore the host's entire display configuration from the client.
+
+**Exit gate:** plain text transfers both ways only with an active authorized session; failures preserve the local clipboard and do not leak content to another host. Unsupported responses, including an HTTP-200 error document, are not treated as clipboard text or successful writes. Apollo display requests succeed on the recorded host build or give an actionable reason; ordinary Apollo launch remains unchanged.
+
+### M4 — Apollo server commands
+
+- [ ] Audit the Android JNI/native path against the chosen PC core and host revision. Implement a minimal native extension; preserve modern PC protocol fixes.
+- [ ] Map host-advertised command names to their original indexes; enforce the native range and permissions, and handle missing/changed command lists.
+- [ ] Add explicit action confirmation as described in the architecture. Do not retry commands automatically or present a transport send as confirmed execution.
+
+**Exit gate:** a harmless configured command reaches the intended action on the test host, invalid/denied commands are blocked, reconnect does not replay actions, and standard Apollo streaming still passes. Include packet/API tests for the native patch and record provenance.

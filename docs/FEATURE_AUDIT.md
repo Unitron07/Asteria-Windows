@@ -28,7 +28,7 @@ The public release is v0.1.0; v0.2.0 has not been tagged or released.
 Earlier future/PENDING PyroWave statements below describe the inspected snapshots;
 the current state above supersedes them.
 
-Source review: September 12, 2026. Findings below describe the inspected snapshots. Subsequent x64 builds passed and the owner confirmed the client works; those results and their limits are recorded in [BASELINE.md](BASELINE.md). Current Asteria identity and x64/ARM64 CI packaging are implemented; M0A real-device native ARM64 validation and M1B P0-R Vibepollo-compatible x64/ARM64 hardware qualification are complete; [P0.5 offline SDL visual qualification](VALIDATION.md#m1b-p05-offline-sdl-qualification) is complete on both named targets; [P1a](NEXT_STEP.md) is next and remains future work, with live PyroWave negotiation still unimplemented; initial M1A comparisons use Moonlight's existing statistics. This historical source audit is not a list of shipped Apollo extensions; see the [README](../README.md) for current preview scope.
+Source review: September 12, 2026. Findings below describe the inspected snapshots. Subsequent x64 builds passed and the owner confirmed the client works; those results and their limits are recorded in [BASELINE.md](BASELINE.md). Current Asteria identity and x64/ARM64 CI packaging are implemented; M0A real-device native ARM64 validation and M1B P0-R Vibepollo-compatible x64/ARM64 hardware qualification are complete; [P0.5 offline SDL visual qualification](VALIDATION.md#m1b-p05-offline-sdl-qualification) is complete on both named targets; [P1a](NEXT_STEP.md) live SDR 4:2:0 is now implemented and owner-validated on the named ARM64 target, with broader qualification open; initial M1A comparisons use Moonlight's existing statistics. This historical source audit is not a list of shipped Apollo extensions; see the [README](../README.md) for current preview scope.
 
 ## Comparison snapshots
 
@@ -62,13 +62,19 @@ The parent repositories' gitlinks establish those SHAs; their [.gitmodules (Andr
 | Performance display | Extend only if needed | Preserve existing statistics; add useful capability/decoder diagnosis [S14] |
 | Multi-monitor, high DPI, portrait use | Validate then extend | Start with one stream moved between local monitors; distinguish this from simultaneous host-monitor streams |
 | Session back/quit menu and custom shortcuts | Extend | Separate disconnect, remote app quit, local close, and capture release [S5] |
-| Apollo text clipboard | Port, M3 | Paired HTTPS, separate read/write permissions, active-session restriction [S6, S7] |
-| Apollo virtual display and scale factor | Port, M3 | Host capability/readiness and launch/resume contract; host owns driver/lifecycle [S6, S7] |
-| Apollo server commands | Port, M4 | Command list from HTTPS; native control-channel dispatch [S6, S8, S9] |
+| Apollo text clipboard | Deprioritized (historical M3) | Paired HTTPS, separate read/write permissions, active-session restriction [S6, S7] |
+| Apollo virtual display and scale factor | Deprioritized (historical M3) | Host capability/readiness and launch/resume contract; host owns driver/lifecycle [S6, S7] |
+| Apollo server commands | Deprioritized (historical M4) | Command list from HTTPS; native control-channel dispatch [S6, S8, S9] |
 | Virtual buttons/layout import/export, touchpad overlay | Defer | Windows touch-device follow-up; investigate Android layout schema before claiming import compatibility [S5] |
 | Android soft keyboard, DeX, foldable positioning, device vibration fallback | Omit direct port | Use Windows equivalents only when an actual requirement exists [S5] |
 | File transfer, simultaneous multiple streams | Out of first release | Not implied by clipboard support or local monitor selection |
-| Asteria VR (remote PCVR) | Plan, M6 | New PC-to-PC SteamVR driver/protocol and Windows client headset path; no shipped support or qualification is established by this source audit |
+| Isolated sessions / MultiSeat | Plan after performance (historical M7) | Primarily host-side sessions/VMs, virtual display/audio and isolated input; paired client controls, status and streaming |
+| Asteria VR (remote PCVR) | Plan after isolated sessions (historical M6) | New PC-to-PC SteamVR driver/protocol and Windows client headset path; no shipped support or qualification is established by this source audit |
+
+The active order is measured codec/performance work, post-v0.2.0 native Vulkan
+PyroWave presentation, isolated sessions / MultiSeat, then VR. The Apollo contract
+findings below retain technical notes for possible future supporting integrations;
+M2–M4 no longer define standalone active milestones. See the [porting plan](PORTING_PLAN.md).
 
 ## Planned Asteria VR scope
 
@@ -125,33 +131,37 @@ Upstream `setup-deps.ps1` downloads the `v15` Windows dependency archives. The M
 
 ## Host-dependent roadmap boundaries
 
-Asteria-Windows is the client repository. The following features require paired
-work in the client and a separately maintained Asteria-oriented Vibepollo fork
-or host extension; none is implemented here today.
+Asteria-Windows is the client repository. Isolated sessions and remote PCVR require
+substantial host-side work in a separately maintained Asteria-oriented Vibepollo
+fork/host extension, outside this repository. Neither feature is implemented here.
+The active order is native Vulkan presentation, isolated sessions, then VR.
 
-### M6 — Asteria VR responsibilities
+### Isolated sessions / MultiSeat (historical M7)
 
-Remote PCVR requires host SteamVR/OpenXR and virtual HMD/runtime integration,
-pose/controller input ingestion, stereo frame capture, timing/metadata and session
-lifecycle. Asteria supplies the local headset/runtime backend, tracking/controller
-capture and upstream pose/input transport, stereo decoding, local headset
-presentation and timing/reprojection integration. PSVR2 with its PC adapter is
-one possible local configuration; the design remains headset-agnostic.
-VR is independent of PyroWave, which may be evaluated later but is not required.
-
-### M7 — Isolated Sessions / MultiSeat
-
-Future concept: one physical host remains locally usable while another user
-streams an isolated desktop/session. Candidate backends include separate Windows
-sessions/multiseat or a VM, virtual displays/audio and isolated keyboard, mouse
-and gamepad routing. This is primarily host-side implementation.
+The concept is one physical host PC remaining usable locally while a remote user
+receives an isolated desktop/session. Candidate backends include separate Windows
+sessions/multiseat or a VM, virtual displays, virtual audio, and isolated keyboard,
+mouse and gamepad routing. Most implementation belongs on the host.
 
 | Asteria client | Vibepollo fork / host extension |
 | --- | --- |
-| UI, control requests and session status | Session/VM creation and cleanup/resource management |
-| Stream reception and isolated input transport | Display/audio lifecycle, isolated input routing |
-| Host-session selection | Application/session launch and stream binding |
+| Session-mode selection, UI/control requests and session state/status | Session/VM creation and cleanup/resource management |
+| Stream reception and isolated input transport | Virtual display/audio lifecycle and isolated input routing |
+| Reconnect/disconnect UX | Application/session launch and stream binding |
 
-No implementation or equal-performance promise exists. Native-class performance
-may be a future target when hardware headroom allows; CPU/GPU contention determines
-real results.
+There is no equal-performance promise. Native-class performance is a possible
+target only when hardware headroom permits; CPU/GPU contention determines results.
+
+### Asteria VR responsibilities (historical M6)
+
+Remote PCVR follows isolated-session work because host-control and session-lifecycle
+infrastructure may be reusable; this ordering is not a hard technical dependency.
+The host extension would own SteamVR/OpenXR and virtual HMD/runtime integration,
+pose/controller ingestion, stereo frame capture, timing metadata and session
+lifecycle. Asteria would own local headset/runtime integration, pose/controller
+capture, upstream tracking/input transport, stereo decode, headset presentation
+and timing/reprojection.
+
+PSVR2 with its PC adapter is one possible future local headset configuration;
+the design remains headset-agnostic. PyroWave may be evaluated later for VR but
+is not a prerequisite.

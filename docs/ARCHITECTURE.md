@@ -31,7 +31,7 @@ future P1a statements there are superseded by the implementation above.
 
 Use Moonlight PC as the application, retaining its source history and layout. Do not build a second Windows shell or extract its streaming internals into a new framework for the first release. This follows the project owner's September 12, 2026 direction.
 
-The [audit](FEATURE_AUDIT.md) pins the reviewed code. M0 integration is merged, x64 CI passed, and the owner confirmed the tested client works; see [BASELINE.md](BASELINE.md) for the evidence and remaining qualification records. Native x64/ARM64 builds and packaging pass CI, and the Asteria identity is implemented. M0A real-device ARM64 validation is complete; M1A begins with Moonlight's built-in statistics; M1B source-diff groundwork and historical P0 offline proof are complete on x64 and native ARM64. P0-R codec/framing requalification and P0.5 offline SDL presentation qualification are complete on the named x64/ARM64 hardware; P1a live SDR 4:2:0 integration is implemented experimentally; owner interoperability qualification is pending. Frame-pacing changes require measured evidence. The extension architecture below describes planned work.
+The [audit](FEATURE_AUDIT.md) pins the reviewed code. M0 integration is merged, x64 CI passed, and the owner confirmed the tested client works; see [BASELINE.md](BASELINE.md) for the evidence and remaining qualification records. Native x64/ARM64 builds and packaging pass CI, and the Asteria identity is implemented. M0A real-device ARM64 validation is complete; M1A begins with Moonlight's built-in statistics; M1B source-diff groundwork and historical P0 offline proof are complete on x64 and native ARM64. P0-R codec/framing requalification and P0.5 offline SDL presentation qualification are complete on the named x64/ARM64 hardware; P1a live SDR 4:2:0 integration is implemented experimentally; owner interoperability is validated on the named ARM64 target; broader qualification remains open. Frame-pacing changes require measured evidence. The active order is measured codec/performance work, post-v0.2.0 native Vulkan PyroWave presentation, isolated sessions / MultiSeat, then VR. The Apollo extension architecture below is retained as deprioritized design guidance for possible future supporting integrations.
 
 ## Native Windows targets
 
@@ -45,16 +45,23 @@ Reuse upstream's ARM64 Qt/MSVC/qmake and packaging paths. Keep architecture-spec
 | --- | --- | --- |
 | UI | `app/gui/` | Extend existing settings and session actions; use keyboard-accessible controls |
 | Settings | `app/settings/streamingpreferences.*` | Versioned profiles and validated Asteria settings |
-| Discovery, pairing, host HTTP | `app/backend/nvcomputer.*`, `nvhttp.*` | Parse Apollo fields and add a bounded authenticated clipboard request path |
+| Discovery, pairing, host HTTP | `app/backend/nvcomputer.*`, `nvhttp.*` | Deprioritized: Apollo capability/clipboard contract notes; revisit for concrete host-control needs |
 | Session lifecycle | `app/streaming/session.cpp` | Attach extension services to the existing session |
 | Input | `app/streaming/input/` | Extend existing capture, direct-pointer, and shortcut paths |
-| Decode/render | Existing `app/streaming/` implementation | Preserve existing codecs; isolated P0 PyroWave offline GPU decode exists. P0-R is hardware-qualified on both targets; standalone P0.5 SDL presentation is qualified on both named targets; P1a explicit live integration remains future work |
-| Native protocol | `moonlight-common-c/moonlight-common-c/` | Keep the current upstream pin; P1 may add the reviewed minimal PyroWave protocol delta. Server-command extensions remain later work |
+| Decode/render | Existing `app/streaming/` implementation | Preserve existing codecs; isolated P0 PyroWave offline GPU decode exists. P0-R is hardware-qualified on both targets; standalone P0.5 SDL presentation is qualified on both named targets; P1a live SDR 4:2:0 is owner-validated on the named ARM64 target; broader qualification remains open |
+| Native protocol | `moonlight-common-c/moonlight-common-c/` | Keep the current upstream pin; P1 may add the reviewed minimal PyroWave protocol delta. Server-command extensions are deprioritized possible supporting integrations |
 | Build/package | `moonlight-qt.pro`, `app/app.pro`, `scripts/`, `wix/` | Asteria identity implemented; qualify portable packages before installer distribution |
 
 New extension classes belong beside the existing backend/session code. Class names and exact filenames can be chosen during implementation; these are responsibilities, not a demand for a new service framework.
 
 ## Responsibilities and boundaries
+
+### Deprioritized Apollo integration design notes
+
+Capability parsing, clipboard, virtual-display convenience requests and server
+commands are no longer standalone active milestones. These responsibilities remain
+useful if host capabilities, display control or command plumbing are needed for
+isolated-session or VR lifecycle workflows. They do not gate the active sequence.
 
 **Host capabilities:** maintain a per-host snapshot of supported, unsupported, and unknown extension states; permission bits; driver readiness; and the advertised command list. Refresh through the paired HTTPS path before launch/resume and after reconnect. Missing permission fields do not disable ordinary Sunshine streaming, but must not grant extension access. Parse permission values as an unsigned bitmask; preserve unknown bits without enabling unknown actions.
 
@@ -64,11 +71,25 @@ New extension classes belong beside the existing backend/session code. Class nam
 
 **Server commands:** show the host-advertised names and send only their validated index through the native control channel. Preserve original list order even if the UI sorts labels; reject indexes outside the supported range. Refresh the list before presenting actions, and do not replay a command after reconnect or timeout. A successful send is not proof of host execution. Do not introduce arbitrary shell-text execution. Confirm actions explicitly marked disruptive; if the host supplies no usable safety classification, confirm each command.
 
+### Core input, presentation and settings
+
 **Input and presentation:** retain upstream SDL routing rather than running a competing XInput/raw-input pipeline. Session shortcut configuration needs conflict detection and a reliable local capture-release action. Release pressed keys/buttons on focus loss and disconnect. Fit/fill/stretch or pan/zoom changes must share a coordinate transform with direct-pointer mapping. Prefer the existing rendering path; prototype and benchmark any overlay integration before depending on a QML overlay over the video window.
 
 **Settings and identity:** Asteria's separate app/settings/pairing/log/package identity is implemented. Qualify data-location and installer lifecycle behavior for the artifacts offered. Test coexistence with Moonlight. Do not silently copy pairing credentials. Profiles use stable host/app identifiers and explicit precedence: global defaults, host profile, app override, session-only override. Version the schema and preserve recoverable settings when migration fails. Verify whether upstream portable mode meets the intended data-location contract before promising a self-contained ZIP.
 
+## Native Vulkan presentation boundary — post-v0.2.0
+
+Planned, not implemented: PyroWave Vulkan decode -> GPU-resident Y/U/V ->
+Vulkan presentation shader -> Vulkan swapchain. Avoid CPU readback/D3D11
+re-upload and dependence on Vulkan/D3D11 external fence sharing to reduce
+presentation overhead and improve ARM64/Qualcomm viability. Retain safe fallback
+paths. This next major performance phase is architectural; measurements drive
+changes, with standard codecs and Moonlight behavior as the baseline.
+
 ## PyroWave boundary (M1B)
+
+The P0/P0-R/P0.5 details below are historical stage boundaries; current live
+P1a and normal-build packaging status is stated above.
 
 P0-R targets Nonary/Vibepollo with upstream codec
 `186f0393b77f7755953b5ecde994bb1cec2e4155`, bitstream ID `186f0393`, C API 0.6.0.
@@ -101,16 +122,16 @@ sampling remains formally unqualified because SDL2 has no independent siting
 control. True physical GPU loss was not induced and remains manual/unproven.
 Production/end-to-end latency, full pacing, 4:4:4 and HDR remain unqualified.
 
-P1a is the next future milestone and would add explicit SDR 4:2:0 choice (Auto remains standard codecs), complete
+The historical P1a plan called for explicit SDR 4:2:0 choice (Auto remains standard codecs), complete
 runtime/presentation preflight, bitstream-ID comparison, minimal SCM/RTSP/SDP
 negotiation, compatibility framing and safe fallback/reconnect without repeating
 host-app actions. P1b adds live record framing, record-start/critical-count/loss
 metadata, adaptive FEC and partial recovery. No live negotiation, user setting,
 partial loss recovery or bandwidth probe is implemented by P0-R or P0.5.
 
-## Planned Asteria VR boundary (M6)
+## Planned Asteria VR boundary (historical M6; after isolated sessions)
 
-Asteria VR is a separate, later PC-to-PC remote PCVR path. The host PC runs the game and SteamVR rendering; a Windows client PC has the headset physically attached and interfaces with its local VR runtime/driver. A host-side SteamVR driver/protocol integration should expose the remote headset and controllers to SteamVR. The client-side headset backend should adapt locally supported PCVR hardware without making any one headset or vendor protocol the transport definition. Both x64 and ARM64 support claims require hardware qualification, not just successful builds.
+Asteria VR follows isolated sessions as a paired client/host PC-to-PC remote PCVR path. Shared host-control/session-lifecycle infrastructure may help, but isolated sessions are not a hard technical dependency. The host PC runs the game and SteamVR rendering; a Windows client PC has the headset physically attached and interfaces with its local VR runtime/driver. A host-side SteamVR driver/protocol integration should expose the remote headset and controllers to SteamVR. The client-side headset backend should adapt locally supported PCVR hardware without making any one headset or vendor protocol the transport definition. Both x64 and ARM64 support claims require hardware qualification, not just successful builds.
 
 The network path must carry low-latency stereoscopic frames from host to client and time-sensitive head, controller, and tracker poses plus buttons/analog inputs from client to host. It must also account for host-to-client haptics and audio, client-to-host microphone audio, and eventually optional hand, eye, and full-body tracking where the local runtime exposes them. Define timestamps, coordinate spaces, device identity, and capability negotiation explicitly; unavailable sensors must remain optional. Clock synchronization, pose prediction, jitter and motion-to-photon latency measurement are design requirements. Investigate client-side reprojection/timewarp using the freshest local pose, with a clear fallback if a headset/runtime does not support the chosen approach.
 
@@ -130,33 +151,37 @@ A failed optional extension reports a useful status and leaves ordinary streamin
 
 ## Host-dependent roadmap boundaries
 
-Asteria-Windows is the client repository. The following features require paired
-work in the client and a separately maintained Asteria-oriented Vibepollo fork
-or host extension; none is implemented here today.
+Asteria-Windows is the client repository. Isolated sessions and remote PCVR require
+substantial host-side work in a separately maintained Asteria-oriented Vibepollo
+fork/host extension, outside this repository. Neither feature is implemented here.
+The active order is native Vulkan presentation, isolated sessions, then VR.
 
-### M6 — Asteria VR responsibilities
+### Isolated sessions / MultiSeat (historical M7)
 
-Remote PCVR requires host SteamVR/OpenXR and virtual HMD/runtime integration,
-pose/controller input ingestion, stereo frame capture, timing/metadata and session
-lifecycle. Asteria supplies the local headset/runtime backend, tracking/controller
-capture and upstream pose/input transport, stereo decoding, local headset
-presentation and timing/reprojection integration. PSVR2 with its PC adapter is
-one possible local configuration; the design remains headset-agnostic.
-VR is independent of PyroWave, which may be evaluated later but is not required.
-
-### M7 — Isolated Sessions / MultiSeat
-
-Future concept: one physical host remains locally usable while another user
-streams an isolated desktop/session. Candidate backends include separate Windows
-sessions/multiseat or a VM, virtual displays/audio and isolated keyboard, mouse
-and gamepad routing. This is primarily host-side implementation.
+The concept is one physical host PC remaining usable locally while a remote user
+receives an isolated desktop/session. Candidate backends include separate Windows
+sessions/multiseat or a VM, virtual displays, virtual audio, and isolated keyboard,
+mouse and gamepad routing. Most implementation belongs on the host.
 
 | Asteria client | Vibepollo fork / host extension |
 | --- | --- |
-| UI, control requests and session status | Session/VM creation and cleanup/resource management |
-| Stream reception and isolated input transport | Display/audio lifecycle, isolated input routing |
-| Host-session selection | Application/session launch and stream binding |
+| Session-mode selection, UI/control requests and session state/status | Session/VM creation and cleanup/resource management |
+| Stream reception and isolated input transport | Virtual display/audio lifecycle and isolated input routing |
+| Reconnect/disconnect UX | Application/session launch and stream binding |
 
-No implementation or equal-performance promise exists. Native-class performance
-may be a future target when hardware headroom allows; CPU/GPU contention determines
-real results.
+There is no equal-performance promise. Native-class performance is a possible
+target only when hardware headroom permits; CPU/GPU contention determines results.
+
+### Asteria VR responsibilities (historical M6)
+
+Remote PCVR follows isolated-session work because host-control and session-lifecycle
+infrastructure may be reusable; this ordering is not a hard technical dependency.
+The host extension would own SteamVR/OpenXR and virtual HMD/runtime integration,
+pose/controller ingestion, stereo frame capture, timing metadata and session
+lifecycle. Asteria would own local headset/runtime integration, pose/controller
+capture, upstream tracking/input transport, stereo decode, headset presentation
+and timing/reprojection.
+
+PSVR2 with its PC adapter is one possible future local headset configuration;
+the design remains headset-agnostic. PyroWave may be evaluated later for VR but
+is not a prerequisite.
