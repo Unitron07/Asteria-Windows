@@ -31,11 +31,19 @@ release until the reviewed PR is merged and verified.
 
 The next major PyroWave performance milestone is **post-v0.2.0**:
 `PyroWave Vulkan decode -> GPU-resident Y/U/V -> Vulkan presentation shader -> Vulkan swapchain`.
-It aims to avoid Vulkan -> CPU -> D3D11 readback and dependence on unsupported
-external-fence sharing on the tested Qualcomm driver. It is not implemented.
+It aims to avoid Vulkan -> CPU -> D3D11 readback/re-upload and dependence on
+Vulkan/D3D11 external-fence sharing, reduce presentation overhead and improve
+ARM64/Qualcomm viability while retaining safe fallback paths. It is not implemented.
+M1A remains measurement-first; standard codecs and Moonlight behavior are the
+baseline. This is architectural work rather than more CPU-fallback micro-optimization.
 P1b live records/FEC/partial recovery and bandwidth probing remain later work.
-M6 VR and M7 isolated sessions need a separate Vibepollo fork/host extension;
+After the performance phase, isolated sessions / MultiSeat are the next major
+feature area, followed by Asteria VR. Session-lifecycle work may benefit VR but
+is not a hard dependency, and VR does not require PyroWave. Both need a separate
+Asteria-oriented Vibepollo fork/host extension;
 see [the roadmap](PORTING_PLAN.md#host-dependent-roadmap-boundaries).
+Old M2–M4 Apollo convenience work is deprioritized; its notes are retained as
+possible supporting integrations rather than standalone active milestones.
 
 ## Historical P0/P0.5 evidence
 

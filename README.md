@@ -11,7 +11,7 @@ Live Vibepollo SDR 8-bit 4:2:0 is owner-validated on Surface Pro 11 / Snapdragon
 Plus / Adreno X1-85; this is not production-stable or universal hardware qualification.
 See [validation](docs/VALIDATION.md#current-live-arm64-owner-result).
 
-**Asteria** is an early-preview native Windows game-streaming client derived from [Moonlight PC](https://github.com/moonlight-stream/moonlight-qt). Enhanced integration with [Apollo](https://github.com/ClassicOldSong/Apollo) and selected desktop/workflow ideas inspired by [Artemis Android](https://github.com/MobinYengejehi/Artemis) are planned.
+**Asteria** is an early-preview native Windows game-streaming client derived from [Moonlight PC](https://github.com/moonlight-stream/moonlight-qt). Its active direction is codec experimentation and low-latency presentation on native Windows x64/ARM64, followed by isolated remote sessions and future remote PCVR.
 
 > **Release status:** [v0.1.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0) is released for Windows x64 and native ARM64 as unsigned portable ZIPs. Expect bugs and incomplete Asteria-specific functionality. The owner verified both CI builds work and previously validated native ARM64 execution on a Surface Pro 11th Edition; see the [release notes](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0) and [validation record](docs/VALIDATION.md) for the tested scope and evidence limits. Report reproducible problems in [GitHub issues](https://github.com/Unitron07/Asteria-Windows/issues).
 
@@ -23,7 +23,7 @@ See [validation](docs/VALIDATION.md#current-live-arm64-owner-result).
 - Separate x64 and native ARM64 CI builds and portable ZIPs. The owner reported a successful x64 baseline test; detailed hardware/host coverage remains recorded as incomplete in the [baseline report](docs/BASELINE.md).
 - **M0A owner validation:** Surface Pro 11th Edition, Snapdragon X Plus, 16 GB RAM; the Asteria process was verified as native ARM64. Against the official x64 Moonlight release running under Windows ARM64 emulation on the same device, repeated same-game 2560×1440, approximately 60 FPS AV1 streams on Apollo were effectively identical, with no meaningful decode, render, or frame-queue regression. Asteria's menus/settings felt noticeably smoother and snappier (qualitative, not timed). The Windows build, GPU driver, decoder, Apollo version, artifact hash, and run durations were not recorded; this is not a broad compatibility or measured latency claim. Moonlight v6.2.0 now provides an official ARM64 portable release. The earlier comparison above used emulated x64; CI-built upstream artifacts remain internal reference builds.
 
-The owner uses Nonary/Vibepollo (the Apollo-derived host service) for this project; Vibepollo is the primary PyroWave protocol target. The original preview baseline used Apollo. Sunshine is not a required qualification target. Apollo-specific capability handling, clipboard transfer, virtual-display controls, and server commands are roadmap work, not included preview features.
+The owner uses Nonary/Vibepollo (the Apollo-derived host service) for this project; Vibepollo is the primary PyroWave protocol target. The original preview baseline used Apollo. Sunshine is not a required qualification target. Apollo-specific capability handling, clipboard transfer, virtual-display controls, and server commands are deprioritized possible future integrations, not included preview features.
 
 ## Current public release
 
@@ -33,25 +33,38 @@ The owner confirmed the completed x64 and ARM64 builds work. Earlier native ARM6
 
 ## Roadmap
 
-1. **M0 — baseline import:** merged.
-2. **M0A — native Windows ARM64:** complete; CI/package architecture checks and owner-verified native ARM64 execution with Apollo AV1 streaming on a Surface Pro 11th Edition are recorded.
-3. **M1 — Asteria identity and desktop workflow:** identity/rebrand implemented; profiles, configurable shortcuts, and additional session workflows remain planned.
-4. **M1A — Windows performance baseline:** use Moonlight's built-in statistics for initial Asteria ARM64 versus emulated x64 Moonlight comparisons. The owner's repeated AV1 runs are initial evidence of stream parity, not a controlled benchmark. Add instrumentation only for a concrete missing metric; change frame pacing only when measurements show a real problem or benefit.
-5. **M1B — experimental PyroWave:** P0-R realigns the isolated offline proof with Nonary/Vibepollo: upstream codec `186f0393b77f7755953b5ecde994bb1cec2e4155`, bitstream ID `186f0393`, compatibility LE framing and complete record framing. P0-R is **complete**, hardware-qualified on RTX 4070 Ti x64 and native Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 ARM64: both formats, API 0.6.0, three decoder lifetimes and malformed rejection/recovery. P0.5 is **COMPLETE** on both named targets: offline raw I420 and compatibility/record SDL IYUV presentation, SDR 8-bit 4:2:0 BT.709 limited-range visual inspection, resize/scaling, fullscreen/maximize/restore, recreation/reset recovery and a 60 FPS pacing sanity loop. Exact chroma siting, physical GPU device loss, production latency, 4:4:4, HDR and live host/network interoperability remain unqualified. P1a explicit live SDR 4:2:0 negotiation, strict bitstream-ID checks, presentation and bitrate QoL are integrated in normal builds; live Vibepollo operation is owner-validated on the named ARM64 device. Broader GPU interop/performance qualification remains open. Native Vulkan presentation is post-v0.2.0 work. P1b live records/FEC/partial recovery remain later. See [the current contract](docs/PYROWAVE_VIBEPOLLO.md) and [next step](docs/NEXT_STEP.md).
-6. **M2 — pointer/scaling correctness and Apollo capability parsing:** planned.
-7. **M3 — Apollo text clipboard and virtual-display requests:** planned. 
-8. **M4 — Apollo server commands:** planned.
-9. **M5 — release qualification:** apply checks to each release's advertised scope.
-10. **M6 — Asteria VR (remote PCVR):** future paired Asteria + Vibepollo-fork work, independent of PyroWave.
-11. **M7 — Isolated Sessions / MultiSeat:** future host-dependent sessions/VMs, virtual display/audio and isolated input, with client controls and status.
+1. **Foundation / ARM64 / identity (M0–M1A):** baseline import, native x64/ARM64
+   and Asteria identity are established; desktop follow-ups and measured Windows
+   performance work remain. Use Moonlight's existing statistics first, and change
+   behavior only for a measured problem or benefit.
+2. **Experimental PyroWave (M1B):** offline decode/presentation is qualified on the
+   named x64/ARM64 targets; live Vibepollo SDR 4:2:0 is owner-validated on the named
+   ARM64 device. Broader GPU interop/performance qualification remains open.
+   Standard codecs and Moonlight behavior remain the baseline.
+3. **Native Vulkan PyroWave presentation:** the next major technical milestone,
+   post-v0.2.0. Planned GPU-resident presentation aims to avoid CPU readback/re-upload
+   and Vulkan/D3D11 external fence sharing while retaining safe fallback paths.
+   It is not implemented.
+4. **Isolated sessions / MultiSeat:** the next major feature area after performance;
+   one host remains usable locally while a remote user gets an isolated session.
+   Most work belongs in a separate Asteria-oriented Vibepollo fork/host extension;
+   Asteria provides controls/status, streaming and isolated input transport.
+   Native-class performance is a possible target only with hardware headroom.
+5. **Asteria VR:** paired client/host remote PCVR after isolated-session work,
+   whose host-control/lifecycle infrastructure may be reusable. This is a priority
+   order, not a hard technical dependency; PyroWave is not required.
 
-Profiles, performance changes, PyroWave, Apollo extensions, and Asteria VR are not prerequisites for this initial preview. Current main includes live Experimental PyroWave in normal packages. Standard codecs retain a 500 Mbps UI ceiling; PyroWave uses 3000 Mbps and automatic bitrate of approximately `width * height * fps * 1.6` bits/s. Manual overrides survive resolution/FPS changes. PyroWave HDR and 4:4:4 remain excluded. Asteria VR, touch-overlay parity, simultaneous multi-stream viewing, and file transfer are later work.
+The old M2–M4 Apollo convenience milestones are deprioritized. Capability parsing,
+clipboard, virtual-display requests and server commands may return as supporting
+integrations. Historical identifiers, technical notes and release-qualification
+gates remain in the [porting plan](docs/PORTING_PLAN.md).
+v0.2.0 is still being prepared; this roadmap does not change release state.
 
 ### Planned Asteria VR
 
 Asteria VR is a PC-to-PC remote PCVR feature: the host PC runs SteamVR and renders the game, while the VR headset is physically connected to a Windows client PC. This requires an Asteria-oriented Vibepollo fork/host extension for SteamVR/OpenXR, virtual HMD integration, pose ingestion, stereo capture and session timing/lifecycle. The client handles the local headset/runtime, tracking/input transport, stereo decoding, presentation and timing/reprojection. The design is headset-agnostic; a PSVR2 with its PC adapter may eventually be one locally attached configuration, alongside other PCVR headsets.
 
-This is separate from the PSVR2 wireless-adapter project, which uses a phone and wearable bridge. Asteria VR does not use that bridge. It also does not depend on the optional M1B PyroWave codec experiment, although later codec or transport work may be reusable. See [M6 in the porting plan](docs/PORTING_PLAN.md) for staged implementation and qualification.
+This is separate from the PSVR2 wireless-adapter project, which uses a phone and wearable bridge. Asteria VR does not use that bridge. It also does not depend on the optional M1B PyroWave codec experiment, although later codec or transport work may be reusable. See [the VR phase in the porting plan](docs/PORTING_PLAN.md) for staged implementation and qualification.
 
 Asteria retains Moonlight's Qt/QML UI, SDL input/session stack, hardware decoding paths, build structure, and upstream history. New behavior is added at narrow integration boundaries so upstream security and correctness fixes remain practical to merge.
 
