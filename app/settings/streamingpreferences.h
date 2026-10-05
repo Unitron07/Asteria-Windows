@@ -37,6 +37,13 @@ public:
     };
     Q_ENUM(VideoCodecConfig)
 
+    Q_INVOKABLE static int getMaximumBitrate(VideoCodecConfig codec);
+    Q_INVOKABLE static int getDefaultBitrateForCodec(int width, int height, int fps,
+                                                    bool yuv444, VideoCodecConfig codec);
+    Q_INVOKABLE void useDefaultBitrate();
+    int defaultBitrateKbps() const;
+    int maximumBitrateKbps() const { return getMaximumBitrate(videoCodecConfig); }
+
     enum VideoDecoderSelection
     {
         VDS_AUTO,
@@ -124,8 +131,9 @@ public:
     Q_PROPERTY(int height MEMBER height NOTIFY displayModeChanged)
     Q_PROPERTY(int fps MEMBER fps NOTIFY displayModeChanged)
     Q_PROPERTY(int bitrateKbps MEMBER bitrateKbps NOTIFY bitrateChanged)
-    Q_PROPERTY(bool unlockBitrate MEMBER unlockBitrate NOTIFY unlockBitrateChanged)
     Q_PROPERTY(bool autoAdjustBitrate MEMBER autoAdjustBitrate NOTIFY autoAdjustBitrateChanged)
+    Q_PROPERTY(int defaultBitrateKbps READ defaultBitrateKbps NOTIFY bitratePolicyChanged)
+    Q_PROPERTY(int maximumBitrateKbps READ maximumBitrateKbps NOTIFY bitratePolicyChanged)
     Q_PROPERTY(bool enableVsync MEMBER enableVsync NOTIFY enableVsyncChanged)
     Q_PROPERTY(bool gameOptimizations MEMBER gameOptimizations NOTIFY gameOptimizationsChanged)
     Q_PROPERTY(bool playAudioOnHost MEMBER playAudioOnHost NOTIFY playAudioOnHostChanged)
@@ -174,7 +182,6 @@ public:
     int height;
     int fps;
     int bitrateKbps;
-    bool unlockBitrate;
     bool autoAdjustBitrate;
     bool enableVsync;
     bool gameOptimizations;
@@ -213,7 +220,7 @@ public:
 signals:
     void displayModeChanged();
     void bitrateChanged();
-    void unlockBitrateChanged();
+    void bitratePolicyChanged();
     void autoAdjustBitrateChanged();
     void enableVsyncChanged();
     void gameOptimizationsChanged();
@@ -250,6 +257,7 @@ signals:
 
 private:
     explicit StreamingPreferences(QQmlEngine *qmlEngine);
+    void refreshBitrate();
 
     QString getSuffixFromLanguage(Language lang);
 

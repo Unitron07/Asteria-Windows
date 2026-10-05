@@ -137,6 +137,11 @@ This unsigned development baseline is not a qualified Asteria release.
         -PackagePath $package[0].FullName -Architecture $Architecture `
         -ReportPath (Join-Path $evidence 'package-architecture.json') `
         -ClientExecutable $clientExecutable
+    if ($clientExecutable -eq 'Asteria.exe') {
+        & (Join-Path $PSScriptRoot 'test-pyrowave-package.ps1') `
+            -PackagePath $package[0].FullName -Architecture $Architecture `
+            -ReportPath (Join-Path $evidence 'pyrowave-package.json')
+    }
     tar -czf (Join-Path $evidence 'source.tar.gz') --exclude=.git --exclude=./build --exclude=./libs -C $SourceRoot .
     if ($LASTEXITCODE -ne 0) { throw 'Unable to archive source and submodules' }
     Get-ChildItem "build/installer-$Architecture-release/*.zip", "build/symbols-$Architecture-release/*.zip", (Join-Path $evidence 'source.tar.gz') |

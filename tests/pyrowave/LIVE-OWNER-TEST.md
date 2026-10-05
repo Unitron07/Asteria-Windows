@@ -12,19 +12,26 @@
 
 # P1a GPU performance owner retest (qualification PENDING)
 
-Use `Asteria-P1a-Experimental-x64-<run>` on RTX 4070 Ti, or the matching
-`arm64` package on Surface Pro 11 / Snapdragon X Plus / Adreno X1-85.
-Extract the artifact, then extract its `Asteria-P1a-Experimental-<arch>.zip`.
+Use the normal `Asteria-Windows-x64-<run>` artifact on RTX 4070 Ti, or the matching
+`arm64` artifact on Surface Pro 11 / Snapdragon X Plus / Adreno X1-85.
+Extract the artifact, then extract its portable Asteria ZIP. PyroWave is bundled;
+there is no second experimental client to download.
 Run `Asteria.exe` from the extracted directory. No local rebuilding is required.
 The portable marker keeps this test's settings/pairing beside this executable.
 Use the included `pyrowave/` directory intact; do not copy a different codec DLL.
 
 1. Pair/connect to Vibepollo using the ordinary UI.
-2. Open Settings â†’ Video codec â†’ **PyroWave (Experimental)**. Turn HDR and YUV
+2. Open Basic Settings â†’ Video codec â†’ **PyroWave (Experimental)** beside
+   Resolution/FPS. Turn HDR and YUV
    4:4:4 off. Keep decoder Auto or Force hardware. Initially use 1920x1080 at
    60 FPS, default packet size, and record the configured bitrate. PyroWave
-   needs substantially more bandwidth than conventional codecs; this build
-   does not calibrate, probe or automatically change bitrate.
+   needs substantially more bandwidth than conventional codecs. Use Default
+   suggests 1.6 bits/pixel/frame, rounded to 0.5 Mbps (about 708 Mbps for
+   2560x1440/120). The PyroWave ceiling is 3000 Mbps; standard codecs use
+   500 Mbps. A manual slider move disables automatic bitrate updates; resolution
+   and FPS changes preserve it, and selecting a lower-cap codec clamps only an
+   out-of-range value. Use Default re-enables automatic updates. No bandwidth
+   calibration or probing is performed.
 3. Start/resume an app. Check the log for local API 0.6.0, bitstream `186f0393`,
    Vulkan adapter, pinned HTTPS SCM support, exact DESCRIBE marker and matching
    host ID, negotiated format `0x10000`, extent/FPS, first complete compatibility
@@ -50,7 +57,8 @@ Use the included `pyrowave/` directory intact; do not copy a different codec DLL
    a subsequent standard-codec attempt must work. Missing/mismatched host ID
    must fail at DESCRIBE before receiving codec frames.
 7. Open View logs from Asteria's menu. Copy the current log, or run the included
-   `collect-pyrowave-logs.ps1` after disconnect to collect portable logs. Fill in
+   `collect-pyrowave-logs.ps1` after disconnect to collect portable logs. Verify
+   codec/bitrate/automatic-or-manual state persist after restart. Fill in
    `OWNER-RESULT.txt`; attach the client log, relevant host log, artifact/run/hash,
    Windows and driver versions, adapter, resolution/FPS/bitrate and failures.
 

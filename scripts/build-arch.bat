@@ -156,6 +156,17 @@ mkdir %BUILD_FOLDER%
 mkdir %INSTALLER_FOLDER%
 mkdir %SYMBOLS_FOLDER%
 
+echo Preparing pinned PyroWave runtime for the normal Windows build
+rem Prefer the CI/host PowerShell 7 runtime to avoid inheriting its module paths
+rem into Windows PowerShell. Clean command prompts can still use Windows PowerShell.
+set PYROWAVE_POWERSHELL=powershell
+where /q pwsh.exe
+if !ERRORLEVEL! EQU 0 set PYROWAVE_POWERSHELL=pwsh
+%PYROWAVE_POWERSHELL% -NoProfile -ExecutionPolicy Bypass -File "%SOURCE_ROOT%\scripts\prepare-pyrowave.ps1" -Architecture %ARCH% -EnvironmentFile "%BUILD_FOLDER%\pyrowave-env.cmd"
+if !ERRORLEVEL! NEQ 0 goto Error
+call "%BUILD_FOLDER%\pyrowave-env.cmd"
+if !ERRORLEVEL! NEQ 0 goto Error
+
 rem Enable LTCG for official builds
 set CFLAGS=/GL
 set CXXFLAGS=/GL
@@ -163,7 +174,7 @@ set LDFLAGS=/LTCG
 
 echo Configuring the project
 pushd %BUILD_FOLDER%
-%QMAKE_CMD% %SOURCE_ROOT%\moonlight-qt.pro %ASTERIA_EXPERIMENTAL_QMAKE_ARGS%
+%QMAKE_CMD% %SOURCE_ROOT%\moonlight-qt.pro "PYROWAVE_ROOT=%PYROWAVE_ROOT%" "VULKAN_HEADERS=%VULKAN_HEADERS%"
 if !ERRORLEVEL! NEQ 0 goto Error
 popd
 
@@ -280,6 +291,11 @@ if "%SIGN%"=="1" (
     signtool %SIGNTOOL_PARAMS% !FILES_TO_SIGN!
     if !ERRORLEVEL! NEQ 0 goto Error
 )
+
+rem Keep the pinned runtime bytes and hash metadata intact. Stage after the
+rem optional signing loop, before WiX harvesting, so MSI and ZIP both include it.
+%PYROWAVE_POWERSHELL% -NoProfile -ExecutionPolicy Bypass -File "%SOURCE_ROOT%\scripts\stage-pyrowave-runtime.ps1" -Architecture %ARCH% -DependencyRoot "%ASTERIA_PYROWAVE_DEPS%" -DeployDirectory "%DEPLOY_FOLDER%" -ClientPath "%BUILD_FOLDER%\app\%BUILD_CONFIG%\Asteria.exe"
+if !ERRORLEVEL! NEQ 0 goto Error
 
 if "%ML_SYMBOL_STORE%" NEQ "" (
     echo Publishing binaries to symbol store: %ML_SYMBOL_STORE%

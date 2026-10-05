@@ -1,6 +1,6 @@
 # Offline P0-R proof and P0.5 SDL presentation
 
-## P1a live implementation tests and owner artifacts
+## P1a live implementation tests and normal Windows packages
 
 Run `./scripts/apply-common-c-p1a.ps1` after recursive checkout and before the
 CMake commands below. The qmake application build applies this maintained patch
@@ -20,11 +20,14 @@ These are plumbing tests, not codec/GPU correctness or performance proof. Live
 frame tests verify retained assembly/metadata capacity and exact output across
 large/small/rejected frames, fragment-count bounds and malformed recovery.
 
-The optional workflow also builds the full experimental app on x64/native ARM64.
-`scripts/build-pyrowave-live.ps1` invokes the established Qt/MSVC build with
-`CONFIG+=pyrowave_experimental`, verifies metadata, then stages the verified
-portable client plus `pyrowave/` runtime in a separate experimental ZIP. Normal
-CI does not build the runtime. No Vulkan/PyroWave startup imports are permitted.
+The normal Windows workflow builds the app with experimental PyroWave support
+on x64/native ARM64. `scripts/build-arch.bat` prepares the exact pinned runtime
+before qmake and stages its `pyrowave/` directory before MSI/portable packaging.
+The former `scripts/build-pyrowave-live.ps1` entry point delegates to that same
+normal build. Dedicated PyroWave validation remains in this optional workflow;
+it no longer uploads a separate P1a end-user executable/package.
+No Vulkan/PyroWave startup imports are permitted. Automatic selects standard
+codecs only; PyroWave must still be explicitly selected as Experimental.
 The restricted loader's CRT closure is staged in the runtime directory; all
 packaged PE types, notices and hashes are checked. See
 [LIVE-OWNER-TEST.md](LIVE-OWNER-TEST.md) for extracting, launching, selection,
