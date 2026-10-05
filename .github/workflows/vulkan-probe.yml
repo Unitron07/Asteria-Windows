@@ -1,0 +1,94 @@
+name: Isolated Stage 2 Vulkan presenter probe
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/m1b-vulkan-stage2-*']
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/streaming/video/pyrowave_vulkan_*'
+      - 'tests/pyrowave/vulkan/**'
+      - 'scripts/*vulkan-probe.ps1'
+      - 'scripts/test-vulkan-owner-runner.ps1'
+      - '.github/workflows/vulkan-probe.yml'
+permissions:
+  contents: read
+concurrency:
+  group: vulkan-probe-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  probe:
+    name: Synthetic Vulkan ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            platform: x64
+            runner: windows-2025
+          - arch: arm64
+            platform: ARM64
+            runner: windows-11-arm
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Fetch reviewed headers and verified SDL archive (no codec build)
+        shell: pwsh
+        run: |
+          git clone --no-checkout https://github.com/KhronosGroup/Vulkan-Headers.git build/vulkan-headers
+          if ($LASTEXITCODE) { throw 'headers clone failed' }
+          git -C build/vulkan-headers checkout --detach 6802bb4733b63ed5efd3adb308a6c885ef180ea1
+          if ($LASTEXITCODE) { throw 'headers pin unavailable' }
+          ./scripts/setup-baseline-deps.ps1 -Architecture '${{ matrix.arch }}'
+      - name: Configure and build isolated probe and GPU-free policy tests
+        shell: pwsh
+        run: |
+          cmake -S tests/pyrowave/vulkan -B build/vulkan-${{ matrix.arch }} -G 'Visual Studio 18 2026' -A ${{ matrix.platform }} -DPYROWAVE_VULKAN_PROBE=ON -DSDL_ARCH=${{ matrix.arch }} "-DSDL_ROOT=$PWD/libs/windows" "-DVULKAN_HEADERS=$PWD/build/vulkan-headers/include"
+          if ($LASTEXITCODE) { throw 'probe configure failed' }
+          cmake --build build/vulkan-${{ matrix.arch }} --config Release --parallel 2
+          if ($LASTEXITCODE) { throw 'probe build failed' }
+      - name: Automated policy and opt-in GPU smoke (unavailable is SKIP)
+        shell: pwsh
+        run: |
+          ctest --test-dir build/vulkan-${{ matrix.arch }} -C Release --output-on-failure
+          if ($LASTEXITCODE) { throw 'probe tests failed' }
+          ./scripts/test-vulkan-probe.ps1 -Executable "build/vulkan-${{ matrix.arch }}/Release/pyrowave-vulkan-probe.exe" -EvidenceRoot "build/vulkan-${{ matrix.arch }}/evidence"
+      - name: Verify architecture and no mandatory Vulkan/codec imports
+        shell: pwsh
+        run: |
+          . ./scripts/pyrowave/pe-machine.ps1
+          $root = "build/vulkan-${{ matrix.arch }}"
+          $compilerRecord = Get-ChildItem "$root/CMakeFiles" -Filter CMakeCXXCompiler.cmake -Recurse | Select-Object -First 1
+          $compilerText = Get-Content $compilerRecord.FullName -Raw
+          if ($compilerText -notmatch 'set\(CMAKE_CXX_COMPILER "([^"]+)"\)') { throw 'Compiler path missing' }
+          $dumpbin = Join-Path (Split-Path $Matches[1] -Parent) 'dumpbin.exe'
+          foreach ($file in @('pyrowave-vulkan-probe.exe','pyrowave-vulkan-policy-tests.exe','SDL2.dll','SDL3.dll')) {
+            $binary = "$root/Release/$file"
+            Assert-PyroWavePe $binary '${{ matrix.arch }}' | ConvertTo-Json | Set-Content "$root/evidence/$file-pe.json"
+            $imports = & $dumpbin /imports $binary
+            if ($LASTEXITCODE) { throw "Import inspection failed: $file" }
+            $imports | Set-Content "$root/evidence/$file-imports.txt"
+            if ($imports -match '(?i)vulkan-1\.dll|libpyrowave-shared|pyrowave-shared') { throw "Forbidden startup import in $file" }
+          }
+          git diff --check
+          if ($LASTEXITCODE) { throw 'Whitespace check failed' }
+      - name: Package standalone owner test and notices
+        shell: pwsh
+        run: ./scripts/stage-vulkan-probe.ps1 -Architecture '${{ matrix.arch }}' -BuildRoot "build/vulkan-${{ matrix.arch }}" -VulkanHeadersRoot build/vulkan-headers
+      - name: GPU-free packaged runner regression (Windows PowerShell and pwsh)
+        shell: pwsh
+        run: ./scripts/test-vulkan-owner-runner.ps1 -RunnerPath "build/vulkan-owner-${{ matrix.arch }}/run-owner-tests.ps1" -EvidenceRoot "build/vulkan-${{ matrix.arch }}/evidence/runner"
+      - name: Upload owner executable and automated evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: vulkan-stage2-${{ matrix.arch }}-${{ github.run_id }}
+          path: |
+            build/vulkan-owner-${{ matrix.arch }}.zip
+            build/vulkan-${{ matrix.arch }}/evidence/
+            build/vulkan-${{ matrix.arch }}/Testing/
+            build/vulkan-${{ matrix.arch }}/CMakeCache.txt
+          if-no-files-found: error
