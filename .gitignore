@@ -27,6 +27,7 @@ Release/
 .codex/
 .DS_Store
 Thumbs.db
+__pycache__/
 
 # Moonlight upstream dependencies and generated configure files
 .vscode/
