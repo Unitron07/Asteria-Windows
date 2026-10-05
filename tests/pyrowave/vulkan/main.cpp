@@ -155,7 +155,8 @@ int main(int argc, char** argv) {
                     if (event.type == SDL_WINDOWEVENT) {
                         log("window_event=" + std::to_string(event.window.event));
                         if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED || event.window.event == SDL_WINDOWEVENT_RESTORED ||
-                            event.window.event == SDL_WINDOWEVENT_DISPLAY_CHANGED || event.window.event == SDL_WINDOWEVENT_EXPOSED) probe.resize();
+                            event.window.event == SDL_WINDOWEVENT_DISPLAY_CHANGED) probe.resize();
+                        // Expose needs only the next scheduled redraw, not a device drain/rebuild.
                         if (event.window.event == SDL_WINDOWEVENT_CLOSE) running = false;
                     }
                 }
