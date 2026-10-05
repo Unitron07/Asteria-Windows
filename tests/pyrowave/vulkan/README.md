@@ -5,6 +5,10 @@ PyroWave, decode video, accelerate live streaming, create output planes, use
 external handles, or change Asteria's production renderer. The SDL/D3D11 test
 is sequential fallback on the same window, not Vulkan/D3D11 interop.
 
+Visible Surface Pro 11 ARM64 qualification is **PASS / OWNER_CONFIRMED**;
+validation remained **SKIP**. See the [qualification record](QUALIFICATION.md)
+for the tested revision, runner fix and remaining Stage 3 review points.
+
 ## Surface Pro 11 owner procedure (mandatory before Stage 3)
 
 1. Download the **ARM64** `vulkan-stage2-arm64-<run>` Actions artifact. Extract
@@ -42,7 +46,7 @@ is sequential fallback on the same window, not Vulkan/D3D11 interop.
    and all logs. Check `executable_arch=ARM64`, selected device containing
    `X1-85`, driver/device identity, `surface_window_identity=STABLE`, nonzero
    presents, multiple generations, same-window D3D11 API result and validation
-   status. Stage 3 stays blocked on this owner result and a separate approval.
+   status. Stage 3 requires separate authorization and architecture review.
 
 Direct commands if the runner script cannot be used:
 
@@ -118,3 +122,6 @@ checks PE architecture/imports for both executables and SDL DLLs, then packages
 notices and SHA-256 manifests. GPU-free tests cover extent/image bounds, queue
 requirements, mode order, resource reuse, timeout/suboptimal/out-of-date/terminal
 state handling. CI cannot replace mandatory Surface visual owner execution.
+The GPU-free packaged runner regression exercises Windows PowerShell 5.1 and
+pwsh from an unrelated directory, with default, explicit and whitespace evidence
+paths. It uses an unavailable CPU-only fixture and never records an owner pass.

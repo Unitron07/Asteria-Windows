@@ -1,7 +1,15 @@
 [CmdletBinding()]
-param([switch]$Surface, [string]$EvidenceRoot = (Join-Path $PSScriptRoot 'owner-evidence'))
+param([switch]$Surface, [string]$EvidenceRoot)
 $ErrorActionPreference = 'Stop'
-$exe = Join-Path $PSScriptRoot 'pyrowave-vulkan-probe.exe'
+$scriptDir = $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($scriptDir) -and $MyInvocation.MyCommand.Path) {
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+}
+if ([string]::IsNullOrWhiteSpace($scriptDir)) { throw 'Unable to determine owner runner script directory.' }
+if ([string]::IsNullOrWhiteSpace($EvidenceRoot)) {
+    $EvidenceRoot = Join-Path $scriptDir 'owner-evidence'
+}
+$exe = Join-Path $scriptDir 'pyrowave-vulkan-probe.exe'
 if (!(Test-Path -LiteralPath $exe)) { throw 'Run this script from the extracted architecture-matching owner package' }
 if ($Surface -and [Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne 'Arm64') {
     throw 'Surface qualification requires Windows ARM64; use the ARM64 artifact'

@@ -9,6 +9,7 @@ on:
       - 'app/streaming/video/pyrowave_vulkan_*'
       - 'tests/pyrowave/vulkan/**'
       - 'scripts/*vulkan-probe.ps1'
+      - 'scripts/test-vulkan-owner-runner.ps1'
       - '.github/workflows/vulkan-probe.yml'
 permissions:
   contents: read
@@ -77,6 +78,9 @@ jobs:
       - name: Package standalone owner test and notices
         shell: pwsh
         run: ./scripts/stage-vulkan-probe.ps1 -Architecture '${{ matrix.arch }}' -BuildRoot "build/vulkan-${{ matrix.arch }}" -VulkanHeadersRoot build/vulkan-headers
+      - name: GPU-free packaged runner regression (Windows PowerShell and pwsh)
+        shell: pwsh
+        run: ./scripts/test-vulkan-owner-runner.ps1 -RunnerPath "build/vulkan-owner-${{ matrix.arch }}/run-owner-tests.ps1" -EvidenceRoot "build/vulkan-${{ matrix.arch }}/evidence/runner"
       - name: Upload owner executable and automated evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
