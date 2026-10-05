@@ -25,3 +25,5 @@ foreach ($case in $cases) {
     $results | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $EvidenceRoot 'gpu-results.json')
     if ($code -ne 0 -and $code -ne 77) { throw "Vulkan probe case failed: $($case.name) ($code)" }
 }
+# Recorded skips are not failures; do not propagate the last native 77 to CI.
+exit 0
