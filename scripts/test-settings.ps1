@@ -42,13 +42,28 @@ nmake /nologo
 if errorlevel 1 exit /b 1
 "$deployTool" $deployArgs --dir "$build\release" --release --qmldir "$SourceRoot\app\gui" --no-opengl-sw "$build\release\asteria-settings-tests.exe"
 if errorlevel 1 exit /b 1
-set QT_QPA_PLATFORM=offscreen
-set QT_QUICK_BACKEND=software
-set QT_QUICK_CONTROLS_STYLE=Basic
-release\asteria-settings-tests.exe -o settings-results.txt,txt -o settings-results.xml,junitxml
-if errorlevel 1 exit /b 1
 "@ | Set-Content (Join-Path $build 'test.cmd') -Encoding ascii
 & cmd /d /c (Join-Path $build 'test.cmd')
-$testExit = $LASTEXITCODE
-if (Test-Path (Join-Path $build 'settings-results.txt')) { Get-Content (Join-Path $build 'settings-results.txt') | Out-Host }
-if ($testExit) { throw 'Settings/preferences/UI regression failed' }
+if ($LASTEXITCODE) { throw 'Settings test build/deployment failed' }
+$env:QT_QPA_PLATFORM = 'offscreen'
+$env:QT_QUICK_BACKEND = 'software'
+$env:QT_QUICK_CONTROLS_STYLE = 'Basic'
+$env:QTEST_FUNCTION_TIMEOUT = '60000'
+$stdout = Join-Path $build 'settings-console.txt'
+$stderr = Join-Path $build 'settings-stderr.txt'
+$test = Start-Process -FilePath (Join-Path $build 'release/asteria-settings-tests.exe') -WorkingDirectory $build -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr -ArgumentList @('-v1','-o','-,txt','-o','settings-results.txt,txt','-o','settings-results.xml,junitxml')
+$timer = [Diagnostics.Stopwatch]::StartNew()
+$printed = 0
+while (!$test.WaitForExit(3000)) {
+    $lines = @(Get-Content -LiteralPath $stdout)
+    $lines | Select-Object -Skip $printed | Out-Host
+    $printed = $lines.Count
+    if ($timer.Elapsed.TotalSeconds -ge 120) {
+        & taskkill /PID $test.Id /T /F | Out-Host
+        Get-Content -LiteralPath $stderr | Out-Host
+        throw 'Settings test timed out after 120 seconds; partial results were retained'
+    }
+}
+Get-Content -LiteralPath $stdout | Select-Object -Skip $printed | Out-Host
+Get-Content -LiteralPath $stderr | Out-Host
+if ($test.ExitCode) { throw "Settings/preferences/UI regression failed ($($test.ExitCode))" }

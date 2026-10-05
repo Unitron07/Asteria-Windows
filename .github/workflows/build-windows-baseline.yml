@@ -68,6 +68,7 @@ jobs:
         run: ./harness/scripts/setup-baseline-deps.ps1 -SourceRoot ./source -Architecture '${{ inputs.architecture }}'
       - name: Test codec-aware preferences, persistence and settings UI
         if: inputs.label == 'asteria'
+        timeout-minutes: 8
         shell: pwsh
         run: ./harness/scripts/test-settings.ps1 -SourceRoot ./source -Architecture '${{ inputs.architecture }}' -QtRoot '${{ runner.workspace }}/Qt/6.11.2'
       - name: Build unsigned Release and collect evidence
