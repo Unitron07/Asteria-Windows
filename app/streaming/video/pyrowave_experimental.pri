@@ -1,4 +1,5 @@
-# Explicit experiment. Restricted runtime load only when selected; no DLL import.
+# Experimental codec, bundled in normal Windows app builds. Restricted runtime
+# load only when explicitly selected; no DLL or Vulkan startup import.
 pyrowave_experimental {
     !win32: error("The PyroWave P0 runtime is Windows only")
     isEmpty(PYROWAVE_ROOT): error("Set PYROWAVE_ROOT to the matching target install directory")

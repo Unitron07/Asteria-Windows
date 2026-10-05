@@ -1,0 +1,7 @@
+<RCC>
+  <qresource prefix="/settings">
+    <file alias="SettingsView.qml">../../app/gui/SettingsView.qml</file>
+    <file alias="AutoResizingComboBox.qml">../../app/gui/AutoResizingComboBox.qml</file>
+    <file alias="NavigableDialog.qml">../../app/gui/NavigableDialog.qml</file>
+  </qresource>
+</RCC>

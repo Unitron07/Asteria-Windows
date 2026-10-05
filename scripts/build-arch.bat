@@ -156,6 +156,12 @@ mkdir %BUILD_FOLDER%
 mkdir %INSTALLER_FOLDER%
 mkdir %SYMBOLS_FOLDER%
 
+echo Preparing pinned PyroWave runtime for the normal Windows build
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SOURCE_ROOT%\scripts\prepare-pyrowave.ps1" -Architecture %ARCH% -EnvironmentFile "%BUILD_FOLDER%\pyrowave-env.cmd"
+if !ERRORLEVEL! NEQ 0 goto Error
+call "%BUILD_FOLDER%\pyrowave-env.cmd"
+if !ERRORLEVEL! NEQ 0 goto Error
+
 rem Enable LTCG for official builds
 set CFLAGS=/GL
 set CXXFLAGS=/GL
@@ -163,7 +169,7 @@ set LDFLAGS=/LTCG
 
 echo Configuring the project
 pushd %BUILD_FOLDER%
-%QMAKE_CMD% %SOURCE_ROOT%\moonlight-qt.pro %ASTERIA_EXPERIMENTAL_QMAKE_ARGS%
+%QMAKE_CMD% %SOURCE_ROOT%\moonlight-qt.pro "PYROWAVE_ROOT=%PYROWAVE_ROOT%" "VULKAN_HEADERS=%VULKAN_HEADERS%"
 if !ERRORLEVEL! NEQ 0 goto Error
 popd
 
@@ -202,6 +208,11 @@ for /r "%BUILD_FOLDER%" %%f in (*.pdb) do (
 copy %SOURCE_ROOT%\libs\windows\lib\%ARCH%\*.pdb %SYMBOLS_FOLDER%
 if !ERRORLEVEL! NEQ 0 goto Error
 7z a %SYMBOLS_FOLDER%\AsteriaDebuggingSymbols-%ARCH%-%VERSION%.zip %SYMBOLS_FOLDER%\*.pdb
+if !ERRORLEVEL! NEQ 0 goto Error
+
+rem Keep the pinned runtime bytes and hash metadata intact. Stage after the
+rem optional signing loop, before WiX harvesting, so MSI and ZIP both include it.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SOURCE_ROOT%\scripts\stage-pyrowave-runtime.ps1" -Architecture %ARCH% -DependencyRoot "%ASTERIA_PYROWAVE_DEPS%" -DeployDirectory "%DEPLOY_FOLDER%" -ClientPath "%BUILD_FOLDER%\app\%BUILD_CONFIG%\Asteria.exe"
 if !ERRORLEVEL! NEQ 0 goto Error
 
 if "%ML_SYMBOL_STORE%" NEQ "" (

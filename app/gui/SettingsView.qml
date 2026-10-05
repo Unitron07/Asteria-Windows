@@ -113,7 +113,7 @@ Flickable {
                 Label {
                     width: parent.width
                     id: resFPStitle
-                    text: qsTr("Resolution and FPS")
+                    text: qsTr("Resolution, FPS and video codec")
                     font.pointSize: 12
                     wrapMode: Text.Wrap
                 }
@@ -126,7 +126,7 @@ Flickable {
                     wrapMode: Text.Wrap
                 }
 
-                Row {
+                Flow {
                     spacing: 5
                     width: parent.width
 
@@ -240,7 +240,7 @@ Flickable {
                         }
 
                         id: resolutionComboBox
-                        maximumWidth: parent.width / 2
+                        maximumWidth: (parent.width - parent.spacing) / 2
                         textRole: "text"
                         model: ListModel {
                             id: resolutionListModel
@@ -280,14 +280,6 @@ Flickable {
                             if (StreamingPreferences.width !== selectedWidth || StreamingPreferences.height !== selectedHeight) {
                                 StreamingPreferences.width = selectedWidth
                                 StreamingPreferences.height = selectedHeight
-
-                                if (StreamingPreferences.autoAdjustBitrate) {
-                                    StreamingPreferences.bitrateKbps = StreamingPreferences.getDefaultBitrate(StreamingPreferences.width,
-                                                                                                              StreamingPreferences.height,
-                                                                                                              StreamingPreferences.fps,
-                                                                                                              StreamingPreferences.enableYUV444);
-                                    slider.value = StreamingPreferences.bitrateKbps
-                                }
                             }
 
                             lastIndexValue = currentIndex
@@ -448,14 +440,6 @@ Flickable {
                             var selectedFps = parseInt(model.get(fpsComboBox.currentIndex).video_fps)
                             if (StreamingPreferences.fps !== selectedFps) {
                                 StreamingPreferences.fps = selectedFps
-
-                                if (StreamingPreferences.autoAdjustBitrate) {
-                                    StreamingPreferences.bitrateKbps = StreamingPreferences.getDefaultBitrate(StreamingPreferences.width,
-                                                                                                              StreamingPreferences.height,
-                                                                                                              StreamingPreferences.fps,
-                                                                                                              StreamingPreferences.enableYUV444);
-                                    slider.value = StreamingPreferences.bitrateKbps
-                                }
                             }
 
                             lastIndexValue = currentIndex
@@ -652,7 +636,7 @@ Flickable {
                         }
 
                         id: fpsComboBox
-                        maximumWidth: parent.width / 2
+                        maximumWidth: (parent.width - parent.spacing) / 2
                         textRole: "text"
                         // ::onActivated must be used, as it only listens for when the index is changed by a human
                         onActivated : {
@@ -661,6 +645,59 @@ Flickable {
                             }
                             else {
                                 updateBitrateForSelection()
+                            }
+                        }
+                    }
+
+                    AutoResizingComboBox {
+                        // ignore setting the index at first, and actually set it when the component is loaded
+                        Component.onCompleted: {
+                            if (StreamingPreferences.pyrowaveAvailable) {
+                                codecListModel.append({text: qsTr("PyroWave (Experimental)"), val: StreamingPreferences.VCC_FORCE_PYROWAVE})
+                            }
+                            var saved_vcc = StreamingPreferences.videoCodecConfig
+
+                            // Default to Automatic (relevant if HDR is enabled,
+                            // where we will match none of the codecs in the list)
+                            currentIndex = 0
+
+                            for(var i = 0; i < codecListModel.count; i++) {
+                                var el_vcc = codecListModel.get(i).val;
+                                if (saved_vcc === el_vcc) {
+                                    currentIndex = i
+                                    break
+                                }
+                            }
+
+                            activated(currentIndex)
+                        }
+
+                        id: codecComboBox
+                        Accessible.name: qsTr("Video codec")
+                        textRole: "text"
+                        model: ListModel {
+                            id: codecListModel
+                            ListElement {
+                                text: qsTr("Automatic (Recommended)")
+                                val: StreamingPreferences.VCC_AUTO
+                            }
+                            ListElement {
+                                text: qsTr("H.264")
+                                val: StreamingPreferences.VCC_FORCE_H264
+                            }
+                            ListElement {
+                                text: qsTr("HEVC (H.265)")
+                                val: StreamingPreferences.VCC_FORCE_HEVC
+                            }
+                            ListElement {
+                                text: qsTr("AV1")
+                                val: StreamingPreferences.VCC_FORCE_AV1
+                            }
+                        }
+                        // ::onActivated must be used, as it only listens for when the index is changed by a human
+                        onActivated : {
+                            if (enabled) {
+                                StreamingPreferences.videoCodecConfig = codecListModel.get(currentIndex).val
                             }
                         }
                     }
@@ -693,18 +730,18 @@ Flickable {
 
                         stepSize: 500
                         from : 500
-                        to: StreamingPreferences.unlockBitrate ? 500000 : 150000
+                        to: StreamingPreferences.maximumBitrateKbps
 
                         snapMode: "SnapOnRelease"
                         width: Math.min(bitrateDesc.implicitWidth, parent.width - (resetBitrateButton.visible ? resetBitrateButton.width + parent.spacing : 0))
 
                         onValueChanged: {
                             bitrateTitle.text = qsTr("Video bitrate: %1 Mbps").arg(value / 1000.0)
-                            StreamingPreferences.bitrateKbps = value
                         }
 
                         onMoved: {
                             StreamingPreferences.autoAdjustBitrate = false
+                            StreamingPreferences.bitrateKbps = value
                         }
 
                         Component.onCompleted: {
@@ -715,13 +752,10 @@ Flickable {
 
                     Button {
                         id: resetBitrateButton
-                        text: qsTr("Use Default (%1 Mbps)").arg(StreamingPreferences.getDefaultBitrate(StreamingPreferences.width, StreamingPreferences.height, StreamingPreferences.fps, StreamingPreferences.enableYUV444) / 1000.0)
-                        visible: StreamingPreferences.bitrateKbps !== StreamingPreferences.getDefaultBitrate(StreamingPreferences.width, StreamingPreferences.height, StreamingPreferences.fps, StreamingPreferences.enableYUV444)
+                        text: qsTr("Use Default (%1 Mbps)").arg(StreamingPreferences.defaultBitrateKbps / 1000.0)
+                        visible: !StreamingPreferences.autoAdjustBitrate || StreamingPreferences.bitrateKbps !== StreamingPreferences.defaultBitrateKbps
                         onClicked: {
-                            var defaultBitrate = StreamingPreferences.getDefaultBitrate(StreamingPreferences.width, StreamingPreferences.height, StreamingPreferences.fps, StreamingPreferences.enableYUV444)
-                            StreamingPreferences.bitrateKbps = defaultBitrate
-                            StreamingPreferences.autoAdjustBitrate = true
-                            slider.value = defaultBitrate
+                            StreamingPreferences.useDefaultBitrate()
                         }
                     }
                 }
@@ -1601,66 +1635,6 @@ Flickable {
 
                 Label {
                     width: parent.width
-                    id: resVCCTitle
-                    text: qsTr("Video codec")
-                    font.pointSize: 12
-                    wrapMode: Text.Wrap
-                }
-
-                AutoResizingComboBox {
-                    // ignore setting the index at first, and actually set it when the component is loaded
-                    Component.onCompleted: {
-                        if (StreamingPreferences.pyrowaveAvailable) {
-                            codecListModel.append({text: qsTr("PyroWave (Experimental)"), val: StreamingPreferences.VCC_FORCE_PYROWAVE})
-                        }
-                        var saved_vcc = StreamingPreferences.videoCodecConfig
-
-                        // Default to Automatic (relevant if HDR is enabled,
-                        // where we will match none of the codecs in the list)
-                        currentIndex = 0
-
-                        for(var i = 0; i < codecListModel.count; i++) {
-                            var el_vcc = codecListModel.get(i).val;
-                            if (saved_vcc === el_vcc) {
-                                currentIndex = i
-                                break
-                            }
-                        }
-
-                        activated(currentIndex)
-                    }
-
-                    id: codecComboBox
-                    textRole: "text"
-                    model: ListModel {
-                        id: codecListModel
-                        ListElement {
-                            text: qsTr("Automatic (Recommended)")
-                            val: StreamingPreferences.VCC_AUTO
-                        }
-                        ListElement {
-                            text: qsTr("H.264")
-                            val: StreamingPreferences.VCC_FORCE_H264
-                        }
-                        ListElement {
-                            text: qsTr("HEVC (H.265)")
-                            val: StreamingPreferences.VCC_FORCE_HEVC
-                        }
-                        ListElement {
-                            text: qsTr("AV1")
-                            val: StreamingPreferences.VCC_FORCE_AV1
-                        }
-                    }
-                    // ::onActivated must be used, as it only listens for when the index is changed by a human
-                    onActivated : {
-                        if (enabled) {
-                            StreamingPreferences.videoCodecConfig = codecListModel.get(currentIndex).val
-                        }
-                    }
-                }
-
-                Label {
-                    width: parent.width
                     id: rendererTitle
                     text: qsTr("Renderer")
                     font.pointSize: 12
@@ -1726,13 +1700,6 @@ Flickable {
                         // This is called on init, so only reset to default bitrate when checked state changes.
                         if (StreamingPreferences.enableYUV444 != checked) {
                             StreamingPreferences.enableYUV444 = checked
-                            if (StreamingPreferences.autoAdjustBitrate) {
-                                StreamingPreferences.bitrateKbps = StreamingPreferences.getDefaultBitrate(StreamingPreferences.width,
-                                                                                                          StreamingPreferences.height,
-                                                                                                          StreamingPreferences.fps,
-                                                                                                          StreamingPreferences.enableYUV444);
-                                slider.value = StreamingPreferences.bitrateKbps
-                            }
                         }
                     }
 
@@ -1743,25 +1710,6 @@ Flickable {
                                       qsTr("Good for streaming desktop and text-heavy games, but not recommended for fast-paced games.")
                                     :
                                       qsTr("YUV 4:4:4 is not supported on this PC.")
-                }
-
-                CheckBox {
-                    id: unlockBitrate
-                    width: parent.width
-                    text: qsTr("Unlock bitrate limit (Experimental)")
-                    font.pointSize: 12
-
-                    checked: StreamingPreferences.unlockBitrate
-                    onCheckedChanged: {
-                        StreamingPreferences.unlockBitrate = checked
-                        StreamingPreferences.bitrateKbps = Math.min(StreamingPreferences.bitrateKbps, slider.to)
-                        slider.value = StreamingPreferences.bitrateKbps
-                    }
-
-                    ToolTip.delay: 1000
-                    ToolTip.timeout: 5000
-                    ToolTip.visible: hovered
-                    ToolTip.text: qsTr("This unlocks extremely high video bitrates for use with Sunshine hosts. It should only be used when streaming over an Ethernet LAN connection.")
                 }
 
                 CheckBox {

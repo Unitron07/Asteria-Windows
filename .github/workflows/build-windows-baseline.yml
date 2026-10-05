@@ -15,7 +15,7 @@ permissions:
   contents: read
 jobs:
   build:
-    runs-on: windows-2025
+    runs-on: ${{ inputs.architecture == 'arm64' && 'windows-11-arm' || 'windows-2025' }}
     timeout-minutes: 60
     steps:
       - name: Checkout build harness
@@ -39,6 +39,9 @@ jobs:
       - name: Test ARM64 runtime packaging repair
         shell: pwsh
         run: ./harness/scripts/test-arm64-package-repair.ps1
+      - name: Test bundled PyroWave package guards
+        shell: pwsh
+        run: ./harness/scripts/test-pyrowave-package-tests.ps1
       - name: Install Qt x64 host kit
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
@@ -61,6 +64,10 @@ jobs:
       - name: Verify and extract Windows dependencies
         shell: pwsh
         run: ./harness/scripts/setup-baseline-deps.ps1 -SourceRoot ./source -Architecture '${{ inputs.architecture }}'
+      - name: Test codec-aware preferences, persistence and settings UI
+        if: inputs.label == 'asteria'
+        shell: pwsh
+        run: ./harness/scripts/test-settings.ps1 -SourceRoot ./source -Architecture '${{ inputs.architecture }}' -QtRoot '${{ runner.workspace }}/Qt/6.11.2'
       - name: Build unsigned Release and collect evidence
         shell: pwsh
         env:
@@ -73,31 +80,33 @@ jobs:
             default { throw "Unsupported target: $env:TARGET_ARCH" }
           }
           ./harness/scripts/build-baseline.ps1 -SourceRoot ./source -Architecture $env:TARGET_ARCH -QtBin "$env:QT_ROOT/$kit/bin"
-      - name: Verify ordinary package excludes experimental PyroWave runtime
+      - name: Verify normal package includes pinned PyroWave without startup imports
         if: inputs.label == 'asteria'
         shell: pwsh
         run: |
           $packages = @(Get-ChildItem 'source/build/installer-${{ inputs.architecture }}-release' -Filter '*.zip')
           if ($packages.Count -ne 1) { throw 'Expected one ordinary portable package' }
-          $archive = [IO.Compression.ZipFile]::OpenRead($packages[0].FullName)
-          try {
-            if ($archive.Entries | Where-Object { $_.FullName.Replace('\','/') -match '(^|/)pyrowave/|(^|/)(libpyrowave-shared.*\.dll|pyrowave-runtime\.json)$' }) {
-              throw 'Ordinary package contains experimental PyroWave runtime files'
-            }
-          } finally { $archive.Dispose() }
+          ./harness/scripts/test-pyrowave-package.ps1 -PackagePath $packages[0].FullName -Architecture '${{ inputs.architecture }}' -ReportPath 'source/build/evidence/${{ inputs.architecture }}/pyrowave-package.json'
           $dumpbin = Get-Content 'source/build/evidence/${{ inputs.architecture }}/dumpbin-path.txt' | Select-Object -First 1
           $imports = & $dumpbin /imports 'source/build/deploy-${{ inputs.architecture }}-release/Asteria.exe'
           if ($LASTEXITCODE) { throw 'Cannot inspect ordinary client imports' }
           $imports | Set-Content 'source/build/evidence/${{ inputs.architecture }}/baseline-client-imports.txt'
-          if ($imports -match 'libpyrowave-shared|vulkan-1\.dll') { throw 'Ordinary client has an experimental startup import' }
+          if ($imports -match 'libpyrowave-shared|vulkan-1\.dll') { throw 'Client has a forbidden codec/Vulkan startup import' }
       - name: Verify packaged Asteria icon resources
         if: inputs.label == 'asteria'
         shell: pwsh
         run: python ./harness/scripts/verify-asteria-package-icons.py --source-root ./source --architecture '${{ inputs.architecture }}'
+      - name: Launch normal client with bundled runtime (standard default selection)
+        if: inputs.label == 'asteria'
+        shell: pwsh
+        run: |
+          $deploy = (Resolve-Path 'source/build/deploy-${{ inputs.architecture }}-release').Path
+          $result = Start-Process -FilePath (Join-Path $deploy 'Asteria.exe') -ArgumentList '--version' -WorkingDirectory $deploy -WindowStyle Hidden -Wait -PassThru -RedirectStandardOutput 'source/build/evidence/${{ inputs.architecture }}/startup-version.txt' -RedirectStandardError 'source/build/evidence/${{ inputs.architecture }}/startup-stderr.txt'
+          if ($result.ExitCode -ne 0) { throw "Normal client startup failed ($($result.ExitCode))" }
       - name: Upload portable package
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: baseline-${{ inputs.label }}-windows-${{ inputs.architecture }}-${{ github.run_id }}
+          name: ${{ inputs.label == 'asteria' && 'Asteria-Windows' || 'baseline-upstream-windows' }}-${{ inputs.architecture }}-${{ github.run_id }}
           path: source/build/installer-${{ inputs.architecture }}-release/*.zip
           if-no-files-found: error
           compression-level: 0
@@ -121,4 +130,13 @@ jobs:
         with:
           name: evidence-${{ inputs.label }}-windows-${{ inputs.architecture }}-${{ github.run_id }}
           path: source/build/evidence/${{ inputs.architecture }}/
+          if-no-files-found: warn
+      - name: Upload settings test results and rendered UI
+        if: always() && inputs.label == 'asteria'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: settings-tests-${{ inputs.architecture }}-${{ github.run_id }}
+          path: |
+            source/build/settings-tests-${{ inputs.architecture }}/settings-results.*
+            source/build/settings-tests-${{ inputs.architecture }}/settings-*.png
           if-no-files-found: warn

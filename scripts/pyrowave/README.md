@@ -20,7 +20,10 @@ Evidence records unmodified commit/tree/source-archive hashes, codec patch hashe
 applied diffs, patched-file hashes, compiler/CMake/options and installed inventory.
 The architecture-specific Granite portable math patch remains separate. API checks
 exist in the dependency helper, compile-time runtime wrapper and restricted DLL load.
-Normal release packages never acquire the experimental runtime.
+Normal Windows x64/native ARM64 packages now include this exact runtime and
+provenance metadata. `prepare-pyrowave.ps1` and `stage-pyrowave-runtime.ps1` use
+the same build lock and strict checks. The app loads it only after explicit
+PyroWave (Experimental) selection and retains existing host/preflight checks.
 
 ## Historical recovery bundle (inactive)
 

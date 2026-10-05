@@ -24,7 +24,7 @@ $env:PATH = 'C:\Qt\6.11.2\msvc2022_64\bin;C:\Program Files\7-Zip;' + $env:PATH
 
 Dependency setup downloads the selected upstream v15 archive, verifies its checked-in SHA-256 before extraction, and records per-file hashes and available version metadata. It refuses an existing `libs/windows` directory. Use a separate fresh checkout per architecture: this isolates upstream's shared headers without modifying its source layout. A completion marker binds each checkout to one target; builds reject the wrong target, changed files, and extra files. Subsequent builds reuse these verified dependencies. See [dependency provenance](DEPENDENCIES_WINDOWS.md).
 
-The wrapper calls the candidate's `scripts/build-arch.bat Release`, which configures qmake, compiles using jom or nmake, deploys runtime DLLs, builds the MSI internally, and produces the portable ZIP and symbol ZIP. No signing or release credentials are required. Outputs:
+The wrapper calls the candidate's `scripts/build-arch.bat Release`, which configures qmake, compiles using jom or nmake, deploys runtime DLLs, builds the MSI internally, and produces the portable ZIP and symbol ZIP. No signing or release credentials are required. Normal Windows packages now include PyroWave (Experimental), still explicit-only. The build prepares the pinned API 0.6.0/bitstream `186f0393` runtime with CMake >= 3.27, verifies its architecture/hash, and stages the restricted-loader dependency closure, metadata and notices before MSI/ZIP generation. The app has no codec/Vulkan startup imports. Outputs:
 
 - `build/installer-x64-release/AsteriaPortable-x64-*.zip`
 - `build/symbols-x64-release/AsteriaDebuggingSymbols-x64-*.zip`

@@ -26,7 +26,6 @@ jobs:
       fail-fast: false
       matrix:
         architecture: [x64, arm64]
-    needs: upstream
     uses: ./.github/workflows/build-windows-baseline.yml
     with:
       architecture: ${{ matrix.architecture }}

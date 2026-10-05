@@ -10,6 +10,7 @@ unix:!macx {
 }
 
 include(../globaldefs.pri)
+win32: CONFIG += pyrowave_experimental
 include(streaming/video/pyrowave_experimental.pri)
 
 # Precompile QML files to avoid writing qmlcache on portable versions.

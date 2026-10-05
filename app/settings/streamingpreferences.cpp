@@ -15,7 +15,6 @@
 #define SER_HEIGHT "height"
 #define SER_FPS "fps"
 #define SER_BITRATE "bitrate"
-#define SER_UNLOCK_BITRATE "unlockbitrate"
 #define SER_AUTOADJUSTBITRATE "autoadjustbitrate"
 #define SER_FULLSCREEN "fullscreen"
 #define SER_VSYNC "vsync"
@@ -62,6 +61,9 @@ Q_GLOBAL_STATIC(QReadWriteLock, s_GlobalPrefsLock)
 StreamingPreferences::StreamingPreferences(QQmlEngine *qmlEngine)
     : m_QmlEngine(qmlEngine)
 {
+    connect(this, &StreamingPreferences::displayModeChanged, this, &StreamingPreferences::refreshBitrate);
+    connect(this, &StreamingPreferences::videoCodecConfigChanged, this, &StreamingPreferences::refreshBitrate);
+    connect(this, &StreamingPreferences::enableYUV444Changed, this, &StreamingPreferences::refreshBitrate);
     reload();
 }
 
@@ -126,8 +128,6 @@ void StreamingPreferences::reload()
     height = settings.value(SER_HEIGHT, 720).toInt();
     fps = settings.value(SER_FPS, 60).toInt();
     enableYUV444 = settings.value(SER_YUV444, false).toBool();
-    bitrateKbps = settings.value(SER_BITRATE, getDefaultBitrate(width, height, fps, enableYUV444)).toInt();
-    unlockBitrate = settings.value(SER_UNLOCK_BITRATE, false).toBool();
     autoAdjustBitrate = settings.value(SER_AUTOADJUSTBITRATE, true).toBool();
     enableVsync = settings.value(SER_VSYNC, true).toBool();
     gameOptimizations = settings.value(SER_GAMEOPTS, true).toBool();
@@ -158,7 +158,7 @@ void StreamingPreferences::reload()
                                                   static_cast<int>(AudioConfig::AC_STEREO)).toInt());
     videoCodecConfig = static_cast<VideoCodecConfig>(settings.value(SER_VIDEOCFG,
                                                   static_cast<int>(VideoCodecConfig::VCC_AUTO)).toInt());
-    // A normal build must not retain a selectable experimental codec.
+    // Builds without the Windows runtime integration cannot select PyroWave.
     if (!pyrowaveAvailable() && videoCodecConfig == VCC_FORCE_PYROWAVE) {
         videoCodecConfig = VCC_AUTO;
     }
@@ -197,6 +197,10 @@ void StreamingPreferences::reload()
         videoCodecConfig = VCC_AUTO;
         enableHdr = true;
     }
+    // Old unlockbitrate keys are intentionally ignored. Keep codec and manual
+    // state before applying the current recommendation or the codec's hard cap.
+    bitrateKbps = settings.value(SER_BITRATE, defaultBitrateKbps()).toInt();
+    refreshBitrate();
 }
 
 bool StreamingPreferences::retranslate()
@@ -331,7 +335,6 @@ void StreamingPreferences::save()
     settings.setValue(SER_HEIGHT, height);
     settings.setValue(SER_FPS, fps);
     settings.setValue(SER_BITRATE, bitrateKbps);
-    settings.setValue(SER_UNLOCK_BITRATE, unlockBitrate);
     settings.setValue(SER_AUTOADJUSTBITRATE, autoAdjustBitrate);
     settings.setValue(SER_VSYNC, enableVsync);
     settings.setValue(SER_GAMEOPTS, gameOptimizations);
@@ -366,6 +369,49 @@ void StreamingPreferences::save()
     settings.setValue(SER_SWAPFACEBUTTONS, swapFaceButtons);
     settings.setValue(SER_CAPTURESYSKEYS, captureSysKeysMode);
     settings.setValue(SER_KEEPAWAKE, keepAwake);
+}
+
+int StreamingPreferences::getMaximumBitrate(VideoCodecConfig codec)
+{
+    return codec == VCC_FORCE_PYROWAVE ? 3000000 : 500000;
+}
+
+int StreamingPreferences::getDefaultBitrateForCodec(int width, int height, int fps,
+                                                   bool yuv444, VideoCodecConfig codec)
+{
+    if (codec != VCC_FORCE_PYROWAVE) {
+        return getDefaultBitrate(width, height, fps, yuv444);
+    }
+    // P1a SDR 8-bit 4:2:0: 1.6 bits per pixel per frame, rounded to 500 kbps.
+    // Promote before multiplying to avoid integer overflow at high resolutions.
+    const double kbps = double(width) * height * fps * 1.6 / 1000.0;
+    return qRound(qBound(500.0, kbps, 3000000.0) / 500.0) * 500;
+}
+
+int StreamingPreferences::defaultBitrateKbps() const
+{
+    return qBound(500, getDefaultBitrateForCodec(width, height, fps, enableYUV444, videoCodecConfig),
+                  maximumBitrateKbps());
+}
+
+void StreamingPreferences::refreshBitrate()
+{
+    emit bitratePolicyChanged();
+    const int next = autoAdjustBitrate ? defaultBitrateKbps()
+                                      : qBound(500, bitrateKbps, maximumBitrateKbps());
+    if (next != bitrateKbps) {
+        bitrateKbps = next;
+        emit bitrateChanged();
+    }
+}
+
+void StreamingPreferences::useDefaultBitrate()
+{
+    if (!autoAdjustBitrate) {
+        autoAdjustBitrate = true;
+        emit autoAdjustBitrateChanged();
+    }
+    refreshBitrate();
 }
 
 int StreamingPreferences::getDefaultBitrate(int width, int height, int fps, bool yuv444)

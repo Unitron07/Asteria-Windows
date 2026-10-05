@@ -187,23 +187,3 @@ jobs:
             build/parser-${{ matrix.arch }}/Release/pyrowave-parser-tests.exe
             build/parser-${{ matrix.arch }}/Testing/
           if-no-files-found: warn
-      - name: Build experimental live client and verify isolated owner package
-        shell: pwsh
-        run: |
-          $kit = if ('${{ matrix.arch }}' -eq 'arm64') { 'msvc2022_arm64' } else { 'msvc2022_64' }
-          $qtBin = Join-Path '${{ runner.workspace }}/Qt/6.11.2' "$kit/bin"
-          ./scripts/build-pyrowave-live.ps1 -Architecture '${{ matrix.arch }}' -DependencyRoot $env:PYROWAVE_DEPS -QtBin $qtBin
-      - name: Upload live owner qualification package
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: Asteria-P1a-Experimental-${{ matrix.arch }}-${{ github.run_id }}
-          path: build/Asteria-P1a-Experimental-${{ matrix.arch }}.zip
-          if-no-files-found: error
-          compression-level: 0
-      - name: Upload live build evidence
-        if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: pyrowave-p1a-evidence-${{ matrix.arch }}-${{ github.run_id }}
-          path: build/evidence/${{ matrix.arch }}/
-          if-no-files-found: warn
