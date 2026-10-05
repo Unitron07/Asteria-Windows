@@ -210,11 +210,6 @@ if !ERRORLEVEL! NEQ 0 goto Error
 7z a %SYMBOLS_FOLDER%\AsteriaDebuggingSymbols-%ARCH%-%VERSION%.zip %SYMBOLS_FOLDER%\*.pdb
 if !ERRORLEVEL! NEQ 0 goto Error
 
-rem Keep the pinned runtime bytes and hash metadata intact. Stage after the
-rem optional signing loop, before WiX harvesting, so MSI and ZIP both include it.
-powershell -NoProfile -ExecutionPolicy Bypass -File "%SOURCE_ROOT%\scripts\stage-pyrowave-runtime.ps1" -Architecture %ARCH% -DependencyRoot "%ASTERIA_PYROWAVE_DEPS%" -DeployDirectory "%DEPLOY_FOLDER%" -ClientPath "%BUILD_FOLDER%\app\%BUILD_CONFIG%\Asteria.exe"
-if !ERRORLEVEL! NEQ 0 goto Error
-
 if "%ML_SYMBOL_STORE%" NEQ "" (
     echo Publishing PDBs to symbol store: %ML_SYMBOL_STORE%
     symstore add /f %SYMBOLS_FOLDER%\*.pdb /s %ML_SYMBOL_STORE% /t Asteria
@@ -291,6 +286,11 @@ if "%SIGN%"=="1" (
     signtool %SIGNTOOL_PARAMS% !FILES_TO_SIGN!
     if !ERRORLEVEL! NEQ 0 goto Error
 )
+
+rem Keep the pinned runtime bytes and hash metadata intact. Stage after the
+rem optional signing loop, before WiX harvesting, so MSI and ZIP both include it.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SOURCE_ROOT%\scripts\stage-pyrowave-runtime.ps1" -Architecture %ARCH% -DependencyRoot "%ASTERIA_PYROWAVE_DEPS%" -DeployDirectory "%DEPLOY_FOLDER%" -ClientPath "%BUILD_FOLDER%\app\%BUILD_CONFIG%\Asteria.exe"
+if !ERRORLEVEL! NEQ 0 goto Error
 
 if "%ML_SYMBOL_STORE%" NEQ "" (
     echo Publishing binaries to symbol store: %ML_SYMBOL_STORE%
