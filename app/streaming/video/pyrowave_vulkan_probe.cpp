@@ -373,9 +373,14 @@ bool Probe::draw() {
     const VkResult complete = vk.GetFenceStatus(device, frame.complete);
     if (complete == VK_NOT_READY) return false; // One query per SDL wait iteration.
     check(complete, "vkGetFenceStatus");
-    // The previous render completion implies the acquire semaphore/fence have
-    // finished. The separate acquisition fence also protects partial-submit
-    // cleanup; it is never host-waited in the presentation hot path.
+    if (frame.acquisitionPending) {
+        const VkResult acquisition = vk.GetFenceStatus(device, frame.acquireComplete);
+        if (acquisition == VK_NOT_READY) return false;
+        check(acquisition, "vkGetFenceStatus acquire");
+    }
+    // Check both completion domains explicitly before resetting the acquisition
+    // fence. It also protects partial-submit cleanup and is never host-waited
+    // in the presentation hot path.
     check(vk.ResetFences(device, 1, &frame.acquireComplete), "vkResetFences acquire");
     frame.acquisitionPending = false;
     uint32_t index = 0;
