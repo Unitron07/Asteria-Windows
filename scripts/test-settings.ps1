@@ -45,6 +45,11 @@ if errorlevel 1 exit /b 1
 "@ | Set-Content (Join-Path $build 'test.cmd') -Encoding ascii
 & cmd /d /c (Join-Path $build 'test.cmd')
 if ($LASTEXITCODE) { throw 'Settings test build/deployment failed' }
+# windeployqt deploys qwindows by default. The headless test must also carry the
+# target kit's offscreen plugin rather than depend on an installed Qt plugin path.
+$offscreenPlugin = Join-Path $QtRoot "$kit/plugins/platforms/qoffscreen.dll"
+if (!(Test-Path -LiteralPath $offscreenPlugin)) { throw "Missing target offscreen plugin: $offscreenPlugin" }
+Copy-Item -LiteralPath $offscreenPlugin -Destination (Join-Path $build 'release/platforms/qoffscreen.dll')
 $env:QT_QPA_PLATFORM = 'offscreen'
 $env:QT_QUICK_BACKEND = 'software'
 $env:QT_QUICK_CONTROLS_STYLE = 'Basic'
