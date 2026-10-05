@@ -235,7 +235,7 @@ private slots:
         QVERIFY(!reset->property("visible").toBool());
         // Use the actual tab focus chain and responsive Flow at both sizes.
         auto resolution=qobject_cast<QQuickItem*>(expression("resolutionComboBox").value<QObject*>()); QVERIFY(resolution);
-        resolution->forceActiveFocus(Qt::TabFocus); QTest::keyClick(&view,Qt::Key_Tab);
+        resolution->forceActiveFocus(Qt::TabFocusReason); QTest::keyClick(&view,Qt::Key_Tab);
         QVERIFY(expression("fpsComboBox.activeFocus").toBool());
         QTest::keyClick(&view,Qt::Key_Tab); QVERIFY(expression("codecComboBox.activeFocus").toBool());
         QTest::qWait(100);
