@@ -13,7 +13,7 @@ function New-PeHeader([uint16]$Machine) {
     [BitConverter]::GetBytes([uint16]0x020B).CopyTo($bytes, 88)
     return ,$bytes
 }
-function Test-Package([string]$Name, [hashtable]$Files, [string]$Architecture, [string]$ExpectedError) {
+function Test-Package([string]$Name, [hashtable]$Files, [string]$Architecture, [string]$ExpectedError, [string]$ClientExecutable = 'Asteria.exe') {
     $zipPath = Join-Path $scratch "$Name.zip"
     $reportPath = Join-Path $scratch "$Name.json"
     $zip = [IO.Compression.ZipFile]::Open($zipPath, [IO.Compression.ZipArchiveMode]::Create)
@@ -24,7 +24,7 @@ function Test-Package([string]$Name, [hashtable]$Files, [string]$Architecture, [
         }
     } finally { $zip.Dispose() }
     $caught = $null
-    try { & $validator -PackagePath $zipPath -Architecture $Architecture -ReportPath $reportPath }
+    try { & $validator -PackagePath $zipPath -Architecture $Architecture -ReportPath $reportPath -ClientExecutable $ClientExecutable }
     catch { $caught = $_.Exception.Message }
     if ($ExpectedError) {
         if (!$caught -or !$caught.Contains($ExpectedError)) { throw "$Name did not reject as expected: $caught" }
@@ -47,6 +47,9 @@ try {
             'source-notices/LICENSE' = [Text.Encoding]::UTF8.GetBytes('notice')
         }
         Test-Package "valid-$arch" $files $arch ''
+        $upstreamFiles = @{'Moonlight.exe' = (New-PeHeader $machine); 'SDL2.dll' = (New-PeHeader $machine)}
+        Test-Package "upstream-$arch" $upstreamFiles $arch '' 'Moonlight.exe'
+        Test-Package "upstream-wrong-client-$arch" $upstreamFiles $arch 'missing Asteria.exe'
         $wrong = if ($arch -eq 'arm64') { 0x8664 } else { 0xAA64 }
         $files['plugins/platforms/contaminant.dll'] = New-PeHeader $wrong
         Test-Package "contaminated-$arch" $files $arch 'contaminant.dll: Machine'
