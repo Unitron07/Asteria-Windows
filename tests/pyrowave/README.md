@@ -222,19 +222,19 @@ coordinates differ from output pixels. Native nearest inspection needs a
   by comparing raw. Dense checks are localized to keep the fixture within the
   unchanged frame/packet caps. Gradient uses Y 16..235 with neutral chroma.
 
-The existing verified v15 archive supplies **SDL2 API 2.32.70 through sdl2-compat**,
-backed by **SDL3 3.4.16** (ARM64 inventory in DEPENDENCIES_WINDOWS.md). No new major
+The current verified v19 archive supplies **SDL2 API 2.32.74 through sdl2-compat**,
+backed by **SDL3 3.4.18** (current versions are recorded per build). No new major
 dependency is introduced. Probe reports compiled/runtime SDL2 version and revision,
 renderer name/flags, advertised IYUV support and actual texture, source/window/output
 dimensions and scaling. Backend advertisement can omit IYUV even when SDL emulates
 it; successful texture creation/query/upload is reported separately.
 
 `SDL_SetYUVConversionMode(SDL_YUV_CONVERSION_BT709)` is set **before every texture
-creation**. The [pinned compatibility source](https://github.com/libsdl-org/sdl2-compat/blob/a53b6ad90ecd2d0ccfe01d5cfd2059793acf8c12/src/sdl2_compat.c)
+creation**. The [pinned compatibility source](https://github.com/libsdl-org/sdl2-compat/blob/e4df8a55f20da762290a78c2bbe8f8d89d01486a/src/sdl2_compat.c)
 maps this to `SDL_COLORSPACE_BT709_LIMITED` in `GetColorspaceForFormatAndSize` and
 sets the SDL3 texture colorspace property in `SDL_CreateTexture`. This matches
 the explicit conversion used by Asteria's existing SDL renderer. The SDL2 API has
-no independent chroma-siting control. The [pinned SDL3 colorspace definition](https://github.com/libsdl-org/SDL/blob/fa2c02bb6e21974a89ea9824bc53c9932abe5f9c/include/SDL3/SDL_pixels.h)
+no independent chroma-siting control. The [pinned SDL3 colorspace definition](https://github.com/libsdl-org/SDL/blob/829a65d769d935c4852f8159e964312c0957260a/include/SDL3/SDL_pixels.h)
 defines `SDL_COLORSPACE_BT709_LIMITED` with **LEFT chroma-location metadata**, while
 Vibepollo's source pattern is **CENTER**. This is a concrete metadata mismatch;
 the probe logs it and does not compensate or claim centered alignment is preserved.

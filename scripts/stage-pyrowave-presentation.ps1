@@ -15,8 +15,8 @@ Copy-Item -LiteralPath (Join-Path $DependencyRoot 'install') -Destination (Join-
 $notices = Join-Path $stage 'source-notices'
 New-Item -ItemType Directory -Force $notices | Out-Null
 foreach ($input in @(
-    @{name='SDL2-compat-LICENSE.txt'; url='https://raw.githubusercontent.com/libsdl-org/sdl2-compat/a53b6ad90ecd2d0ccfe01d5cfd2059793acf8c12/LICENSE.txt'},
-    @{name='SDL3-LICENSE.txt'; url='https://raw.githubusercontent.com/libsdl-org/SDL/fa2c02bb6e21974a89ea9824bc53c9932abe5f9c/LICENSE.txt'}
+    @{name='SDL2-compat-LICENSE.txt'; url='https://raw.githubusercontent.com/libsdl-org/sdl2-compat/e4df8a55f20da762290a78c2bbe8f8d89d01486a/LICENSE.txt'},
+    @{name='SDL3-LICENSE.txt'; url='https://raw.githubusercontent.com/libsdl-org/SDL/829a65d769d935c4852f8159e964312c0957260a/LICENSE.txt'}
 )) {
     Invoke-WebRequest -Uri $input.url -OutFile (Join-Path $notices $input.name)
 }
@@ -25,7 +25,7 @@ Copy-Item -LiteralPath (Join-Path $sourceRoot 'scripts/baseline-deps.json') -Des
 Copy-Item -LiteralPath (Join-Path $sourceRoot 'docs/DEPENDENCIES_WINDOWS.md') -Destination $notices
 Copy-Item -LiteralPath (Join-Path $sourceRoot 'tests/pyrowave/README.md') -Destination (Join-Path $stage 'README.md')
 @"
-Offline P0.5 $Architecture probe. Native target SDL2 API via pinned sdl2-compat/SDL3 v15 archive.
+Offline P0.5 $Architecture probe. Native target SDL2 API via pinned sdl2-compat/SDL3 v19 archive.
 Run from this directory with the matching Windows architecture and MSVC runtime installed:
 .\pyrowave-offline-proof.exe --present-raw-i420 - .\evidence-raw
 .\pyrowave-offline-proof.exe --present-compatibility .\runtime\bin .\evidence-compat
