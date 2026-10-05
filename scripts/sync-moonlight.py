@@ -10,7 +10,7 @@ ISSUE_TITLE = 'maintenance: Moonlight upstream integration requires review'
 
 
 def run(*args, check=True):
-    result = subprocess.run(args, text=True, stdout=subprocess.PIPE,
+    result = subprocess.run(args, text=True, encoding='utf-8', stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE)
     if check and result.returncode:
         raise RuntimeError(f'{args[0]} failed ({result.returncode}):\n{result.stdout}\n{result.stderr}')
@@ -70,7 +70,7 @@ def validate(base):
 
 
 def main():
-    baseline = json.loads(Path(RECORD).read_text())
+    baseline = json.loads(Path(RECORD).read_text(encoding='utf-8'))
     if baseline['repository'] != 'moonlight-stream/moonlight-qt' or baseline['branch'] != 'master':
         raise RuntimeError('Unexpected upstream repository or branch')
     git('config', 'user.name', 'github-actions[bot]')
@@ -82,7 +82,7 @@ def main():
     summary = Path(os.environ.get('GITHUB_STEP_SUMMARY', 'build/upstream-summary.md'))
     summary.parent.mkdir(parents=True, exist_ok=True)
     if old == new:
-        summary.write_text('Moonlight upstream is unchanged.\n')
+        summary.write_text('Moonlight upstream is unchanged.\n', encoding='utf-8')
         return
     if git('merge-base', '--is-ancestor', old, new, check=False).returncode:
         raise RuntimeError('Upstream no longer descends from the baseline; manual review required')
@@ -104,40 +104,40 @@ def main():
         if (record.returncode == 0 and json.loads(record.stdout)['commit'] == new
                 and git('merge-base', '--is-ancestor', base, remote_sha, check=False).returncode == 0):
             # A validated proposal already includes current main and upstream. Repair a missing PR too.
-            body_path.write_text(body + 'Validation: existing validated proposal reused.\n')
+            body_path.write_text(body + 'Validation: existing validated proposal reused.\n', encoding='utf-8')
             publish_pr(body_path)
-            summary.write_text(body_path.read_text())
+            summary.write_text(body_path.read_text(encoding='utf-8'), encoding='utf-8')
             return
     git('switch', '-c', BRANCH)
     conflicts = merge(new)
     if conflicts:
         body_path.write_text(body + 'Merge aborted. Manual integration required. Conflicted files:\n\n'
-                             + ''.join(f'- `{f}`\n' for f in conflicts))
+                             + ''.join(f'- `{f}`\n' for f in conflicts), encoding='utf-8')
         notice(body_path)
-        summary.write_text(body_path.read_text())
+        summary.write_text(body_path.read_text(encoding='utf-8'), encoding='utf-8')
         return
     try:
         baseline.update(ref='master', commit=new)
-        Path(RECORD).write_text(json.dumps(baseline, indent=2) + '\n')
+        Path(RECORD).write_text(json.dumps(baseline, indent=2) + '\n', encoding='utf-8')
         git('add', RECORD)
         git('commit', '-m', f'Merge Moonlight upstream {new[:12]} and record baseline')
         git('submodule', 'update', '--init', '--recursive')
         validate(base)
     except Exception as exc:
-        body_path.write_text(body + f'Validation failed; no branch published.\n\n```\n{exc}\n```\n')
+        body_path.write_text(body + f'Validation failed; no branch published.\n\n```\n{exc}\n```\n', encoding='utf-8')
         notice(body_path)
-        summary.write_text(body_path.read_text())
+        summary.write_text(body_path.read_text(encoding='utf-8'), encoding='utf-8')
         raise
     body_path.write_text(body + 'Validation: diff whitespace, PowerShell preflight/package guards, '
                          'CMake configuration and GPU-free PyroWave regression tests passed.\n\n'
                          'Qt/qmake, settings UI, live input, runtime/GPU and full x64/ARM64 package '
                          'qualification were not run by this weekly job. GITHUB_TOKEN PRs do not '
                          'trigger normal PR workflows: manually dispatch the Windows baseline and '
-                         'PyroWave workflows on this branch before merging.\n')
+                         'PyroWave workflows on this branch before merging.\n', encoding='utf-8')
     git('push', f'--force-with-lease=refs/heads/{BRANCH}:{remote_sha}', 'origin',
         f'HEAD:refs/heads/{BRANCH}')
     publish_pr(body_path)
-    summary.write_text(body_path.read_text())
+    summary.write_text(body_path.read_text(encoding='utf-8'), encoding='utf-8')
 
 
 if __name__ == '__main__':

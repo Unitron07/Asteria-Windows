@@ -85,6 +85,40 @@ class SyncTests(unittest.TestCase):
             publish.assert_not_called()
         self.assertIn('unchanged', Path('build/upstream-summary.md').read_text())
 
+    def test_clean_proposal_updates_baseline_and_reuses_remote_branch(self):
+        # Exercise the complete Git path against a local bare origin, without GitHub writes.
+        sync.git('switch', '-c', 'upstream')
+        self.change('upstream-feature', 'upstream\n')
+        new = sync.git('rev-parse', 'HEAD').stdout.strip()
+        sync.git('switch', 'main')
+        Path('.upstream').mkdir()
+        Path(sync.RECORD).write_text(json.dumps({'repository': 'moonlight-stream/moonlight-qt',
+                                              'branch': 'master', 'ref': 'v6.2.0', 'commit': self.base}))
+        sync.git('add', sync.RECORD)
+        sync.git('commit', '-m', 'Asteria baseline')
+        Path('build').mkdir()
+        sync.git('init', '--bare', 'build/origin.git')
+        sync.git('remote', 'add', 'origin', str(Path('build/origin.git').resolve()))
+        sync.git('update-ref', 'refs/remotes/moonlight/master', new)
+        real_git = sync.git
+        def fake_git(*args, **kwargs):
+            if args[:2] == ('fetch', '--no-tags'):
+                return subprocess.CompletedProcess(args, 0, '', '')
+            return real_git(*args, **kwargs)
+        with patch.object(sync, 'git', side_effect=fake_git), patch.object(sync, 'validate') as validate, \
+                patch.object(sync, 'publish_pr') as publish:
+            sync.main()
+            self.assertEqual(json.loads(Path(sync.RECORD).read_text())['commit'], new)
+            self.assertEqual(len(sync.git('rev-list', '--parents', '-1', 'HEAD').stdout.split()), 3)
+            tip = sync.git('rev-parse', 'HEAD').stdout.strip()
+            validate.assert_called_once()
+            sync.git('switch', 'main')
+            sync.git('branch', '-D', sync.BRANCH)
+            sync.main()
+            self.assertEqual(sync.git('ls-remote', 'origin', f'refs/heads/{sync.BRANCH}').stdout.split()[0], tip)
+            self.assertEqual(validate.call_count, 1)
+            self.assertEqual(publish.call_count, 2)
+
 
 if __name__ == '__main__':
     unittest.main()
