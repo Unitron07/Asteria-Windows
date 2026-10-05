@@ -31,14 +31,15 @@ codecs only; PyroWave must still be explicitly selected as Experimental.
 The restricted loader's CRT closure is staged in the runtime directory; all
 packaged PE types, notices and hashes are checked. See
 [LIVE-OWNER-TEST.md](LIVE-OWNER-TEST.md) for extracting, launching, selection,
-logging, manual retry and live qualification criteria. Live owner qualification
-remains PENDING; passing CI only establishes build/API/test evidence.
+logging, manual retry and live qualification criteria. Live SDR 4:2:0 is
+owner-validated on the named ARM64 device; broader hardware/GPU performance
+qualification remains open. Passing CI only establishes build/API/test evidence.
 
 
 This standalone parser/Windows runtime harness does not connect to a host.
-Normal Asteria builds and release packages stay unchanged; Qt/qmake remains the
-application toolchain. Experimental app compilation needs
-`CONFIG+=pyrowave_experimental`. No Session hook, codec setting or advertisement.
+Qt/qmake remains the application toolchain. The normal Windows application build
+enables `CONFIG+=pyrowave_experimental` and includes the live Session hook,
+explicit Experimental codec setting and bounded SDR 4:2:0 advertisement.
 
 Active codec: Themaister/pyrowave `186f0393b77f7755953b5ecde994bb1cec2e4155`;
 bitstream ID `186f0393`; C API 0.6.0. See [the current contract](../../docs/PYROWAVE_VIBEPOLLO.md)

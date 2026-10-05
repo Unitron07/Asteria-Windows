@@ -215,7 +215,7 @@ Windows 10 x64 still needs its own declared minimum OS/runtime and hardware qual
 
 ## First public preview record (2026-09-25)
 
-[v0.1.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0) is an unsigned, portable Windows x64 and native ARM64 prerelease. Both packages came from main commit [`34dfd937528586babded200fafaee535e21d4a40`](https://github.com/Unitron07/Asteria-Windows/commit/34dfd937528586babded200fafaee535e21d4a40) in successful [CI run 36191650824](https://github.com/Unitron07/Asteria-Windows/actions/runs/36191650824). The tag resolves to that commit. The release job checked each original ZIP against its passing, hash-bound `package-architecture.json` and confirmed 69 x64 and 68 ARM64 EXE/DLL entries, including deployed runtimes and plugins. It also checked `portable.dat`, root license, and provenance notices before attaching the unchanged ZIPs.
+[v0.1.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0) is an unsigned, portable Windows x64 and native ARM64 release (GitHub prerelease flag is false). Both packages came from main commit [`34dfd937528586babded200fafaee535e21d4a40`](https://github.com/Unitron07/Asteria-Windows/commit/34dfd937528586babded200fafaee535e21d4a40) in successful [CI run 36191650824](https://github.com/Unitron07/Asteria-Windows/actions/runs/36191650824). The tag resolves to that commit. The release job checked each original ZIP against its passing, hash-bound `package-architecture.json` and confirmed 69 x64 and 68 ARM64 EXE/DLL entries, including deployed runtimes and plugins. It also checked `portable.dat`, root license, and provenance notices before attaching the unchanged ZIPs.
 
 | Portable release asset | SHA-256 |
 | --- | --- |
