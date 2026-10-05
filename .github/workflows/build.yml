@@ -19,7 +19,7 @@ jobs:
     uses: ./.github/workflows/build-windows-baseline.yml
     with:
       architecture: ${{ matrix.architecture }}
-      source-ref: e3fd29e4d7dc5723d8d0da7d19e2698daec74456
+      source-ref: de2467e433821664cdd2224aad8c89a625be1ad9
       label: upstream
   candidate:
     strategy:

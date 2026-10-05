@@ -71,6 +71,17 @@ jobs:
         timeout-minutes: 8
         shell: pwsh
         run: ./harness/scripts/test-settings.ps1 -SourceRoot ./source -Architecture '${{ inputs.architecture }}' -QtRoot '${{ runner.workspace }}/Qt/6.11.2'
+      - name: Test keyboard mapping and extended-key release state
+        if: inputs.label == 'asteria'
+        shell: pwsh
+        run: |
+          $platform = if ('${{ inputs.architecture }}' -eq 'arm64') { 'ARM64' } else { 'x64' }
+          cmake -S source/tests/input -B source/build/input-tests -A $platform -DSDL_ARCH=${{ inputs.architecture }}
+          if ($LASTEXITCODE) { throw 'Input test configuration failed' }
+          cmake --build source/build/input-tests --config Release --parallel 2
+          if ($LASTEXITCODE) { throw 'Input test build failed' }
+          ctest --test-dir source/build/input-tests -C Release --output-on-failure
+          if ($LASTEXITCODE) { throw 'Input regressions failed' }
       - name: Build unsigned Release and collect evidence
         shell: pwsh
         env:

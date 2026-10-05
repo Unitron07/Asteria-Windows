@@ -88,6 +88,17 @@ private slots:
         prefs = Prefs::get();
     }
     void init() { QSettings().clear(); prefs->reload(); }
+    void newInstallResolutionAndPersistedOverride() {
+        QCOMPARE(prefs->width, 1920);
+        QCOMPARE(prefs->height, 1080);
+        QSettings settings;
+        settings.setValue("width", 1280);
+        settings.setValue("height", 720);
+        settings.sync();
+        prefs->reload();
+        QCOMPARE(prefs->width, 1280);
+        QCOMPARE(prefs->height, 720);
+    }
     void codecCaps() {
         for (auto codec : {Prefs::VCC_AUTO,Prefs::VCC_FORCE_H264,Prefs::VCC_FORCE_HEVC,
                            Prefs::VCC_FORCE_HEVC_HDR_DEPRECATED,Prefs::VCC_FORCE_AV1}) {
