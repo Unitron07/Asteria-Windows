@@ -47,6 +47,15 @@ public:
                             Framing framing = Framing::Compatibility);
     bool encodeProofPixels(const Pixels& pixels, std::vector<std::uint8_t>& container,
                            Framing framing = Framing::Compatibility);
+#ifdef PYROWAVE_VULKAN_SHARED_DEVICE
+    // Only compiled by the isolated offline project; caller retains all Vulkan
+    // create-info storage, queue userdata and handles until close() finishes.
+    bool borrowDevice(const pyrowave_device_create_info& info);
+    bool decodeNative(const std::vector<std::uint8_t>& container,
+                      const pyrowave_gpu_buffers& buffers,
+                      const pyrowave_gpu_sync_operation& acquire,
+                      const pyrowave_gpu_sync_operation& release);
+#endif
 
 private:
     friend class GpuPresentation;
