@@ -166,7 +166,9 @@ int main(int argc,char** argv) {
                     auto pixels=Presentation::pattern(pattern); std::vector<uint8_t> compatibility;
                     if(!reference.encodeProofPixels(pixels,compatibility)) throw std::runtime_error(reference.error());
                     PyroWave::Frame frame; std::string error;
-                    if(!PyroWave::parseFrame(compatibility.data(),compatibility.size(),compatibility.size(),frame,error)) throw std::runtime_error(error);
+                    const PyroWave::StreamContext context{1920,1080,PyroWave::Chroma::Yuv420,true};
+                    if(!PyroWave::parseFrame(compatibility.data(),compatibility.size(),compatibility.size(),frame,error,&context)) throw std::runtime_error(error);
+                    require(!frame.records.empty(),"fixture has no validated sequence record");
                     const auto rangeByte=frame.records.at(0).offset+7;
                     for(bool limited:{false,true}) {
                         if(limited) compatibility[rangeByte]|=0x40; else compatibility[rangeByte]&=uint8_t(~0x40);

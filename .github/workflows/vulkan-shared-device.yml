@@ -87,6 +87,7 @@ jobs:
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $runner -EvidenceRoot $evidence
           if ($LASTEXITCODE -eq 77) { Write-Output 'SKIP: hosted runner has no suitable real GPU' }
           elseif ($LASTEXITCODE) { throw 'Packaged Stage 3 owner procedure failed' }
+          exit 0 # An explicitly recorded SKIP is an accepted CI outcome.
       - name: Upload architecture-specific owner package and evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
