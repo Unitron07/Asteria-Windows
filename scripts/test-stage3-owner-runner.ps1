@@ -66,32 +66,20 @@ foreach ($shell in $shells) {
         $arguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $package 'run-stage3-owner-tests.ps1'),'-Verbose')
         if ($case -eq 'explicit') { $expected = Join-Path $EvidenceRoot ((Split-Path $shell -Leaf) + ' explicit evidence'); $arguments += @('-EvidenceRoot',$expected) }
         if ($case -eq 'whitespace') { $arguments += @('-EvidenceRoot','   ') }
-        $start = New-Object Diagnostics.ProcessStartInfo
-        $start.FileName = $shell; $start.Arguments = ($arguments | ForEach-Object { '"' + $_ + '"' }) -join ' '
-        $start.WorkingDirectory = $unrelated; $start.UseShellExecute = $false; $start.CreateNoWindow = $true
-        if ((Split-Path $shell -Leaf) -ieq 'powershell.exe') {
-            # Let Windows PowerShell construct its own architecture-appropriate
-            # defaults instead of inheriting PowerShell 7's module paths.
-            $start.EnvironmentVariables.Remove('PSModulePath')
-        }
-        $start.RedirectStandardOutput = $true; $start.RedirectStandardError = $true
-        $process = [Diagnostics.Process]::Start($start)
-        $stdout = $process.StandardOutput.ReadToEndAsync(); $stderr = $process.StandardError.ReadToEndAsync()
-        if (!$process.WaitForExit(30000)) {
-            $process.Kill()
-            $process.WaitForExit(1000) | Out-Null
-            $diagnostic = "Runner regression timeout: $shell / $case"
-            if ($stdout.IsCompleted) { $diagnostic += "`n$($stdout.Result)" }
-            if ($stderr.IsCompleted) { $diagnostic += "`n$($stderr.Result)" }
-            $diagnostic | Set-Content -LiteralPath (Join-Path $package 'child-output.txt')
-            throw $diagnostic
-        }
-        $code = $process.ExitCode; $process.Dispose()
-        ($stdout.Result + $stderr.Result) | Set-Content -LiteralPath (Join-Path $package 'child-output.txt')
-        if ($code -ne 77) { throw "Runner SKIP fixture returned ${code}: $($stdout.Result) $($stderr.Result)" }
+        # Use PowerShell's native launcher, as in the documented owner command.
+        # It handles cross-version module-path hygiene on Windows/ARM64. The CI
+        # step bounds shell startup; each actual GPU process has its own timeout.
+        $PSNativeCommandUseErrorActionPreference = $false
+        Write-Output "Runner case: $(Split-Path $shell -Leaf)/$case fixture_arch=$fixtureArch"
+        Push-Location -LiteralPath $unrelated
+        try { $output = & $shell @arguments 2>&1 | Out-String; $code = $LASTEXITCODE }
+        finally { Pop-Location }
+        $output | Set-Content -LiteralPath (Join-Path $package 'child-output.txt')
+        if ($code -ne 77) { throw "Runner SKIP fixture returned ${code}: $output" }
         $record = Get-Content -LiteralPath (Join-Path $expected 'owner-result.json') -Raw | ConvertFrom-Json
         if ($record.overall -cne 'SKIP' -or $record.sourceRevision -cne 'GPU_FREE_FIXTURE') { throw 'Runner evidence mismatch' }
         if (Test-Path -LiteralPath (Join-Path $unrelated 'stage3-evidence')) { throw 'Runner wrote relative to CWD' }
     }
 }
 Write-Output 'PASS: actual packaged Stage 3 runner, Windows PowerShell 5.1/pwsh, unrelated CWD, spaces/default/explicit roots, explicit SKIP'
+$global:LASTEXITCODE = 0 # All six intentional exit-77 results were verified above.

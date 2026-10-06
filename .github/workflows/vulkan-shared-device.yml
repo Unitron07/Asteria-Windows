@@ -76,6 +76,7 @@ jobs:
         shell: pwsh
         run: ./scripts/stage-vulkan-shared-device.ps1 -Architecture '${{ matrix.arch }}' -BuildRoot 'build/stage3-${{ matrix.arch }}' -DependencyRoot 'build/pyrowave/${{ matrix.arch }}'
       - name: Packaged Windows PowerShell 5.1 and PowerShell 7 runner regression
+        timeout-minutes: 3
         shell: pwsh
         run: ./scripts/test-stage3-owner-runner.ps1 -PackageRoot 'build/stage3-owner-${{ matrix.arch }}' -EvidenceRoot 'build/stage3-${{ matrix.arch }}/evidence/runner' -FixtureExe 'build/stage3-${{ matrix.arch }}/Release/stage3-owner-runner-fixture.exe'
       - name: Actual packaged offline owner procedure
