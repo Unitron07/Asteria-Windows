@@ -70,9 +70,9 @@ foreach ($shell in $shells) {
         $start.FileName = $shell; $start.Arguments = ($arguments | ForEach-Object { '"' + $_ + '"' }) -join ' '
         $start.WorkingDirectory = $unrelated; $start.UseShellExecute = $false; $start.CreateNoWindow = $true
         if ((Split-Path $shell -Leaf) -ieq 'powershell.exe') {
-            # Match native PowerShell 7 -> Windows PowerShell launching, which
-            # strips the host kit's incompatible module directories.
-            $start.EnvironmentVariables['PSModulePath'] = Join-Path ([Environment]::GetFolderPath('Windows')) 'System32/WindowsPowerShell/v1.0/Modules'
+            # Let Windows PowerShell construct its own architecture-appropriate
+            # defaults instead of inheriting PowerShell 7's module paths.
+            $start.EnvironmentVariables.Remove('PSModulePath')
         }
         $start.RedirectStandardOutput = $true; $start.RedirectStandardError = $true
         $process = [Diagnostics.Process]::Start($start)
