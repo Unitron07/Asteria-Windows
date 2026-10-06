@@ -1,5 +1,10 @@
 # PyroWave P1a GPU presentation and stats
 
+The separately authorized [Stage 3 offline shared-device proof](../tests/pyrowave/vulkan/STAGE3.md)
+adds direct pinned decode into Asteria-owned Vulkan Y/U/V images with test-only
+readback. Surface qualification is pending; live Vulkan presentation remains
+future work. It does not change the live paths described below.
+
 ## Current live ARM64 owner result
 
 Owner-reported test: Surface Pro 11, Snapdragon X Plus, Qualcomm Adreno X1-85;

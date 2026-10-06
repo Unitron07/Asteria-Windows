@@ -1,5 +1,10 @@
 # Next step: post-v0.2.0 native Vulkan presentation
 
+[Stage 3](../tests/pyrowave/vulkan/STAGE3.md) is an isolated offline shared-device
+decode proof. Owner Surface qualification is pending. Live Vulkan presentation,
+production integration and Stage 4/5 remain future work; the confirmed pinned
+borrowed-factory failure cleanup leak blocks production promotion pending review.
+
 ## Current state: v0.2.0 released
 
 Live PyroWave SDR 8-bit 4:2:0 has been validated against Vibepollo on native
