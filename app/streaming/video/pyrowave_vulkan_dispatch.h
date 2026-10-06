@@ -17,7 +17,7 @@ public:
     Dispatch& operator=(const Dispatch&) = delete;
     void load();
     void instance(VkInstance instance);
-    void device(VkDevice device);
+    void device(VkDevice device, bool requireSwapchain = true);
     std::string loaderPath;
     // Test injection deliberately excludes destruction functions.
     std::string missingExport;
@@ -30,12 +30,13 @@ public:
     X(GetPhysicalDeviceSurfaceCapabilitiesKHR) X(GetPhysicalDeviceSurfaceFormatsKHR) \
     X(GetPhysicalDeviceSurfacePresentModesKHR) X(EnumerateDeviceExtensionProperties) \
     X(CreateDevice) X(DestroyDevice) X(DestroySurfaceKHR)
-#define PW_DEVICE(X) X(GetDeviceQueue) X(DeviceWaitIdle) X(CreateSwapchainKHR) X(DestroySwapchainKHR) \
-    X(GetSwapchainImagesKHR) X(AcquireNextImageKHR) X(QueuePresentKHR) X(CreateImageView) X(DestroyImageView) \
+#define PW_SWAPCHAIN(X) X(CreateSwapchainKHR) X(DestroySwapchainKHR) X(GetSwapchainImagesKHR) X(AcquireNextImageKHR) X(QueuePresentKHR)
+#define PW_DEVICE_CORE(X) X(GetDeviceQueue) X(DeviceWaitIdle) X(CreateImageView) X(DestroyImageView) \
     X(CreateRenderPass) X(DestroyRenderPass) X(CreateFramebuffer) X(DestroyFramebuffer) \
     X(CreateSemaphore) X(DestroySemaphore) X(CreateFence) X(DestroyFence) X(GetFenceStatus) X(ResetFences) X(WaitForFences) \
     X(CreateCommandPool) X(DestroyCommandPool) X(AllocateCommandBuffers) X(ResetCommandBuffer) \
     X(BeginCommandBuffer) X(EndCommandBuffer) X(CmdBeginRenderPass) X(CmdClearAttachments) X(CmdEndRenderPass) X(QueueSubmit)
+#define PW_DEVICE(X) PW_DEVICE_CORE(X) PW_SWAPCHAIN(X)
 #define PW_DECLARE(name) PFN_vk##name name = nullptr;
     PW_GLOBAL(PW_DECLARE)
     PW_INSTANCE(PW_DECLARE)

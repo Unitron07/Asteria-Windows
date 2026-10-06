@@ -14,7 +14,15 @@ using System; using System.IO;
 public static class Fixture {
  public static int Main(string[] args) {
   if (Environment.GetCommandLineArgs()[0].Contains("policy-tests")) return 0;
-  for(int i=0;i+1<args.Length;i++) if(args[i]=="--log") File.WriteAllText(args[i+1],"validation_status=SKIP\noverall=SKIP\n");
+  string log=null;
+  for(int i=0;i<args.Length;i++) {
+   if((args[i]=="--runtime" || args[i]=="--log") && i+1<args.Length) {
+    if(args[i]=="--log") log=args[i+1];
+    i++;
+   } else return 2;
+  }
+  if(log==null) return 2;
+  File.WriteAllText(log,"validation_status=SKIP\noverall=SKIP\n");
   return 77;
  }
 }

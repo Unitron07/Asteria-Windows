@@ -36,9 +36,10 @@ void Dispatch::instance(VkInstance instance) {
     CreateDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(GetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
     DestroyDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(GetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
 }
-void Dispatch::device(VkDevice device) {
+void Dispatch::device(VkDevice device, bool requireSwapchain) {
 #define PW_LOAD(name) name = reinterpret_cast<PFN_vk##name>(required(GetDeviceProcAddr(device, "vk" #name), "vk" #name));
-    PW_DEVICE(PW_LOAD)
+    PW_DEVICE_CORE(PW_LOAD)
+    if (requireSwapchain) { PW_SWAPCHAIN(PW_LOAD) }
 #undef PW_LOAD
 }
 } // namespace PyroWaveVulkan

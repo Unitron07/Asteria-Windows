@@ -139,7 +139,7 @@ void Probe::initialize() {
     deviceInfo.ppEnabledExtensionNames = deviceExtensions.data();
     if (options.configure) options.configure(deviceInfo);
     check(vk.CreateDevice(physical, &deviceInfo, nullptr, &device), "vkCreateDevice");
-    vk.device(device);
+    vk.device(device, !options.deviceOnly);
     vk.GetDeviceQueue(device, family, 0, &queue);
     log(std::string(options.deviceOnly ? "offline_device=YES" : "device_extension=VK_KHR_swapchain features=none")+
         " queue_family=" + std::to_string(family) + " queue_index=0");

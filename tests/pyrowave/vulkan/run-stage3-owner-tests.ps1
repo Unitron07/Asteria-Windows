@@ -34,7 +34,8 @@ function Invoke-Stage3([string]$Name,[string[]]$ExtraArguments) {
     # Process timeout also bounds driver hangs and the known failed-factory leak.
     $start = New-Object Diagnostics.ProcessStartInfo
     $start.FileName = $exe
-    $arguments = @('--runtime',(Join-Path $scriptDir 'install/bin'),'--log',$log) + $ExtraArguments
+    $arguments = @('--runtime',(Join-Path $scriptDir 'install/bin'),'--log',$log) +
+        @($ExtraArguments | Where-Object { ![string]::IsNullOrWhiteSpace($_) })
     $start.Arguments = ($arguments | ForEach-Object { '"' + $_ + '"' }) -join ' '
     $start.UseShellExecute = $false; $start.CreateNoWindow = $true
     $process = [Diagnostics.Process]::Start($start)
