@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$PackageRoot,[Parameter(Mandatory)][string]$EvidenceRoot)
+param([Parameter(Mandatory)][string]$PackageRoot,[Parameter(Mandatory)][string]$EvidenceRoot,[string]$FixtureExe)
 $ErrorActionPreference = 'Stop'
 $PackageRoot = (Resolve-Path -LiteralPath $PackageRoot).Path
 $runner = Join-Path $PackageRoot 'run-stage3-owner-tests.ps1'
@@ -8,6 +8,14 @@ New-Item -ItemType Directory -Force -Path $EvidenceRoot | Out-Null
 $EvidenceRoot = (Resolve-Path -LiteralPath $EvidenceRoot).Path
 $unrelated = Join-Path $EvidenceRoot 'unrelated working directory'
 New-Item -ItemType Directory -Force -Path $unrelated | Out-Null
+$fixtureArch = 'x64'
+if (![string]::IsNullOrWhiteSpace($FixtureExe)) {
+    $FixtureExe = (Resolve-Path -LiteralPath $FixtureExe).Path
+    $fixtureArch = (Get-Content -LiteralPath (Join-Path $PackageRoot 'build.json') -Raw | ConvertFrom-Json).architecture
+    . (Join-Path $PackageRoot 'pe-machine.ps1')
+    Assert-PyroWavePe $FixtureExe $fixtureArch | Out-Null
+    $fixtureExe = $FixtureExe
+} else {
 $fixture = Join-Path $EvidenceRoot 'Unavailable.cs'
 @'
 using System; using System.IO;
@@ -31,6 +39,7 @@ $csc = Join-Path ([Environment]::GetFolderPath('Windows')) 'Microsoft.NET/Framew
 $fixtureExe = Join-Path $EvidenceRoot 'fixture.exe'
 & $csc /nologo /platform:x64 /target:exe "/out:$fixtureExe" $fixture
 if ($LASTEXITCODE) { throw 'Runner regression fixture compile failed' }
+}
 $shells = @((Get-Command powershell.exe -ErrorAction Stop).Source)
 $pwsh = Get-Command pwsh.exe -ErrorAction SilentlyContinue
 if ($pwsh) { $shells += $pwsh.Source }
@@ -46,10 +55,10 @@ foreach ($shell in $shells) {
         }
         $runtime = Join-Path $package 'install/bin/libpyrowave-shared-0.dll'
         Copy-Item -LiteralPath $fixtureExe -Destination $runtime
-        @{architecture='x64';codecCommit='186f0393b77f7755953b5ecde994bb1cec2e4155';bitstreamId='186f0393';apiVersion='0.6.0';
+        @{architecture=$fixtureArch;codecCommit='186f0393b77f7755953b5ecde994bb1cec2e4155';bitstreamId='186f0393';apiVersion='0.6.0';
             sha256=(Get-FileHash -LiteralPath $runtime).Hash.ToLowerInvariant()} |
             ConvertTo-Json | Set-Content -LiteralPath (Join-Path $package 'install/bin/pyrowave-runtime.json')
-        @{architecture='x64';sourceRevision='GPU_FREE_FIXTURE'} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $package 'build.json')
+        @{architecture=$fixtureArch;sourceRevision='GPU_FREE_FIXTURE'} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $package 'build.json')
         Get-ChildItem -LiteralPath $package -Recurse -File | ForEach-Object {
             @{file=$_.FullName.Substring($package.Length+1);sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant()}
         } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $package 'sha256.json')

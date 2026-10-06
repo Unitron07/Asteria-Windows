@@ -12,6 +12,7 @@ add_executable(pyrowave-vulkan-shared-device-policy-tests shared_policy_tests.cp
 add_test(NAME vulkan-shared-policy COMMAND pyrowave-vulkan-shared-device-policy-tests)
 option(PYROWAVE_VULKAN_SHARED_DEVICE "Build offline same-device pinned codec proof" OFF)
 if(PYROWAVE_VULKAN_SHARED_DEVICE)
+    add_executable(stage3-owner-runner-fixture owner_runner_fixture.cpp)
     if(NOT WIN32 OR NOT SDL_ARCH MATCHES "^(x64|arm64)$" OR
        NOT EXISTS "${PYROWAVE_ROOT}/include/pyrowave/pyrowave.h" OR
        NOT EXISTS "${VULKAN_HEADERS}/vulkan/vulkan_core.h")
