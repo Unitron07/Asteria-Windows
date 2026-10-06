@@ -1,18 +1,14 @@
 [CmdletBinding()]
 param([switch]$Surface,[string]$EvidenceRoot)
 $ErrorActionPreference = 'Stop'
-# A Windows PowerShell child launched through ProcessStartInfo can inherit the
-# parent's PowerShell 7 module paths. Load this shell's own built-in modules.
-if ($PSVersionTable.PSVersion.Major -le 5) {
-    Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1') -Force
-    Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Management/Microsoft.PowerShell.Management.psd1') -Force
-}
+Write-Verbose "Stage 3 runner startup: PowerShell $($PSVersionTable.PSVersion)"
 $scriptDir = $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($scriptDir) -and $MyInvocation.MyCommand.Path) { $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path }
 if ([string]::IsNullOrWhiteSpace($scriptDir)) { throw 'Cannot determine runner directory' }
 if ([string]::IsNullOrWhiteSpace($EvidenceRoot)) { $EvidenceRoot = Join-Path $scriptDir 'stage3-evidence' }
 New-Item -ItemType Directory -Force -Path $EvidenceRoot | Out-Null
 $EvidenceRoot = (Resolve-Path -LiteralPath $EvidenceRoot).Path
+Write-Verbose "Stage 3 runner evidence directory resolved"
 . (Join-Path $scriptDir 'runtime-provenance.ps1')
 $build = Get-Content -LiteralPath (Join-Path $scriptDir 'build.json') -Raw | ConvertFrom-Json
 $exe = Join-Path $scriptDir 'pyrowave-vulkan-shared-device.exe'

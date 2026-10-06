@@ -63,7 +63,7 @@ foreach ($shell in $shells) {
             @{file=$_.FullName.Substring($package.Length+1);sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant()}
         } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $package 'sha256.json')
         $expected = Join-Path $package 'stage3-evidence'
-        $arguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $package 'run-stage3-owner-tests.ps1'))
+        $arguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $package 'run-stage3-owner-tests.ps1'),'-Verbose')
         if ($case -eq 'explicit') { $expected = Join-Path $EvidenceRoot ((Split-Path $shell -Leaf) + ' explicit evidence'); $arguments += @('-EvidenceRoot',$expected) }
         if ($case -eq 'whitespace') { $arguments += @('-EvidenceRoot','   ') }
         $start = New-Object Diagnostics.ProcessStartInfo
@@ -77,8 +77,17 @@ foreach ($shell in $shells) {
         $start.RedirectStandardOutput = $true; $start.RedirectStandardError = $true
         $process = [Diagnostics.Process]::Start($start)
         $stdout = $process.StandardOutput.ReadToEndAsync(); $stderr = $process.StandardError.ReadToEndAsync()
-        if (!$process.WaitForExit(30000)) { $process.Kill(); throw 'Runner regression timeout' }
+        if (!$process.WaitForExit(30000)) {
+            $process.Kill()
+            $process.WaitForExit(1000) | Out-Null
+            $diagnostic = "Runner regression timeout: $shell / $case"
+            if ($stdout.IsCompleted) { $diagnostic += "`n$($stdout.Result)" }
+            if ($stderr.IsCompleted) { $diagnostic += "`n$($stderr.Result)" }
+            $diagnostic | Set-Content -LiteralPath (Join-Path $package 'child-output.txt')
+            throw $diagnostic
+        }
         $code = $process.ExitCode; $process.Dispose()
+        ($stdout.Result + $stderr.Result) | Set-Content -LiteralPath (Join-Path $package 'child-output.txt')
         if ($code -ne 77) { throw "Runner SKIP fixture returned ${code}: $($stdout.Result) $($stderr.Result)" }
         $record = Get-Content -LiteralPath (Join-Path $expected 'owner-result.json') -Raw | ConvertFrom-Json
         if ($record.overall -cne 'SKIP' -or $record.sourceRevision -cne 'GPU_FREE_FIXTURE') { throw 'Runner evidence mismatch' }
