@@ -120,15 +120,17 @@ int main(int argc,char** argv) {
     try {
         require(!surface || arch=="arm64","Surface requires ARM64 executable");
         log("runtime_sha256="+verify(runtimeDir,arch));
-        require(candidate.load(runtimeDir),candidate.error());
+        if(!candidate.load(runtimeDir)) throw std::runtime_error(candidate.error());
         vk.load(); log("vulkan_loader="+vk.loaderPath);
         if(factory) {
             factoryFault(vk,runtimeDir,log); candidate.close(); log("overall=FACTORY_FAULT_DIAGNOSTIC"); return 0;
         }
-        SDL_SetMainReady(); if(SDL_Init(SDL_INIT_VIDEO)!=0) throw std::runtime_error(SDL_GetError());
-        require(SDL_Vulkan_LoadLibrary(vk.loaderPath.c_str())==0,SDL_GetError());
+        SDL_SetMainReady();
+        if(SDL_Init(SDL_INIT_VIDEO)!=0) throw std::runtime_error(std::string("SDL video unavailable: ")+SDL_GetError());
+        if(SDL_Vulkan_LoadLibrary(vk.loaderPath.c_str())!=0)
+            throw std::runtime_error(std::string("SDL Vulkan loader unavailable: ")+SDL_GetError());
         window=SDL_CreateWindow("Asteria offline Stage 3",0,0,128,128,SDL_WINDOW_HIDDEN | SDL_WINDOW_VULKAN);
-        require(window!=nullptr,SDL_GetError());
+        if(!window) throw std::runtime_error(std::string("SDL Vulkan window unavailable: ")+SDL_GetError());
         ProbeOptions options; options.deviceOnly=true; options.minimumApi=VK_API_VERSION_1_2; options.deviceName=expectedDevice;
         options.suitable=[&](VkPhysicalDevice physical) { native.loadInstance(vk,owner->instanceHandle()); return requirements.suitable(physical); };
         options.configure=[&](VkDeviceCreateInfo& info) { requirements.configure(info); };
@@ -144,38 +146,42 @@ int main(int argc,char** argv) {
         // Store the entire borrowed create-info (including queue info) outside this
         // try scope below: wrapper must be closed before these locals expire.
         try {
-            require(candidate.borrowDevice(info),candidate.error());
+            if(!candidate.borrowDevice(info)) throw std::runtime_error(candidate.error());
             log("borrowed_instance_match=YES borrowed_physical_match=YES borrowed_device_match=YES shared_instance_match=YES shared_physical_device_match=YES shared_device_match=YES");
             checkpoint("borrowed");
-            require(candidate.createDecoder(1920,1080,true),candidate.error());
+            if(!candidate.createDecoder(1920,1080,true)) throw std::runtime_error(candidate.error());
             auto path=std::string(candidate.decoderPath()); log("preferred_decoder_path="+path+" actual_decoder_path="+path);
             outputs=std::make_unique<Stage3::Outputs>(*owner,vk,native,queueLock,log,path=="fragment" ? Stage3::Path::Fragment : Stage3::Path::Compute);
-            try { outputs->initialize(fault); } catch(...) { if(fault=="partial-images") injected=true; throw; }
+            try { outputs->initialize(fault); } catch(const std::exception& e) {
+                if(fault=="partial-images" && std::string(e.what())=="injected partial-images") injected=true;
+                throw;
+            }
             // Separate codec-owned device is strictly test setup/reference, never candidate output.
-            require(reference.load(runtimeDir) && reference.createDecoder(1920,1080),reference.error());
+            if(!reference.load(runtimeDir) || !reference.createDecoder(1920,1080)) throw std::runtime_error(reference.error());
             log("reference_device_role=FIXTURE_AND_CPU_REFERENCE candidate_device_role=ASTERIA_BORROWED_ONLY");
             unsigned frames=0;
             for(unsigned lifetime=0;lifetime<3;++lifetime) {
-                if(lifetime) require(candidate.createDecoder(1920,1080,true),candidate.error());
+                if(lifetime && !candidate.createDecoder(1920,1080,true)) throw std::runtime_error(candidate.error());
                 for(auto pattern:{Presentation::Pattern::Gradient,Presentation::Pattern::Bars}) {
                     auto pixels=Presentation::pattern(pattern); std::vector<uint8_t> compatibility;
-                    require(reference.encodeProofPixels(pixels,compatibility),reference.error());
+                    if(!reference.encodeProofPixels(pixels,compatibility)) throw std::runtime_error(reference.error());
                     PyroWave::Frame frame; std::string error;
-                    require(PyroWave::parseFrame(compatibility.data(),compatibility.size(),compatibility.size(),frame,error),error);
+                    if(!PyroWave::parseFrame(compatibility.data(),compatibility.size(),compatibility.size(),frame,error)) throw std::runtime_error(error);
                     const auto rangeByte=frame.records.at(0).offset+7;
                     for(bool limited:{false,true}) {
                         if(limited) compatibility[rangeByte]|=0x40; else compatibility[rangeByte]&=uint8_t(~0x40);
                         std::vector<uint8_t> records;
                         for(auto p:frame.packets) records.insert(records.end(),compatibility.begin()+p.offset,compatibility.begin()+p.offset+p.size);
                         for(auto* fixture:{&compatibility,&records}) {
-                            PyroWave::Pixels cpu; require(reference.decode(*fixture,cpu),reference.error());
+                            PyroWave::Pixels cpu; if(!reference.decode(*fixture,cpu)) throw std::runtime_error(reference.error());
                             for(unsigned reuse=0;reuse<6;++reuse) {
                                 const unsigned slot=frames%Stage3::SlotCount;
                                 auto views=outputs->views(slot); auto a=outputs->acquire(slot),r=outputs->release(slot);
                                 auto bad=*fixture; bad.pop_back();
                                 require(!candidate.decodeNative(bad,views,a,r) && candidate.frameRejected(),"parser rejection not reported");
                                 checkpoint("rejected");
-                                require(candidate.decodeNative(*fixture,views,a,r),candidate.error()); outputs->submitted(slot);
+                                if(!candidate.decodeNative(*fixture,views,a,r)) throw std::runtime_error(candidate.error());
+                                outputs->submitted(slot);
                                 checkpoint("decoded");
                                 auto gpu=outputs->read(slot);
                                 for(unsigned p=0;p<3;++p) {
@@ -208,6 +214,8 @@ int main(int argc,char** argv) {
         const std::string error=e.what(); log("reason="+error);
         // Only known loader/device absence is SKIP. Runtime/API/mismatch/errors never skip.
         const bool missing=error.find("System32 Vulkan loader unavailable")!=std::string::npos ||
+            error.find("SDL video unavailable:")==0 || error.find("SDL Vulkan loader unavailable:")==0 ||
+            error.find("SDL Vulkan window unavailable:")==0 ||
             error.find("no suitable Stage 3 loader API")!=std::string::npos ||
             error.find("no non-software physical device")!=std::string::npos;
         result=unavailable && missing ? 77 : 1;
