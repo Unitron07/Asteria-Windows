@@ -10,6 +10,7 @@
 namespace Stage3 {
 constexpr unsigned SlotCount = 3;
 enum class Path { Compute, Fragment };
+inline Path selectedPath(bool prefersFragment,bool forceCompute) { return prefersFragment && !forceCompute ? Path::Fragment : Path::Compute; }
 // Vulkan bit values, without a loader/header dependency in the policy executable.
 inline uint32_t usage(Path path) { return 1u | (path == Path::Compute ? 8u : 16u); }
 struct Plane { uint32_t width, height; uint64_t bytes; };

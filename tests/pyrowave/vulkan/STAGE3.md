@@ -1,6 +1,6 @@
 # Stage 3: offline shared-device decode
 
-**OFFLINE ONLY. Surface owner qualification is pending.** This opt-in executable
+**OFFLINE ONLY. Initial Surface qualification FAILED; diagnostic rerun pending.** This opt-in executable
 tests direct decode into caller-owned images. It adds no production renderer,
 Session integration, live streaming, YUV-to-RGB shader, video swapchain, overlays,
 HDR, frame pacing, or Stage 4/5 work. Existing interop and CPU fallbacks stay intact.
@@ -184,8 +184,11 @@ The runner resolves its own directory after parameter binding and works from an
 unrelated CWD. Surface asserts the executable/package is ARM64 and asserts X1-85
 **after normal selection**, never using the name to select a device. For x64 omit
 `-Surface`. It verifies PE architecture, runtime pin/SHA256 and package hashes,
-runs decode and teardown faults, and writes `stage3-evidence/owner-result.json`
-plus each case's JSON/text logs. Return that directory for review.
+runs the targeted diagnostic automatically on Surface, and writes
+`stage3-evidence/owner-result.json` plus mode, repeat and comparison JSON/logs.
+Return that directory, including bounded `.bin` plane dumps, for review.
+The broader decode/fault suite runs only if both targeted paths match exactly.
+The independent factory diagnostic still runs after a completed mismatch diagnosis.
 
 `overall=API_PASS` means offline API/correctness success only. `SKIP` (exit 77)
 means no suitable real GPU/loader; it is never a pass. Missing runtime/API exports,
@@ -202,4 +205,131 @@ under both PowerShell versions from unrelated directories with spaces, and runs
 the actual package procedure with PASS or explicit SKIP. Baseline (upstream and
 Asteria x64/ARM64), existing PyroWave and Stage 2 workflows run on the same head.
 CI links and any real hardware result must refer to that final head. Surface
-qualification remains **PENDING** until the owner runs the reviewed package.
+qualification remains **FAILED / PENDING DIAGNOSIS** after the initial run below.
+
+## Initial Surface owner failure (reported by owner)
+
+At source revision `88420c037c786f280e7de5d074c2516a2d9cc83b`, Surface Pro 11 /
+Snapdragon X Plus / Qualcomm Adreno X1-85 / native Windows ARM64 selected the
+codec's recommended **fragment** path. Instance, physical-device and device
+handles all matched exactly. Native caller-owned R8 Y/U/V output, timeline
+handoff and Vulkan readback were reached with zero external-memory handles,
+zero external-semaphore handles, zero D3D11 resources, and no external-handle API.
+
+The first valid comparison failed: frame 0, lifetime 0, gradient, compatibility
+framing, full range, Y plane 0. CPU SHA256:
+`be612e37407051e3cf8e2ad21491b15bfa54956877ed8e6b61dda7b1eb08f150`;
+GPU SHA256:
+`27fa2560bd2c2a318faf6ab7c51aaf0aac13209b629cdafa277f309c85a6a0bc`.
+Result **FAIL**, validation **SKIP**. Hash inequality alone does not establish
+error magnitude, spatial distribution, repeatability, or the root cause.
+Raw owner plane bytes were not supplied with this continuation request.
+The independent confirmed factory cleanup leak still blocks production promotion.
+
+The same revision's RTX 4070 Ti x64 compute result remains historical evidence:
+144 valid frames, 432 exact plane comparisons, three slots, three decoder
+lifetimes, malformed rejection/recovery, matching borrowed handles, no external
+handles. It does not qualify the failing X1-85 fragment output.
+
+## Diagnostic revision and result contract
+
+`--force-compute` uses the existing pinned `fragment_path=false` create-info
+field; AUTO still follows `pyrowave_decoder_device_prefers_fragment_path`.
+The recommendation is logged independently of the actual path. No vendor table,
+CPU candidate output, default candidate device, runtime patch or tolerance is added.
+
+Surface mode invokes `--diagnostic-suite`: both modes use the SAME Asteria
+instance/physical/device/queue and the SAME encoded fixtures generated once.
+Borrowed wrappers are recreated per mode to preserve decoder -> wrapper -> output
+resource destruction order. Output support is queried for each actual path:
+AUTO fragment uses 17 (COLOR_ATTACHMENT + TRANSFER_SRC); compute uses 9
+(STORAGE + TRANSFER_SRC). Three image sets stay bounded; diagnostic repeats use
+slot 0 and the identical fixture. The original 144-frame suite remains intact.
+
+Seven targeted fixtures: low (Y=16), mid (128), high (235), existing horizontal
+gradient and BT.709 bars in compatibility/full framing; the same gradient with
+limited metadata; and its packet payload in record framing. U/V constants are
+128 except the existing bars. Encoded hashes identify identical inputs across
+modes. All three planes are compared before a case fails.
+
+Per-plane JSON records byte/mismatch counts and percentage, CPU/GPU extrema,
+maximum/mean absolute error, nine signed GPU-minus-CPU histogram buckets,
+first/last offsets, up to 32 x/y/value samples, border counts, affected rows,
+longest equal/unequal linear runs, and quadrant counts. The first failing frame
+per mode dumps all three CPU/GPU planes and metadata (about 6 MiB per mode),
+never every repeated frame. CPU vs AUTO, CPU vs forced compute, and AUTO vs
+forced compute are all recorded; the latter labels its left/right outputs.
+
+Each mismatching fixture/path is decoded four more times on slot 0 without
+prefill or added idle. Five hashes per plane classify `repeat_hash_stable`.
+Surface then runs a separate optional prefill experiment with 165 and 90:
+new diagnostic images add TRANSFER_DST (19/11), re-query support and synchronize
+the clear with positive timeline payloads. Baseline images retain 17/9. Counts
+of the sentinel and sentinel bytes unequal to CPU are evidence candidates,
+not proof of unwritten output: legal decoded pixels may coincide, and the
+codec's DONT_CARE render-pass load can discard prior contents.
+
+`-DiagnosticDeviceIdle` adds a clearly labeled experiment after codec submission
+and before readback, comparing normal/idle bytes on each fixture/path. It is
+never the normal synchronization architecture. For an x64 diagnostic run use
+`-Diagnostic`; `-DiagnosticPrefill` enables its optional clear experiment.
+
+Evidence: `auto-fragment.json/log` (filename denotes AUTO, actual path is explicit),
+`forced-compute.json/log`, `repeatability.json/log`, `cross-comparison.json`,
+`diagnostic-summary.json`, `diagnostic-suite.json/log`, plane dumps, factory
+status, runtime provenance, and `owner-result.json`. A completed investigation
+with unequal bytes is **DIAGNOSTIC_COMPLETE**, exit 1, with a failing
+`stage3Qualification` such as `FAIL_FRAGMENT_MISMATCH`; it is never API_PASS.
+Both targeted paths must be exact before the unchanged broader suite can qualify.
+GPU-free runner fixtures explicitly test that a failing AUTO path cannot be hidden
+by a passing forced-compute path or runner completion.
+
+## Readback re-audit
+
+The actual positive codec release payload is waited by the caller queue submit
+at ALL_COMMANDS. Its signal makes codec writes available; the wait makes them
+visible. The existing explicit producer barrier includes COLOR_ATTACHMENT_OUTPUT /
+COLOR_ATTACHMENT_WRITE for fragment and COMPUTE_SHADER / SHADER_WRITE for
+compute, followed by TRANSFER / TRANSFER_READ. Images stay GENERAL, legal for
+the copy source. Each plane has its own exact-size staging buffer, offset zero,
+rowLength/imageHeight zero (tightly packed), mip/layer zero and exact 1920x1080
+or 960x540 extent. Transfer writes are made visible to HOST reads; the actual
+consumer timeline is host-waited before map/read and command-buffer reset.
+Non-coherent allocations are mapped and invalidated over VK_WHOLE_SIZE, then
+unmapped. Reuse acquires the recorded consumer payload, never an inferred
+completion. No normal per-frame DeviceWaitIdle was added; the original final
+teardown drain remains. This review finds no concrete readback defect, but cannot
+rule out a driver/path issue without new hardware measurements.
+
+## Pinned fragment-output source findings
+
+The [fragment shader](https://github.com/Themaister/pyrowave/blob/186f0393b77f7755953b5ecde994bb1cec2e4155/shaders/idwt.frag#L23)
+declares `mediump` floating outputs and sampled inputs. Its CDF 9/7 synthesis
+sum (lines 224-238) is written as float, with final Y/CbCr +0.5 shifts (240-251).
+There is no explicit byte rounding or dithering in this output shader. Float
+output reaches the caller's R8_UNORM color attachment through fixed-function
+conversion. The [compute shader](https://github.com/Themaister/pyrowave/blob/186f0393b77f7755953b5ecde994bb1cec2e4155/shaders/idwt.comp#L82)
+uses separable lifting steps and `imageStore` (203-213), also to UNORM; it does
+NOT implement an explicit integer quantizer that guarantees equality to fragment.
+The arithmetic/filter evaluation and intermediate layout differ, so final UNORM
+conversion is not the only numerical difference that must be considered.
+
+[Fragment output conversion](https://docs.vulkan.org/spec/latest/chapters/interfaces.html#interfaces-fragmentoutput)
+uses the specification's float-to-normalized conversion. The
+[conversion rule](https://docs.vulkan.org/spec/latest/chapters/fundamentals.html#fundamentals-fp-conversion)
+clamps to [0,1], scales by 255 for eight bits, and permits either of the two closest
+integer values; nearest rounding is recommended. It does not mandate a particular
+half-LSB tie break. This permits numerical differences; it does not prove the
+reported Surface mismatch is rounding, nor justify any acceptance tolerance.
+
+The [decoder render passes](https://github.com/Themaister/pyrowave/blob/186f0393b77f7755953b5ecde994bb1cec2e4155/pyrowave_decoder.cpp#L441)
+store enabled attachments, bind caller views at final output, use opaque sprite
+state, and split edge scissors plus 420 render-area fixups (535-666). The
+[Granite opaque state](https://github.com/Themaister/Granite/blob/b6cffd5ce81f540f0855e6778428483e14763d9b/vulkan/command_buffer.cpp#L4276)
+disables blending. Its [render-pass defaults](https://github.com/Themaister/Granite/blob/b6cffd5ce81f540f0855e6778428483e14763d9b/vulkan/render_pass.cpp#L157)
+select DONT_CARE load and STORE when the store mask is set. The Stage 3 view
+and image formats are both R8_UNORM with identity swizzle. No decoder dithering
+flag or shader noise was found in this audited path. Viewport/scissor/fixup
+correctness on X1-85 is not proven by source reading; the spatial metrics and
+prefill experiment specifically probe it. Root cause remains unproven until
+the new owner evidence isolates a subsystem.

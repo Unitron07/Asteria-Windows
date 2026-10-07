@@ -29,7 +29,7 @@ void pyrowave_device_get_vk_device_handles(pyrowave_device,VkInstance* i,VkPhysi
 pyrowave_result pyrowave_device_set_queue_type(pyrowave_device,VkQueueFlagBits flags) { return flags==VK_QUEUE_GRAPHICS_BIT ? PYROWAVE_SUCCESS : PYROWAVE_ERROR_INVALID_ARGUMENT; }
 bool pyrowave_decoder_device_prefers_fragment_path(pyrowave_device) { return fragment; }
 pyrowave_result pyrowave_decoder_create(const pyrowave_decoder_create_info* info,pyrowave_decoder* out) {
-    if (info->fragment_path!=fragment) return PYROWAVE_ERROR_INVALID_ARGUMENT;
+    if (info->fragment_path && !fragment) return PYROWAVE_ERROR_INVALID_ARGUMENT;
     *out=reinterpret_cast<pyrowave_decoder>(uintptr_t(14)); return PYROWAVE_SUCCESS;
 }
 void pyrowave_decoder_destroy(pyrowave_decoder) { borrowed.queue_lock_callback(borrowed.userdata); borrowed.queue_unlock_callback(borrowed.userdata); }

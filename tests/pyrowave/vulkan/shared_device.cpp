@@ -79,8 +79,8 @@ void Requirements::configure(VkDeviceCreateInfo& info) {
     for (auto name:extensions) log(std::string("enabled_device_extension=")+name);
     log("shaderFloat16=DISABLED optional shaderInt16=DISABLED encoder_only stage3_api_policy=1.2_plus_extensions");
 }
-Outputs::Outputs(PyroWaveVulkan::Probe& o,PyroWaveVulkan::Dispatch& v,NativeDispatch& n,QueueLock& q,PyroWaveVulkan::Log l,Path p)
-    :owner(o),vk(v),native(n),queueLock(q),log(std::move(l)),path(p) {}
+Outputs::Outputs(PyroWaveVulkan::Probe& o,PyroWaveVulkan::Dispatch& v,NativeDispatch& n,QueueLock& q,PyroWaveVulkan::Log l,Path p,bool prefill)
+    :owner(o),vk(v),native(n),queueLock(q),log(std::move(l)),path(p),diagnosticPrefill(prefill) {}
 Outputs::~Outputs() { close(); }
 void Outputs::allocate(Resource& r,VkMemoryRequirements req,VkMemoryPropertyFlags required,VkMemoryPropertyFlags preferred) {
     int type=-1;
@@ -133,7 +133,7 @@ void Outputs::initialize(const std::string& fault) {
     }
     VkImageFormatProperties support{};
     check(native.GetPhysicalDeviceImageFormatProperties(physical,VK_FORMAT_R8_UNORM,VK_IMAGE_TYPE_2D,
-        VK_IMAGE_TILING_OPTIMAL,usage(path),0,&support),"R8 output image-format usage query");
+        VK_IMAGE_TILING_OPTIMAL,usage(path) | (diagnosticPrefill ? VK_IMAGE_USAGE_TRANSFER_DST_BIT : 0),0,&support),"R8 output image-format usage query");
     if (support.maxExtent.width<1920 || support.maxExtent.height<1080 || !(support.sampleCounts & VK_SAMPLE_COUNT_1_BIT))
         throw std::runtime_error("unsupported caller plane extent/sample count");
     VkCommandPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
@@ -153,7 +153,7 @@ void Outputs::initialize(const std::string& fault) {
             VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO}; info.imageType=VK_IMAGE_TYPE_2D;
             info.format=VK_FORMAT_R8_UNORM; info.extent={plane.width,plane.height,1};
             info.mipLevels=1; info.arrayLayers=1; info.samples=VK_SAMPLE_COUNT_1_BIT;
-            info.tiling=VK_IMAGE_TILING_OPTIMAL; info.usage=usage(path); info.sharingMode=VK_SHARING_MODE_EXCLUSIVE;
+            info.tiling=VK_IMAGE_TILING_OPTIMAL; info.usage=usage(path) | (diagnosticPrefill ? VK_IMAGE_USAGE_TRANSFER_DST_BIT : 0); info.sharingMode=VK_SHARING_MODE_EXCLUSIVE;
             check(native.CreateImage(device,&info,nullptr,&image.image),"caller-owned R8 image");
             VkMemoryRequirements req{}; native.GetImageMemoryRequirements(device,image.image,&req);
             allocate(image,req,0,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -201,9 +201,32 @@ pyrowave_gpu_sync_operation Outputs::release(unsigned index) const {
     pyrowave_gpu_sync_operation op{}; const auto& slot=slots.at(index); op.sync={slot.timeline,slot.payload.next()[1]}; return op;
 }
 void Outputs::submitted(unsigned index) { auto& s=slots.at(index); s.payload.submitted(s.payload.next()[1]); }
-PyroWave::Pixels Outputs::read(unsigned index) {
+void Outputs::prefill(unsigned index,uint8_t value) {
+    if(!diagnosticPrefill) throw std::runtime_error("prefill requires diagnostic-only TRANSFER_DST usage");
+    auto& slot=slots.at(index); const auto previous=slot.payload.next()[0];
+    begin();
+    VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER}; barrier.srcAccessMask=VK_ACCESS_TRANSFER_READ_BIT;
+    barrier.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
+    native.CmdPipelineBarrier(command,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,0,1,&barrier,0,nullptr,0,nullptr);
+    VkClearColorValue clear{}; clear.float32[0]=float(value)/255.0f;
+    VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
+    for(const auto& image:slot.images) native.CmdClearColorImage(command,image.image,VK_IMAGE_LAYOUT_GENERAL,&clear,1,&range);
+    barrier.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask=path==Path::Fragment ? VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT : VK_ACCESS_SHADER_WRITE_BIT;
+    native.CmdPipelineBarrier(command,VK_PIPELINE_STAGE_TRANSFER_BIT,
+        path==Path::Fragment ? VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT : VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,0,1,&barrier,0,nullptr,0,nullptr);
+    submit(slot.timeline,previous,previous+1); wait(slot.timeline,previous+1);
+    slot.payload.consumed=previous+1;
+    log("diagnostic_prefill=YES prefill_value="+std::to_string(value)+" prefill_complete_payload="+std::to_string(previous+1));
+}
+PyroWave::Pixels Outputs::read(unsigned index,bool diagnosticDeviceIdle) {
     auto& slot=slots.at(index); if (!slot.payload.pending) throw std::runtime_error("read without decode submission");
     const uint64_t decode=slot.payload.decoded, consumer=decode+1;
+    if(diagnosticDeviceIdle) {
+        QueueLock::Guard guard(queueLock);
+        check(vk.DeviceWaitIdle(owner.deviceHandle()),"diagnostic-only device idle after codec submission");
+        log("diagnostic_device_idle=YES architecture_qualification=NOT_A_VALID_REPLACEMENT_FOR_TIMELINES");
+    }
     begin();
     // The timeline wait supplies execution and memory dependencies from codec writes.
     // Keep GENERAL; explicit barriers identify the following copy and host access.

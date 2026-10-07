@@ -8,7 +8,7 @@ $metadata = Assert-PyroWaveRuntime $DependencyRoot $Architecture
 $stage = Join-Path $source "build/stage3-owner-$Architecture"
 if (Test-Path -LiteralPath $stage) { throw 'Use a fresh Stage 3 staging directory' }
 New-Item -ItemType Directory -Path $stage,(Join-Path $stage 'install/bin'),(Join-Path $stage 'source-notices') | Out-Null
-foreach ($file in @('pyrowave-vulkan-shared-device.exe','pyrowave-vulkan-shared-device-policy-tests.exe','SDL2.dll','SDL3.dll')) {
+foreach ($file in @('pyrowave-vulkan-shared-device.exe','pyrowave-vulkan-shared-device-policy-tests.exe','pyrowave-vulkan-shared-diagnostic-tests.exe','SDL2.dll','SDL3.dll')) {
     Copy-Item -LiteralPath (Join-Path $BuildRoot "Release/$file") -Destination $stage
 }
 foreach ($file in @('libpyrowave-shared-0.dll','pyrowave-runtime.json')) {
@@ -45,7 +45,7 @@ foreach ($binary in @(Get-ChildItem -LiteralPath $stage -Recurse -File | Where-O
 $revision = & git -C $source rev-parse HEAD
 if ($LASTEXITCODE) { throw 'Cannot record source revision' }
 @{architecture=$Architecture;sourceRevision=$revision;runtime=$metadata;scope='Stage3 OFFLINE ONLY';
-    runtimePatch='NONE_ADDED_FOR_STAGE3';productionRendererChanged=$false;ownerSurfaceQualification='PENDING';
+    runtimePatch='NONE_ADDED_FOR_STAGE3';productionRendererChanged=$false;ownerSurfaceQualification='FAILED_INITIAL_FRAGMENT_COMPARISON_NEW_DIAGNOSIS_PENDING';
     factoryCleanup='CONFIRMED_LEAK_PRODUCTION_PROMOTION_BLOCKED'} |
     ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $stage 'build.json') -Encoding utf8
 if (Get-ChildItem -LiteralPath $stage -Recurse -Filter vulkan-1.dll) { throw 'Vulkan loader must never be packaged' }

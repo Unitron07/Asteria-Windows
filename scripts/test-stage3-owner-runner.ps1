@@ -21,15 +21,24 @@ $fixture = Join-Path $EvidenceRoot 'Unavailable.cs'
 using System; using System.IO;
 public static class Fixture {
  public static int Main(string[] args) {
-  if (Environment.GetCommandLineArgs()[0].Contains("policy-tests")) return 0;
+  if (Environment.GetCommandLineArgs()[0].Contains("-tests")) return 0;
   string log=null;
+  bool diagnostic=false, factory=false;
   for(int i=0;i<args.Length;i++) {
    if((args[i]=="--runtime" || args[i]=="--log") && i+1<args.Length) {
     if(args[i]=="--log") log=args[i+1];
     i++;
-   } else return 2;
+   } else if(args[i]=="--diagnostic-suite") diagnostic=true;
+   else if(args[i]=="--factory-fault") factory=true;
+   else if(args[i]!="--diagnostic-prefill" && args[i]!="--diagnostic-device-idle") return 2;
   }
   if(log==null) return 2;
+  if(Environment.GetEnvironmentVariable("STAGE3_FIXTURE_DIAGNOSTIC")!=null) {
+   if(factory) { File.WriteAllText(log,"fixture=GPU_FREE validation_errors=0 overall=FACTORY_FAULT_DIAGNOSTIC\n"); return 0; }
+   if(!diagnostic) return 2;
+   File.WriteAllText(Path.Combine(Path.GetDirectoryName(log),"diagnostic-summary.json"),"{\"sourceRevision\":\"GPU_FREE_FIXTURE\",\"overall\":\"DIAGNOSTIC_COMPLETE\",\"stage3Qualification\":\"FAIL_FRAGMENT_MISMATCH\",\"autoExact\":false,\"forcedComputeExact\":true}");
+   File.WriteAllText(log,"fixture=GPU_FREE diagnostic_complete=YES validation_errors=0 overall=DIAGNOSTIC_COMPLETE\n"); return 1;
+  }
   File.WriteAllText(log,"validation_status=SKIP\noverall=SKIP\n");
   return 77;
  }
@@ -44,13 +53,13 @@ $shells = @((Get-Command powershell.exe -ErrorAction Stop).Source)
 $pwsh = Get-Command pwsh.exe -ErrorAction SilentlyContinue
 if ($pwsh) { $shells += $pwsh.Source }
 foreach ($shell in $shells) {
-    foreach ($case in @('default','explicit','whitespace')) {
+    foreach ($case in @('default','explicit','whitespace','diagnostic-skip','diagnostic-mismatch')) {
         $package = Join-Path $EvidenceRoot ((Split-Path $shell -Leaf) + " $case package with spaces")
         New-Item -ItemType Directory -Force -Path $package,(Join-Path $package 'install/bin') | Out-Null
         foreach ($name in @('run-stage3-owner-tests.ps1','runtime-provenance.ps1','pe-machine.ps1')) {
             Copy-Item -LiteralPath (Join-Path $PackageRoot $name) -Destination $package
         }
-        foreach ($name in @('pyrowave-vulkan-shared-device.exe','pyrowave-vulkan-shared-device-policy-tests.exe')) {
+        foreach ($name in @('pyrowave-vulkan-shared-device.exe','pyrowave-vulkan-shared-device-policy-tests.exe','pyrowave-vulkan-shared-diagnostic-tests.exe')) {
             Copy-Item -LiteralPath $fixtureExe -Destination (Join-Path $package $name)
         }
         $runtime = Join-Path $package 'install/bin/libpyrowave-shared-0.dll'
@@ -66,20 +75,28 @@ foreach ($shell in $shells) {
         $arguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $package 'run-stage3-owner-tests.ps1'),'-Verbose')
         if ($case -eq 'explicit') { $expected = Join-Path $EvidenceRoot ((Split-Path $shell -Leaf) + ' explicit evidence'); $arguments += @('-EvidenceRoot',$expected) }
         if ($case -eq 'whitespace') { $arguments += @('-EvidenceRoot','   ') }
+        if ($case -like 'diagnostic-*') { $arguments += @('-Diagnostic','-DiagnosticDeviceIdle','-DiagnosticPrefill') }
         # Use PowerShell's native launcher, as in the documented owner command.
         # It handles cross-version module-path hygiene on Windows/ARM64. The CI
         # step bounds shell startup; each actual GPU process has its own timeout.
         $PSNativeCommandUseErrorActionPreference = $false
         Write-Output "Runner case: $(Split-Path $shell -Leaf)/$case fixture_arch=$fixtureArch"
         Push-Location -LiteralPath $unrelated
-        try { $output = & $shell @arguments 2>&1 | Out-String; $code = $LASTEXITCODE }
-        finally { Pop-Location }
+        try {
+            if ($case -eq 'diagnostic-mismatch') { $env:STAGE3_FIXTURE_DIAGNOSTIC='1' }
+            $output = & $shell @arguments 2>&1 | Out-String; $code = $LASTEXITCODE
+        } finally { Remove-Item Env:\STAGE3_FIXTURE_DIAGNOSTIC -ErrorAction SilentlyContinue; Pop-Location }
         $output | Set-Content -LiteralPath (Join-Path $package 'child-output.txt')
-        if ($code -ne 77) { throw "Runner SKIP fixture returned ${code}: $output" }
         $record = Get-Content -LiteralPath (Join-Path $expected 'owner-result.json') -Raw | ConvertFrom-Json
-        if ($record.overall -cne 'SKIP' -or $record.sourceRevision -cne 'GPU_FREE_FIXTURE') { throw 'Runner evidence mismatch' }
+        if ($case -eq 'diagnostic-mismatch') {
+            if ($code -ne 1 -or $record.overall -cne 'DIAGNOSTIC_COMPLETE' -or $record.stage3Qualification -cne 'FAIL_FRAGMENT_MISMATCH' -or $record.runs.Count -ne 2) { throw "Diagnostic mismatch was hidden or aborted: $output" }
+            if ($record.diagnostics.autoExact -ne $false -or $record.diagnostics.forcedComputeExact -ne $true) { throw 'Diagnostic path results lost' }
+        } else {
+            if ($code -ne 77 -or $record.overall -cne 'SKIP') { throw "Runner SKIP fixture returned ${code}: $output" }
+        }
+        if ($record.sourceRevision -cne 'GPU_FREE_FIXTURE') { throw 'Runner evidence identity mismatch' }
         if (Test-Path -LiteralPath (Join-Path $unrelated 'stage3-evidence')) { throw 'Runner wrote relative to CWD' }
     }
 }
-Write-Output 'PASS: actual packaged Stage 3 runner, Windows PowerShell 5.1/pwsh, unrelated CWD, spaces/default/explicit roots, explicit SKIP'
+Write-Output 'PASS: packaged Stage 3 runner PS5.1/7, unrelated CWD, spaces/default/explicit roots, SKIP and AUTO mismatch retained after completed diagnostics'
 $global:LASTEXITCODE = 0 # All six intentional exit-77 results were verified above.

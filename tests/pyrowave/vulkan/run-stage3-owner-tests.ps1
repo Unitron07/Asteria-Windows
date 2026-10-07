@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$Surface,[string]$EvidenceRoot)
+param([switch]$Surface,[string]$EvidenceRoot,[switch]$Diagnostic,[switch]$DiagnosticDeviceIdle,[switch]$DiagnosticPrefill)
 $ErrorActionPreference = 'Stop'
 Write-Verbose "Stage 3 runner startup: PowerShell $($PSVersionTable.PSVersion)"
 $scriptDir = $PSScriptRoot
@@ -24,6 +24,10 @@ foreach ($entry in $manifest) {
 }
 & $policy
 if ($LASTEXITCODE) { throw 'GPU-free policy tests failed' }
+$diagnosticTests = Join-Path $scriptDir 'pyrowave-vulkan-shared-diagnostic-tests.exe'
+Assert-PyroWavePe $diagnosticTests $build.architecture | Out-Null
+& $diagnosticTests
+if ($LASTEXITCODE) { throw 'GPU-free diagnostic tests failed' }
 $extra = if ($Surface) { @('--surface','--expect-device','X1-85') } else { @() }
 function Invoke-Stage3([string]$Name,[string[]]$ExtraArguments) {
     $log = Join-Path $EvidenceRoot "$Name.log"
@@ -47,7 +51,8 @@ function Invoke-Stage3([string]$Name,[string[]]$ExtraArguments) {
             $fields[$key] = @($fields[$key]) + @($match.Groups['value'].Value) | Where-Object { $null -ne $_ }
         }
     }
-    $status = if ($code -eq 77) { 'SKIP' } elseif ($code) { 'FAIL' } elseif ($Name -eq 'decode') { 'API_PASS' } else { 'DIAGNOSTIC_PASS' }
+    $status = if ($code -eq 77) { 'SKIP' } elseif ($Name -eq 'diagnostic-suite' -and $fields['diagnostic_complete'] -contains 'YES') { 'DIAGNOSTIC_COMPLETE' }
+        elseif ($code) { 'FAIL' } elseif ($Name -eq 'decode') { 'API_PASS' } else { 'DIAGNOSTIC_PASS' }
     $record = @{name=$Name;overall=$status;exitCode=$code;fields=$fields;logEntries=$lines;
         sourceRevision=$build.sourceRevision;architecture=$build.architecture;runtime=$runtime;surface=$Surface.IsPresent;
         scope='OFFLINE ONLY';liveStreaming=$false;productionPromotion='BLOCKED_FACTORY_CLEANUP';runtimePatch='NONE_ADDED_FOR_STAGE3'}
@@ -55,21 +60,51 @@ function Invoke-Stage3([string]$Name,[string[]]$ExtraArguments) {
     return $record
 }
 $runs = @()
-$decode = Invoke-Stage3 'decode' $extra
-$runs += $decode
-if ($decode.exitCode -eq 0) {
+$summary = $null
+$diagnose = $Surface -or $Diagnostic
+if (($DiagnosticDeviceIdle -or $DiagnosticPrefill) -and !$diagnose) { throw 'Diagnostic experiment requires -Surface or -Diagnostic' }
+if ($diagnose) {
+    $diagnosticArgs = @('--diagnostic-suite') + $extra
+    if ($Surface -or $DiagnosticPrefill) { $diagnosticArgs += '--diagnostic-prefill' }
+    if ($DiagnosticDeviceIdle) { $diagnosticArgs += '--diagnostic-device-idle' }
+    $started = [DateTime]::UtcNow
+    $diagnosticRun = Invoke-Stage3 'diagnostic-suite' $diagnosticArgs
+    $runs += $diagnosticRun
+    $summaryPath = Join-Path $EvidenceRoot 'diagnostic-summary.json'
+    if ($diagnosticRun.overall -eq 'DIAGNOSTIC_COMPLETE') {
+        if (!(Test-Path -LiteralPath $summaryPath) -or (Get-Item -LiteralPath $summaryPath).LastWriteTimeUtc -lt $started) { throw 'Missing/current diagnostic summary required' }
+        $summary = [IO.File]::ReadAllText($summaryPath) | ConvertFrom-Json
+        if ($summary.overall -cne 'DIAGNOSTIC_COMPLETE' -or $summary.sourceRevision -cne $build.sourceRevision) { throw 'Diagnostic summary identity mismatch' }
+        if ($diagnosticRun.fields['validation_errors'] | Where-Object { [int]$_ -gt 0 }) { throw 'Vulkan validation ERROR in diagnostic run' }
+        if ($diagnosticRun.exitCode -ne 0 -and $summary.stage3Qualification -eq 'TARGETED_EXACT_MATCH_FULL_SUITE_PENDING') { throw 'Diagnostic failure cannot qualify exact output' }
+    }
+}
+$decode = $null
+if (!$diagnose -or ($summary -and $summary.stage3Qualification -eq 'TARGETED_EXACT_MATCH_FULL_SUITE_PENDING')) {
+    $decode = Invoke-Stage3 'decode' $extra
+    $runs += $decode
+}
+if ($decode -and $decode.exitCode -eq 0) {
     foreach ($fault in @('borrowed','partial-images','decoded','reused','rejected')) {
         $runs += Invoke-Stage3 "fault-$fault" (@('--fail-at',$fault) + $extra)
         if ($runs[-1].exitCode) { break }
     }
-    $runs += Invoke-Stage3 'factory-fault' @('--factory-fault')
 }
-$status = if (@($runs | Where-Object { $_.exitCode -ne 0 -and $_.exitCode -ne 77 }).Count) { 'FAIL' }
+$factory = $null
+if (($decode -and $decode.exitCode -eq 0) -or $summary) {
+    $factory = Invoke-Stage3 'factory-fault' @('--factory-fault'); $runs += $factory
+}
+$unexpectedFailure = @($runs | Where-Object { $_.overall -eq 'FAIL' }).Count
+$status = if ($unexpectedFailure) { 'FAIL' }
+    elseif ($summary -and $summary.stage3Qualification -ne 'TARGETED_EXACT_MATCH_FULL_SUITE_PENDING') { 'DIAGNOSTIC_COMPLETE' }
     elseif (@($runs | Where-Object { $_.exitCode -eq 77 }).Count) { 'SKIP' } else { 'API_PASS' }
+$qualification = if ($summary -and $status -eq 'DIAGNOSTIC_COMPLETE') { $summary.stage3Qualification }
+    elseif ($status -eq 'API_PASS') { 'API_PASS_EXACT_FULL_SUITE' } else { $status }
 @{overall=$status;sourceRevision=$build.sourceRevision;architecture=$build.architecture;runs=$runs;
-    ownerSurfaceQualification=$(if ($Surface -and $status -eq 'API_PASS') { 'API_PASS_OWNER_RUN' } else { 'PENDING' });
+    stage3Qualification=$qualification;diagnostics=$summary;
+    ownerSurfaceQualification=$(if ($Surface -and $status -eq 'API_PASS') { 'API_PASS_OWNER_RUN' } elseif ($Surface -and $summary) { $qualification } else { 'PENDING' });
     validationReview='Inspect all VALIDATION WARNING lines; unavailable validation is SKIP';
     runtimePatch='NONE_ADDED_FOR_STAGE3';productionPromotion='BLOCKED_FACTORY_CLEANUP'} |
     ConvertTo-Json -Depth 14 | Set-Content -LiteralPath (Join-Path $EvidenceRoot 'owner-result.json') -Encoding utf8
 Write-Host "Stage 3 $status. Evidence: $EvidenceRoot. Live presentation remains future work."
-if ($status -eq 'FAIL') { exit 1 }; if ($status -eq 'SKIP') { exit 77 }; exit 0
+if ($status -eq 'FAIL' -or $status -eq 'DIAGNOSTIC_COMPLETE') { exit 1 }; if ($status -eq 'SKIP') { exit 77 }; exit 0

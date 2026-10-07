@@ -5,7 +5,7 @@
 
 namespace Stage3 {
 #define STAGE3_INSTANCE(X) X(GetPhysicalDeviceFeatures2) X(GetPhysicalDeviceImageFormatProperties) X(GetPhysicalDeviceMemoryProperties) X(GetPhysicalDeviceFormatProperties)
-#define STAGE3_DEVICE(X) X(CreateImage) X(DestroyImage) X(GetImageMemoryRequirements) X(AllocateMemory) X(FreeMemory) X(BindImageMemory) X(CreateBuffer) X(DestroyBuffer) X(GetBufferMemoryRequirements) X(BindBufferMemory) X(MapMemory) X(UnmapMemory) X(InvalidateMappedMemoryRanges) X(CmdPipelineBarrier) X(CmdCopyImageToBuffer) X(WaitSemaphores)
+#define STAGE3_DEVICE(X) X(CreateImage) X(DestroyImage) X(GetImageMemoryRequirements) X(AllocateMemory) X(FreeMemory) X(BindImageMemory) X(CreateBuffer) X(DestroyBuffer) X(GetBufferMemoryRequirements) X(BindBufferMemory) X(MapMemory) X(UnmapMemory) X(InvalidateMappedMemoryRanges) X(CmdPipelineBarrier) X(CmdCopyImageToBuffer) X(CmdClearColorImage) X(WaitSemaphores)
 struct NativeDispatch {
 #define DECLARE(name) PFN_vk##name name = nullptr;
     STAGE3_INSTANCE(DECLARE)
@@ -46,19 +46,21 @@ class Outputs {
     };
     std::array<Slot,SlotCount> slots{};
     Path path;
+    bool diagnosticPrefill;
     void allocate(Resource& resource,VkMemoryRequirements requirements,VkMemoryPropertyFlags required,VkMemoryPropertyFlags preferred);
     void begin();
     void submit(VkSemaphore timeline,uint64_t wait,uint64_t signal);
     void wait(VkSemaphore timeline,uint64_t value);
 public:
-    Outputs(PyroWaveVulkan::Probe& o,PyroWaveVulkan::Dispatch& v,NativeDispatch& n,QueueLock& q,PyroWaveVulkan::Log l,Path p);
+    Outputs(PyroWaveVulkan::Probe& o,PyroWaveVulkan::Dispatch& v,NativeDispatch& n,QueueLock& q,PyroWaveVulkan::Log l,Path p,bool prefill=false);
     ~Outputs();
     void initialize(const std::string& fault);
     pyrowave_gpu_buffers views(unsigned slot) const;
     pyrowave_gpu_sync_operation acquire(unsigned slot) const;
     pyrowave_gpu_sync_operation release(unsigned slot) const;
     void submitted(unsigned slot);
-    PyroWave::Pixels read(unsigned slot);
+    PyroWave::Pixels read(unsigned slot,bool diagnosticDeviceIdle=false);
+    void prefill(unsigned slot,uint8_t value);
     void drain();
     void close() noexcept;
 };

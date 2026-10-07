@@ -40,6 +40,10 @@ int main(int argc,char** argv) {
                 { Stage3::QueueLock::Guard caller(lock); }
                 require(runtime.createDecoder(128,128,true));
                 require(std::string(runtime.decoderPath())==(fragment ? "fragment" : "compute"));
+                require(runtime.nativePrefersFragment()==fragment);
+                require(runtime.createDecoder(128,128,false));
+                require(std::string(runtime.decoderPath())=="compute" && runtime.nativePrefersFragment()==fragment);
+                require(runtime.createDecoder(128,128,true));
                 std::vector<uint8_t> bytes;
                 auto word=[&](uint32_t n) { for(int i=0;i<4;++i) bytes.push_back(uint8_t(n>>(i*8))); };
                 word(1); word(8); word(0x80000000u|(127u<<14)|127u); word(0);
