@@ -42,7 +42,7 @@ public static class Fixture {
   }
   if(factory) {
    bool failed=File.Exists(Path.Combine(root,"factory-fail"));
-   File.WriteAllText(log,"factory_failure_cleanup="+(failed ? "FAIL" : "PATCHED_AND_VERIFIED")+" validation_status=SKIP\n"); return failed ? 1 : 0;
+   File.WriteAllText(log,"factory_failure_cleanup=PATCHED_SOURCE_TEST_REQUIRED owner_qualification=PENDING\nfactory_fault_probe=PASS factory_failure_cleanup="+(failed ? "FAIL" : "PATCHED_AND_VERIFIED")+" memory_growth_is_supporting_diagnostic=YES\nvalidation_status=SKIP\n"); return failed ? 1 : 0;
   }
   bool failedDecode=File.Exists(Path.Combine(root,"decode-fail"));
   File.WriteAllText(log,"comparison=NUMERIC_EQUIVALENCE stage3_tolerance=1 numerically_equivalent=true exact_equal=false max_absolute_error=1 frames_tested=144 slots_exercised=3 decoder_lifetimes=3 malformed_recovery=PASS\nvalidation_status=SKIP\n"); return failedDecode ? 1 : 0;

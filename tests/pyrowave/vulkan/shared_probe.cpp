@@ -82,7 +82,7 @@ void factoryFault(Dispatch& vk,const std::filesystem::path& directory,const Log&
             std::to_string(before)+" private_after="+std::to_string(after)+" growth="+std::to_string(int64_t(after)-int64_t(before)));
     }
     destroy(instance,nullptr); FreeLibrary(module);
-    log("factory_fault_probe=PASS factory_failure_cleanup=PATCHED_AND_VERIFIED memory_growth_is_supporting_diagnostic");
+    log("factory_fault_probe=PASS factory_failure_cleanup=PATCHED_AND_VERIFIED memory_growth_is_supporting_diagnostic=YES");
 }
 }
 int main(int argc,char** argv) {
