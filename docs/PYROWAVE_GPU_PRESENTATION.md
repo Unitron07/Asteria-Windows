@@ -20,9 +20,10 @@ FORCE_COMPUTE/compute both passed the per-byte ±1 contract; factory cleanup was
 `PATCHED_AND_VERIFIED`. Vulkan validation remained `SKIP` because the layer was
 unavailable. The precise arithmetic cause of the ±1 differences remains unproven.
 
-The next step is **Stage 4: native Vulkan YUV-to-RGB presentation and swapchain
-work**. Stage 3 included no Stage 4, live presentation or production renderer
-changes; the live paths described below are unchanged.
+**Stage 4 IMPLEMENTED / OWNER QUALIFICATION PENDING.** The isolated offline
+native Vulkan presenter, shader verifier and owner package are described in
+[STAGE4.md](../tests/pyrowave/vulkan/STAGE4.md). Stop before merge for exact-head
+Surface qualification. Production rendering and live Session behavior are unchanged.
 
 ## Current live ARM64 owner result
 
@@ -107,7 +108,7 @@ not replay host launch or silently continue with suspect GPU resources.
 
 A dedicated native Vulkan PyroWave presenter (GPU Y/U/V images, YUV-to-RGB shader
 and Vulkan swapchain) is the **next step, Stage 4, after completed Stage 3**.
-It is not implemented.
+Stage 4 is implemented offline; owner qualification and live integration remain pending.
 Target architecture: `PyroWave Vulkan decode -> GPU-resident Y/U/V -> Vulkan presentation shader -> Vulkan swapchain`. This avoids Vulkan -> CPU -> D3D11 round-trips and dependence on unsupported external-fence sharing. Unsupported interop currently uses synchronized CPU I420 output. Other Moonlight forks have explored GPU-resident PyroWave interop, but they are not dependencies; Asteria is independently maintained with Vibepollo as its primary protocol target.
 
 ## Lifetime and latency
