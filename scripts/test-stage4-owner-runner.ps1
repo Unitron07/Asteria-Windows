@@ -45,3 +45,4 @@ foreach($field in @('borrowedDeviceMatch','cpuYuvReadbackInPresentation','extern
 $badShader=$shader.Clone(); $badShader.cases=@($cases[0]) * 80; $rejected=$false
 try { Assert-Stage4Api $api $badShader $life $build.sourceRevision $build.architecture $true } catch { $rejected=$true }; if(!$rejected) { throw 'Duplicate shader cases accepted' }
 @{result='PASS';shells=$shells;packageCases=8;ownershipNumericalLifecycleCases=12;visibleOwnerPassGenerated=$false} | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $EvidenceRoot 'runner-tests.json') -Encoding utf8
+$global:LASTEXITCODE = 0 # All intentional child SKIP/FAIL outcomes were verified.
