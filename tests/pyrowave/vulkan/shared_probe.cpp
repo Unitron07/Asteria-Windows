@@ -225,18 +225,19 @@ int main(int argc,char** argv) {
                                 allExact=allExact && !mismatch;
                                 if(outOfTolerance || (mismatch && !dumped)) {
                                     Stage3::DiagnosticFixture diagnosticFrame;
-                                    diagnosticFrame.name="qualification-first-failure"; diagnosticFrame.pattern=Presentation::name(pattern);
+                                    diagnosticFrame.name="qualification-nonbitexact-frame"; diagnosticFrame.pattern=Presentation::name(pattern);
                                     diagnosticFrame.framing=fixture==&compatibility ? "compatibility" : "records";
                                     diagnosticFrame.range=limited ? "limited" : "full"; diagnosticFrame.encoded=*fixture;
                                     const auto directory=logPath.has_parent_path() ? logPath.parent_path() : std::filesystem::path(".");
+                                    const std::string prefix=forceCompute ? "qualification-forced-compute-" : "qualification-auto-";
                                     std::vector<std::string> metrics;
                                     for(unsigned p=0;p<3;++p) {
                                         auto record=Stage3::diagnosticPlane(diagnosticFrame,frames,p,forceCompute ? "FORCE_COMPUTE" : "AUTO",path,cpu.planes[p],gpu.planes[p],hash);
                                         metrics.push_back(record); log("diagnostic_metrics="+record);
-                                        Stage3::diagnosticBinary(directory/("cpu-plane"+std::to_string(p)+".bin"),cpu.planes[p]);
-                                        Stage3::diagnosticBinary(directory/("gpu-plane"+std::to_string(p)+".bin"),gpu.planes[p]);
+                                        Stage3::diagnosticBinary(directory/(prefix+"cpu-plane"+std::to_string(p)+".bin"),cpu.planes[p]);
+                                        Stage3::diagnosticBinary(directory/(prefix+"gpu-plane"+std::to_string(p)+".bin"),gpu.planes[p]);
                                     }
-                                    Stage3::diagnosticFile(directory/"comparison-failure.json",Stage3::jsonArray(metrics));
+                                    Stage3::diagnosticFile(directory/(prefix+"comparison.json"),Stage3::jsonArray(metrics));
                                     dumped=true;
                                     if(outOfTolerance) throw std::runtime_error("FAIL_GPU_OUTPUT_TOLERANCE; frame/fixture/plane and first out-of-bound values recorded; STOP");
                                 }

@@ -67,8 +67,8 @@ jobs:
           New-Item -ItemType Directory -Force "$root/evidence" | Out-Null
           $build = Get-Content 'build/pyrowave/${{ matrix.arch }}/evidence/build.json' -Raw | ConvertFrom-Json
           $dumpbin = Join-Path (Split-Path $build.compiler -Parent) 'dumpbin.exe'
-          foreach ($file in @('pyrowave-vulkan-shared-device.exe','pyrowave-vulkan-shared-device-policy-tests.exe','pyrowave-vulkan-shared-diagnostic-tests.exe','pyrowave-vulkan-shared-runtime-tests.exe','SDL2.dll','SDL3.dll')) {
-            $binary = "$root/Release/$file"
+          foreach ($file in @('pyrowave-vulkan-shared-device.exe','pyrowave-vulkan-shared-device-policy-tests.exe','pyrowave-vulkan-shared-diagnostic-tests.exe','pyrowave-vulkan-shared-runtime-tests.exe','pyrowave-factory-cleanup-tests.exe','SDL2.dll','SDL3.dll')) {
+            $binary = if ($file -eq 'pyrowave-factory-cleanup-tests.exe') { "build/pyrowave/${{ matrix.arch }}/install/bin/$file" } else { "$root/Release/$file" }
             Assert-PyroWavePe $binary '${{ matrix.arch }}' | ConvertTo-Json | Set-Content "$root/evidence/$file-pe.json"
             $imports = & $dumpbin /imports $binary
             if ($LASTEXITCODE) { throw "PE import inspection failed: $file" }
