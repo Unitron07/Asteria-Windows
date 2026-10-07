@@ -75,8 +75,10 @@ if ($diagnose) {
         if (!(Test-Path -LiteralPath $summaryPath) -or (Get-Item -LiteralPath $summaryPath).LastWriteTimeUtc -lt $started) { throw 'Missing/current diagnostic summary required' }
         $summary = [IO.File]::ReadAllText($summaryPath) | ConvertFrom-Json
         if ($summary.overall -cne 'DIAGNOSTIC_COMPLETE' -or $summary.sourceRevision -cne $build.sourceRevision) { throw 'Diagnostic summary identity mismatch' }
-        if ($diagnosticRun.fields['validation_errors'] | Where-Object { [int]$_ -gt 0 }) { throw 'Vulkan validation ERROR in diagnostic run' }
-        if ($diagnosticRun.exitCode -ne 0 -and $summary.stage3Qualification -eq 'TARGETED_EXACT_MATCH_FULL_SUITE_PENDING') { throw 'Diagnostic failure cannot qualify exact output' }
+        if (($diagnosticRun.fields['validation_errors'] | Where-Object { [int]$_ -gt 0 }) -or
+            ($diagnosticRun.exitCode -ne 0 -and $summary.stage3Qualification -eq 'TARGETED_EXACT_MATCH_FULL_SUITE_PENDING')) {
+            $diagnosticRun.overall='FAIL'; $summary.stage3Qualification='FAIL_VALIDATION_OR_CLEANUP';
+        }
     }
 }
 $decode = $null

@@ -4,6 +4,7 @@
 #include "../presentation_patterns.h"
 #include <fstream>
 #include <functional>
+#include <memory>
 
 namespace Stage3 {
 using Hash = std::function<std::string(const std::vector<uint8_t>&)>;
@@ -35,6 +36,11 @@ inline std::vector<DiagnosticFixture> diagnosticFixtures(PyroWave::Runtime& refe
             std::fill(pixels.planes[0].begin(),pixels.planes[0].end(),value);
         }
         if(!reference.encodeProofPixels(pixels,f.encoded)) throw std::runtime_error(reference.error());
+        PyroWave::Frame parsed; std::string error;
+        const PyroWave::StreamContext context{1920,1080,PyroWave::Chroma::Yuv420,true};
+        if(!PyroWave::parseFrame(f.encoded.data(),f.encoded.size(),f.encoded.size(),parsed,error,&context) || parsed.records.empty())
+            throw std::runtime_error("diagnostic fixture sequence validation failed: "+error);
+        f.encoded.at(parsed.records[0].offset+7)&=uint8_t(~0x40);
         fixtures.push_back(std::move(f));
     }
     const auto gradient=fixtures[3];
@@ -71,7 +77,7 @@ inline bool runDiagnostics(PyroWave::Runtime& candidate,PyroWave::Runtime& refer
     std::array<std::vector<PyroWave::Pixels>,2> baseline;
     std::array<bool,2> exact{true,true}; std::array<std::string,2> paths;
     std::vector<std::string> repeats,cross;
-    bool stable=true,experimentsExact=true;
+    bool stable=true,experimentsExact=true,repeated=false;
     candidate.close();
     for(unsigned mode=0;mode<2;++mode) {
         const std::string requested=mode ? "FORCE_COMPUTE" : "AUTO",file=mode ? "forced-compute" : "auto-fragment";
@@ -112,6 +118,7 @@ inline bool runDiagnostics(PyroWave::Runtime& candidate,PyroWave::Runtime& refer
                     diagnosticFile(directory/(file+"-dump-metadata.json"),jsonArray(metadata)); dumped=true;
                 }
                 if(mismatch) {
+                    repeated=true;
                     std::array<std::vector<std::string>,3> hashes;
                     for(unsigned p=0;p<3;++p) hashes[p].push_back(hash(gpu.planes[p]));
                     for(unsigned repeat=1;repeat<=4;++repeat) {
@@ -178,14 +185,14 @@ inline bool runDiagnostics(PyroWave::Runtime& candidate,PyroWave::Runtime& refer
         cross.push_back("{\"left_output\":\"AUTO\",\"right_output\":\"FORCE_COMPUTE\",\"comparison\":"+record+"}");
     }
     diagnosticFile(directory/"cross-comparison.json",jsonArray(cross));
-    diagnosticFile(directory/"repeatability.json","{\"repeat_hash_stable\":\""+std::string(stable ? "YES" : "NO")+"\",\"records\":"+jsonArray(repeats)+"}");
+    diagnosticFile(directory/"repeatability.json","{\"repeat_hash_stable\":\""+std::string(!repeated ? "NOT_REQUIRED_ALL_BASELINES_EQUAL" : stable ? "YES" : "NO")+"\",\"records\":"+jsonArray(repeats)+"}");
     diagnosticFile(directory/"repeatability.log",diagnosticLines(repeats));
     const bool okay=exact[0] && exact[1] && stable && experimentsExact;
     const std::string qualification=okay ? "TARGETED_EXACT_MATCH_FULL_SUITE_PENDING" : !stable ? "FAIL_NONDETERMINISTIC_OUTPUT" :
         !exact[0] ? (paths[0]=="fragment" ? "FAIL_FRAGMENT_MISMATCH" : "FAIL_AUTO_COMPUTE_MISMATCH") : !exact[1] ? "FAIL_FORCE_COMPUTE_MISMATCH" : "FAIL_DIAGNOSTIC_EXPERIMENT";
     diagnosticFile(directory/"diagnostic-summary.json","{\"sourceRevision\":\"" STAGE3_SOURCE_REVISION "\",\"overall\":\"DIAGNOSTIC_COMPLETE\",\"stage3Qualification\":\""+qualification+
         "\",\"autoExact\":"+(exact[0] ? "true" : "false")+",\"forcedComputeExact\":"+(exact[1] ? "true" : "false")+
-        ",\"autoVsForcedComputeExact\":"+(autoComputeEqual ? "true" : "false")+",\"repeatHashStable\":"+(stable ? "true" : "false")+
+        ",\"autoVsForcedComputeExact\":"+(autoComputeEqual ? "true" : "false")+",\"repeatHashStable\":"+(!repeated ? "null" : stable ? "true" : "false")+
         ",\"experimentsExact\":"+(experimentsExact ? "true" : "false")+",\"sameCallerDevice\":true,\"identicalEncodedFixtures\":true,\"fixtureCount\":7}");
     log("diagnostic_complete=YES stage3_qualification="+qualification+" comparison_criterion=EXACT_BYTES");
     return okay;
