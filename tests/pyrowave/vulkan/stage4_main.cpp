@@ -145,7 +145,14 @@ int main(int argc,char** argv) {
     } catch(const std::exception& e) {
         error=e.what(); log("error="+error);
         injected=(!fault.empty() && error=="injected Stage 4 "+fault) || (owner && owner->injectedFailure);
-        const bool absent=error.find("System32 Vulkan loader unavailable")!=std::string::npos || error.find("no non-software physical device")!=std::string::npos || error.find("no suitable Stage 3 loader API")!=std::string::npos;
+        // Capability absence before initialization is SKIP. Decoder, shader,
+        // submission and device-loss failures after initialization remain FAIL.
+        const bool absent=error.find("System32 Vulkan loader unavailable")!=std::string::npos ||
+            error.find("SDL unavailable: ")==0 || error.find("SDL Vulkan unavailable: ")==0 ||
+            error.find("SDL window unavailable: ")==0 || error.find("missing surface extension ")==0 ||
+            error.find("no non-software physical device")!=std::string::npos ||
+            error.find("no suitable Stage 3 loader API")!=std::string::npos ||
+            error=="surface does not support color attachments" || error=="no SDR UNORM surface format";
         result=unavailable && absent ? 77 : 1;
     }
     // Final drain is allowed; no application queue/device idle in normal frames.
