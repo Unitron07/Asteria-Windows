@@ -59,13 +59,15 @@ inline std::vector<DiagnosticFixture> diagnosticFixtures(PyroWave::Runtime& refe
 inline std::string diagnosticPlane(const DiagnosticFixture& fixture,unsigned frame,unsigned plane,const std::string& mode,
     const std::string& path,const std::vector<uint8_t>& a,const std::vector<uint8_t>& b,const Hash& hash) {
     const auto extent=planes(1920,1080)[plane];
+    const auto metrics=differences(a,b,extent.width,extent.height);
     std::ostringstream s;
     s<<"{\"fixture\":\""<<fixture.name<<"\",\"frame\":"<<frame<<",\"pattern\":\""<<fixture.pattern
      <<"\",\"framing\":\""<<fixture.framing<<"\",\"range\":\""<<fixture.range<<"\",\"requested_decoder_mode\":\""<<mode
      <<"\",\"decoder_path\":\""<<path<<"\",\"plane\":"<<plane<<",\"width\":"<<extent.width<<",\"height\":"<<extent.height
      <<",\"format\":\"R8_UNORM\",\"encoded_sha256\":\""<<hash(fixture.encoded)<<"\",\"cpu_sha256\":\""<<hash(a)
-     <<"\",\"gpu_sha256\":\""<<hash(b)<<"\",\"exact_equal\":"<<(a==b ? "true" : "false")<<",\"metrics\":"
-     <<differenceJson(differences(a,b,extent.width,extent.height))<<'}'; return s.str();
+     <<"\",\"gpu_sha256\":\""<<hash(b)<<"\",\"exact_equal\":"<<(a==b ? "true" : "false")
+     <<",\"numerically_equivalent\":"<<(metrics.numericallyEquivalent() ? "true" : "false")<<",\"stage3_tolerance\":1,\"max_absolute_error\":"<<metrics.maxAbsoluteError<<",\"metrics\":"
+     <<differenceJson(metrics)<<'}'; return s.str();
 }
 // Both modes borrow the SAME caller device and use fixtures generated ONCE.
 // Wrapper recreation preserves the required decoder -> wrapper -> outputs order.
@@ -75,9 +77,13 @@ inline bool runDiagnostics(PyroWave::Runtime& candidate,PyroWave::Runtime& refer
     const std::filesystem::path& directory,const Hash& hash,bool prefill,bool deviceIdle) {
     auto fixtures=diagnosticFixtures(reference);
     std::array<std::vector<PyroWave::Pixels>,2> baseline;
-    std::array<bool,2> exact{true,true}; std::array<std::string,2> paths;
+    std::array<bool,2> exact{true,true},equivalent{true,true}; std::array<unsigned,2> maximum{}; std::array<std::string,2> paths;
     std::vector<std::string> repeats,cross;
-    bool stable=true,experimentsExact=true,repeated=false;
+    bool stable=true,experimentsStable=true,deviceIdleChanged=false;
+    auto compare=[&](unsigned mode,unsigned plane,const auto& cpu,const auto& gpu) {
+        const auto extent=planes(1920,1080)[plane]; const auto d=differences(cpu,gpu,extent.width,extent.height);
+        equivalent[mode]=equivalent[mode] && d.numericallyEquivalent(); maximum[mode]=std::max(maximum[mode],d.maxAbsoluteError);
+    };
     candidate.close();
     for(unsigned mode=0;mode<2;++mode) {
         const std::string requested=mode ? "FORCE_COMPUTE" : "AUTO",file=mode ? "forced-compute" : "auto-fragment";
@@ -104,7 +110,7 @@ inline bool runDiagnostics(PyroWave::Runtime& candidate,PyroWave::Runtime& refer
                 for(unsigned p=0;p<3;++p) {
                     const auto record=diagnosticPlane(f,frame,p,requested,paths[mode],f.cpu.planes[p],gpu.planes[p],hash);
                     comparisons.push_back(record); log("diagnostic_metrics="+record);
-                    mismatch|=f.cpu.planes[p]!=gpu.planes[p];
+                    mismatch|=f.cpu.planes[p]!=gpu.planes[p]; compare(mode,p,f.cpu.planes[p],gpu.planes[p]);
                 }
                 exact[mode]=exact[mode] && !mismatch;
                 if(mismatch && !dumped) {
@@ -117,8 +123,7 @@ inline bool runDiagnostics(PyroWave::Runtime& candidate,PyroWave::Runtime& refer
                     }
                     diagnosticFile(directory/(file+"-dump-metadata.json"),jsonArray(metadata)); dumped=true;
                 }
-                if(mismatch) {
-                    repeated=true;
+                { // Every fixture repeats, including exact baselines.
                     std::array<std::vector<std::string>,3> hashes;
                     for(unsigned p=0;p<3;++p) hashes[p].push_back(hash(gpu.planes[p]));
                     for(unsigned repeat=1;repeat<=4;++repeat) {
@@ -128,6 +133,7 @@ inline bool runDiagnostics(PyroWave::Runtime& candidate,PyroWave::Runtime& refer
                             const auto record=diagnosticPlane(f,frame,p,requested,paths[mode],f.cpu.planes[p],again.planes[p],hash);
                             repeats.push_back("{\"repeat\":"+std::to_string(repeat)+",\"comparison\":"+record+"}");
                             exact[mode]=exact[mode] && f.cpu.planes[p]==again.planes[p];
+                            compare(mode,p,f.cpu.planes[p],again.planes[p]);
                         }
                     }
                     for(unsigned p=0;p<3;++p) {
@@ -143,7 +149,9 @@ inline bool runDiagnostics(PyroWave::Runtime& candidate,PyroWave::Runtime& refer
                     for(unsigned p=0;p<3;++p) {
                         const auto record=diagnosticPlane(f,frame,p,requested,paths[mode],f.cpu.planes[p],idle.planes[p],hash);
                         repeats.push_back("{\"diagnostic_device_idle\":true,\"normal_gpu_hash_equal\":"+std::string(gpu.planes[p]==idle.planes[p] ? "true" : "false")+",\"comparison\":"+record+"}");
-                        experimentsExact=experimentsExact && f.cpu.planes[p]==idle.planes[p];
+                        compare(mode,p,f.cpu.planes[p],idle.planes[p]);
+                        deviceIdleChanged|=gpu.planes[p]!=idle.planes[p];
+                        experimentsStable=experimentsStable && gpu.planes[p]==idle.planes[p];
                         log("device_idle_changed_bytes="+std::string(gpu.planes[p]==idle.planes[p] ? "NO" : "YES")+" fixture="+f.name+" requested_decoder_mode="+requested+" plane="+std::to_string(p));
                     }
                 }
@@ -165,12 +173,13 @@ inline bool runDiagnostics(PyroWave::Runtime& candidate,PyroWave::Runtime& refer
                         const auto record=diagnosticPlane(f,frame,p,requested,paths[mode],f.cpu.planes[p],filled.planes[p],hash);
                         repeats.push_back("{\"prefill_value\":"+std::to_string(value)+",\"remaining_prefill_bytes\":"+std::to_string(remains)+
                             ",\"prefill_candidates_not_equal_to_cpu\":"+std::to_string(unexpected)+",\"normal_gpu_hash_equal\":"+(baseline[mode][frame].planes[p]==filled.planes[p] ? "true" : "false")+",\"comparison\":"+record+"}");
-                        experimentsExact=experimentsExact && f.cpu.planes[p]==filled.planes[p];
+                        compare(mode,p,f.cpu.planes[p],filled.planes[p]);
+                        experimentsStable=experimentsStable && baseline[mode][frame].planes[p]==filled.planes[p];
                     }
                 }
             }
             diagnosticFile(directory/(file+".json"),"{\"requested_decoder_mode\":\""+requested+"\",\"preferred_decoder_path\":\""+(preferred ? "fragment" : "compute")+
-                "\",\"actual_decoder_path\":\""+paths[mode]+"\",\"exact_equal\":"+(exact[mode] ? "true" : "false")+",\"planes\":"+jsonArray(comparisons)+"}");
+                "\",\"actual_decoder_path\":\""+paths[mode]+"\",\"exact_equal\":"+(exact[mode] ? "true" : "false")+",\"numerically_equivalent\":"+(equivalent[mode] ? "true" : "false")+",\"stage3_tolerance\":1,\"max_absolute_error\":"+std::to_string(maximum[mode])+",\"planes\":"+jsonArray(comparisons)+"}");
             diagnosticFile(directory/(file+".log"),"requested_decoder_mode="+requested+" actual_decoder_path="+paths[mode]+"\n"+diagnosticLines(comparisons));
             outputs->drain(); candidate.close(); outputs->close();
         } catch(...) {
@@ -185,16 +194,19 @@ inline bool runDiagnostics(PyroWave::Runtime& candidate,PyroWave::Runtime& refer
         cross.push_back("{\"left_output\":\"AUTO\",\"right_output\":\"FORCE_COMPUTE\",\"comparison\":"+record+"}");
     }
     diagnosticFile(directory/"cross-comparison.json",jsonArray(cross));
-    diagnosticFile(directory/"repeatability.json","{\"repeat_hash_stable\":\""+std::string(!repeated ? "NOT_REQUIRED_ALL_BASELINES_EQUAL" : stable ? "YES" : "NO")+"\",\"records\":"+jsonArray(repeats)+"}");
+    diagnosticFile(directory/"repeatability.json","{\"repeat_hash_stable\":\""+std::string(stable ? "YES" : "NO")+"\",\"records\":"+jsonArray(repeats)+"}");
     diagnosticFile(directory/"repeatability.log",diagnosticLines(repeats));
-    const bool okay=exact[0] && exact[1] && stable && experimentsExact;
-    const std::string qualification=okay ? "TARGETED_EXACT_MATCH_FULL_SUITE_PENDING" : !stable ? "FAIL_NONDETERMINISTIC_OUTPUT" :
-        !exact[0] ? (paths[0]=="fragment" ? "FAIL_FRAGMENT_MISMATCH" : "FAIL_AUTO_COMPUTE_MISMATCH") : !exact[1] ? "FAIL_FORCE_COMPUTE_MISMATCH" : "FAIL_DIAGNOSTIC_EXPERIMENT";
+    const bool okay=equivalent[0] && equivalent[1] && stable && experimentsStable;
+    const std::string qualification=!stable ? "FAIL_NONDETERMINISTIC_OUTPUT" : deviceIdleChanged ? "FAIL_DEVICE_IDLE_CHANGED_OUTPUT" :
+        !experimentsStable ? "FAIL_DIAGNOSTIC_EXPERIMENT" : !equivalent[0] || !equivalent[1] ? "FAIL_GPU_OUTPUT_TOLERANCE" : "TARGETED_NUMERIC_EQUIVALENCE_FULL_SUITE_PENDING";
     diagnosticFile(directory/"diagnostic-summary.json","{\"sourceRevision\":\"" STAGE3_SOURCE_REVISION "\",\"overall\":\"DIAGNOSTIC_COMPLETE\",\"stage3Qualification\":\""+qualification+
-        "\",\"autoExact\":"+(exact[0] ? "true" : "false")+",\"forcedComputeExact\":"+(exact[1] ? "true" : "false")+
-        ",\"autoVsForcedComputeExact\":"+(autoComputeEqual ? "true" : "false")+",\"repeatHashStable\":"+(!repeated ? "null" : stable ? "true" : "false")+
-        ",\"experimentsExact\":"+(experimentsExact ? "true" : "false")+",\"sameCallerDevice\":true,\"identicalEncodedFixtures\":true,\"fixtureCount\":7}");
-    log("diagnostic_complete=YES stage3_qualification="+qualification+" comparison_criterion=EXACT_BYTES");
+        "\",\"autoActualPath\":\""+paths[0]+"\",\"forcedComputeActualPath\":\""+paths[1]+"\",\"autoExact\":"+(exact[0] ? "true" : "false")+",\"forcedComputeExact\":"+(exact[1] ? "true" : "false")+
+        ",\"autoNumericallyEquivalent\":"+(equivalent[0] ? "true" : "false")+",\"forcedComputeNumericallyEquivalent\":"+(equivalent[1] ? "true" : "false")+
+        ",\"autoMaxAbsoluteError\":"+std::to_string(maximum[0])+",\"forcedComputeMaxAbsoluteError\":"+std::to_string(maximum[1])+",\"stage3Tolerance\":1"+
+        ",\"autoVsForcedComputeExact\":"+(autoComputeEqual ? "true" : "false")+",\"repeatHashStable\":"+(stable ? "true" : "false")+
+        ",\"experimentsStable\":"+(experimentsStable ? "true" : "false")+",\"deviceIdleTested\":"+(deviceIdle ? "true" : "false")+",\"deviceIdleChangedBytes\":"+(deviceIdleChanged ? "true" : "false")+
+        ",\"sameCallerDevice\":true,\"identicalEncodedFixtures\":true,\"callerOwnedR8Images\":true,\"positiveTimelines\":true,\"externalMemoryHandles\":0,\"externalSemaphoreHandles\":0,\"d3d11Resources\":0,\"externalHandleApiUsage\":\"NONE\",\"fixtureCount\":7}");
+    log("diagnostic_complete=YES stage3_qualification="+qualification+" comparison_criterion=NUMERIC_EQUIVALENCE stage3_tolerance=1");
     return okay;
 }
 }

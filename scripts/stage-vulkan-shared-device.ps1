@@ -11,9 +11,10 @@ New-Item -ItemType Directory -Path $stage,(Join-Path $stage 'install/bin'),(Join
 foreach ($file in @('pyrowave-vulkan-shared-device.exe','pyrowave-vulkan-shared-device-policy-tests.exe','pyrowave-vulkan-shared-diagnostic-tests.exe','SDL2.dll','SDL3.dll')) {
     Copy-Item -LiteralPath (Join-Path $BuildRoot "Release/$file") -Destination $stage
 }
-foreach ($file in @('libpyrowave-shared-0.dll','pyrowave-runtime.json')) {
+foreach ($file in @('libpyrowave-shared-0.dll','pyrowave-runtime.json','factory-ownership.json')) {
     Copy-Item -LiteralPath (Join-Path $DependencyRoot "install/bin/$file") -Destination (Join-Path $stage 'install/bin')
 }
+Copy-Item -LiteralPath (Join-Path $DependencyRoot 'install/bin/pyrowave-factory-cleanup-tests.exe') -Destination $stage
 Copy-Item -LiteralPath (Join-Path $DependencyRoot 'install/source-notices') -Destination (Join-Path $stage 'source-notices/runtime') -Recurse
 Copy-Item -LiteralPath (Join-Path $source 'LICENSE'),(Join-Path $source 'scripts/baseline-deps.json') -Destination (Join-Path $stage 'source-notices')
 foreach ($notice in @(
@@ -45,9 +46,9 @@ foreach ($binary in @(Get-ChildItem -LiteralPath $stage -Recurse -File | Where-O
 $revision = & git -C $source rev-parse HEAD
 if ($LASTEXITCODE) { throw 'Cannot record source revision' }
 @{architecture=$Architecture;sourceRevision=$revision;runtime=$metadata;scope='Stage3 OFFLINE ONLY';
-    runtimePatch='NONE_ADDED_FOR_STAGE3';productionRendererChanged=$false;ownerSurfaceQualification='FAILED_INITIAL_FRAGMENT_COMPARISON_NEW_DIAGNOSIS_PENDING';
-    factoryCleanup='CONFIRMED_LEAK_PRODUCTION_PROMOTION_BLOCKED'} |
-    ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $stage 'build.json') -Encoding utf8
+    runtimePatch='0004-borrowed-factory-cleanup.patch';productionRendererChanged=$false;ownerSurfaceQualification='PENDING_FINAL_NUMERIC_OWNER_RUN';
+    factoryCleanup='PATCHED_SOURCE_TEST_PASSED_PUBLIC_FAULT_PENDING'} |
+    ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $stage 'build.json') -Encoding utf8
 if (Get-ChildItem -LiteralPath $stage -Recurse -Filter vulkan-1.dll) { throw 'Vulkan loader must never be packaged' }
 Get-ChildItem -LiteralPath $stage -Recurse -File | ForEach-Object {
     @{file=$_.FullName.Substring($stage.Length+1);sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}

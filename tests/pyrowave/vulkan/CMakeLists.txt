@@ -14,6 +14,7 @@ add_executable(pyrowave-vulkan-shared-diagnostic-tests shared_diagnostic_tests.c
 add_test(NAME vulkan-shared-diagnostics COMMAND pyrowave-vulkan-shared-diagnostic-tests)
 option(PYROWAVE_VULKAN_SHARED_DEVICE "Build offline same-device pinned codec proof" OFF)
 if(PYROWAVE_VULKAN_SHARED_DEVICE)
+    add_test(NAME pinned-factory-ownership COMMAND "${PYROWAVE_ROOT}/bin/pyrowave-factory-cleanup-tests.exe")
     add_executable(stage3-owner-runner-fixture owner_runner_fixture.cpp)
     if(NOT WIN32 OR NOT SDL_ARCH MATCHES "^(x64|arm64)$" OR
        NOT EXISTS "${PYROWAVE_ROOT}/include/pyrowave/pyrowave.h" OR

@@ -1,9 +1,21 @@
 # PyroWave P1a GPU presentation and stats
 
-The separately authorized [Stage 3 offline shared-device proof](../tests/pyrowave/vulkan/STAGE3.md)
-adds direct pinned decode into Asteria-owned Vulkan Y/U/V images with test-only
-readback. Surface qualification is pending; live Vulkan presentation remains
-future work. It does not change the live paths described below.
+[Stage 3 offline shared-device proof](../tests/pyrowave/vulkan/STAGE3.md) now
+distinguishes exact identity from approved numerical equivalence: every decoded
+Y/U/V byte must be within ±1 of CPU decode; a single ±2 fails. Exact hashes and
+all diagnostic metrics remain recorded. At diagnostic head f08ecabb, the owner
+found deterministic ±1 variants in BOTH AUTO fragment and forced compute on
+Surface X1-85, using identical fixtures and the same caller device. Repeats were
+stable, device idle did not change bytes, and external handles/D3D11 stayed zero.
+Pinned upstream validation permits bounded reconstruction error; no exact
+Qualcomm arithmetic root cause is claimed. The separately recorded same-pin
+factory patch deletes the wrapper on either initialization failure, with source
+ownership tests and public fault diagnostics required for verification.
+
+Final Surface qualification with rebuilt patched-runtime packages is pending.
+PR #36 remains draft/unmerged. Live Vulkan presentation, YUV-to-RGB, production
+renderer changes and Stage 4/5 remain future work. This offline continuation
+does not change the live paths described below.
 
 ## Current live ARM64 owner result
 

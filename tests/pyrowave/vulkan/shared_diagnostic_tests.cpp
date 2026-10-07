@@ -13,6 +13,15 @@ int main() {
         auto b=a; b[5]=7; auto one=differences(a,b,4,2);
         require(one.mismatching==1 && one.matching==7 && one.percentage()==12.5 && one.maxAbsoluteError==2 && one.meanAbsoluteError()==0.25);
         require(one.first==5 && one.last==5 && one.samples[0].x==1 && one.samples[0].y==1 && one.samples[0].difference==2);
+        require(equal.numericallyEquivalent() && !one.numericallyEquivalent() && one.firstOutOfTolerance==5);
+        std::vector<uint8_t> boundCpu(100,16),boundGpu=boundCpu;
+        for(unsigned i=0;i<15;++i) boundGpu[i]=17;
+        auto bounded=differences(boundCpu,boundGpu,10,10);
+        require(bounded.percentage()==15 && bounded.maxAbsoluteError==1 && bounded.numericallyEquivalent());
+        boundGpu[99]=18; auto lateFailure=differences(boundCpu,boundGpu,10,10);
+        require(!lateFailure.numericallyEquivalent() && lateFailure.firstOutOfTolerance==99 && lateFailure.toleranceFailure.cpu==16 && lateFailure.toleranceFailure.gpu==18);
+        require(differences({0,255},{1,254},2,1).numericallyEquivalent());
+        require(!differences({0,255},{2,253},2,1).numericallyEquivalent());
         require(one.firstRow==0 && one.lastRow==1 && one.rows==1 && one.longestMatching==5 && one.longestMismatching==1 && one.regions[2]==1);
         std::vector<uint8_t> cpu(9,128),gpu{124,125,126,127,128,129,130,131,132};
         auto histogram=differences(cpu,gpu,3,3); for(auto count:histogram.histogram) require(count==1);

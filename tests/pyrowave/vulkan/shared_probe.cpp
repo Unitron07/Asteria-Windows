@@ -41,6 +41,8 @@ std::string verify(const std::filesystem::path& directory,const std::string& arc
     if(field(json,"architecture")!=architecture || field(json,"codecCommit")!=PyroWave::CodecCommit ||
         field(json,"bitstreamId")!=PyroWave::BitstreamId || field(json,"apiVersion")!="0.6.0")
         throw std::runtime_error("pinned runtime provenance mismatch");
+    if(field(json,"factoryCleanupSourceTest")!="PASSED" || field(json,"factoryCleanupPatch")!="0004-borrowed-factory-cleanup.patch")
+        throw std::runtime_error("Stage 3 requires verified same-pin factory cleanup provenance");
     auto binary=readText(directory/L"libpyrowave-shared-0.dll");
     std::vector<uint8_t> bytes(binary.begin(),binary.end()); auto sha=hash(bytes);
     if(field(json,"sha256")!=sha) throw std::runtime_error("runtime SHA256 mismatch");
@@ -77,10 +79,10 @@ void factoryFault(Dispatch& vk,const std::filesystem::path& directory,const Log&
         }
         auto after=privateBytes();
         log("factory_batch="+std::to_string(batch)+" calls=100 result=-5 returned_wrapper=NULL private_before="+
-            std::to_string(before)+" private_after="+std::to_string(after)+" growth="+std::to_string(after-before));
+            std::to_string(before)+" private_after="+std::to_string(after)+" growth="+std::to_string(int64_t(after)-int64_t(before)));
     }
     destroy(instance,nullptr); FreeLibrary(module);
-    log("factory_fault_probe=SOURCE_CONFIRMED_UNREACHABLE_WRAPPER memory_growth_is_diagnostic production_promotion=BLOCKED");
+    log("factory_fault_probe=PASS factory_failure_cleanup=PATCHED_AND_VERIFIED memory_growth_is_supporting_diagnostic");
 }
 }
 int main(int argc,char** argv) {
@@ -114,8 +116,8 @@ int main(int argc,char** argv) {
     Log log=[&](const std::string& text) { std::lock_guard<std::mutex> guard(logging); std::cout<<text<<std::endl; evidence<<text<<std::endl; };
     log("scope=OFFLINE_ONLY output_path=NATIVE_GPU_CALLER_OWNED architecture="+arch);
     log("source_revision=" STAGE3_SOURCE_REVISION);
-    log("codec_commit="+std::string(PyroWave::CodecCommit)+" bitstream_id="+PyroWave::BitstreamId+" api_version=0.6.0 runtime_patch=NONE_ADDED_FOR_STAGE3");
-    log("factory_failure_path=CONFIRMED_LEAK production_promotion=BLOCKED owner_qualification=PENDING");
+    log("codec_commit="+std::string(PyroWave::CodecCommit)+" bitstream_id="+PyroWave::BitstreamId+" api_version=0.6.0 runtime_patch=0004-borrowed-factory-cleanup.patch");
+    log("factory_failure_cleanup=PATCHED_SOURCE_TEST_REQUIRED owner_qualification=PENDING");
     Dispatch vk; Stage3::NativeDispatch native; Stage3::QueueLock queueLock;
     Stage3::Requirements requirements{native,vk,log};
     std::unique_ptr<Probe> owner; std::unique_ptr<Stage3::Outputs> outputs;
@@ -162,11 +164,12 @@ int main(int argc,char** argv) {
                 const auto directory=logPath.has_parent_path() ? logPath.parent_path() : std::filesystem::path(".");
                 const bool okay=Stage3::runDiagnostics(candidate,reference,info,runtimeDir,*owner,vk,native,queueLock,log,directory,hash,diagnosticPrefill,diagnosticIdle);
                 diagnosticComplete=true;
-                if(!okay) throw std::runtime_error("CPU/GPU exact output mismatch; diagnostic evidence complete; STOP");
+                if(!okay) throw std::runtime_error("Stage 3 numerical/stability gate failed; diagnostic evidence complete; STOP");
             } else {
             const bool preferred=candidate.nativePrefersFragment();
             if(!candidate.createDecoder(1920,1080,!forceCompute)) throw std::runtime_error(candidate.error());
             auto path=std::string(candidate.decoderPath());
+            require(path==(Stage3::selectedPath(preferred,forceCompute)==Stage3::Path::Fragment ? "fragment" : "compute"),"wrong actual decoder path");
             log("requested_decoder_mode="+std::string(forceCompute ? "FORCE_COMPUTE" : "AUTO")+" preferred_decoder_path="+(preferred ? "fragment" : "compute")+" actual_decoder_path="+path);
             outputs=std::make_unique<Stage3::Outputs>(*owner,vk,native,queueLock,log,path=="fragment" ? Stage3::Path::Fragment : Stage3::Path::Compute);
             try { outputs->initialize(fault); } catch(const std::exception& e) {
@@ -176,7 +179,7 @@ int main(int argc,char** argv) {
             // Separate codec-owned device is strictly test setup/reference, never candidate output.
             if(!reference.load(runtimeDir) || !reference.createDecoder(1920,1080)) throw std::runtime_error(reference.error());
             log("reference_device_role=FIXTURE_AND_CPU_REFERENCE candidate_device_role=ASTERIA_BORROWED_ONLY");
-            unsigned frames=0;
+            unsigned frames=0,maximumError=0; bool allExact=true,dumped=false;
             for(unsigned lifetime=0;lifetime<3;++lifetime) {
                 if(lifetime && !candidate.createDecoder(1920,1080,!forceCompute)) throw std::runtime_error(candidate.error());
                 for(auto pattern:{Presentation::Pattern::Gradient,Presentation::Pattern::Bars}) {
@@ -193,6 +196,7 @@ int main(int argc,char** argv) {
                         for(auto p:frame.packets) records.insert(records.end(),compatibility.begin()+p.offset,compatibility.begin()+p.offset+p.size);
                         for(auto* fixture:{&compatibility,&records}) {
                             PyroWave::Pixels cpu; if(!reference.decode(*fixture,cpu)) throw std::runtime_error(reference.error());
+                            std::array<std::string,3> repeatHashes;
                             for(unsigned reuse=0;reuse<6;++reuse) {
                                 const unsigned slot=frames%Stage3::SlotCount;
                                 auto views=outputs->views(slot); auto a=outputs->acquire(slot),r=outputs->release(slot);
@@ -203,15 +207,23 @@ int main(int argc,char** argv) {
                                 outputs->submitted(slot);
                                 checkpoint("decoded");
                                 auto gpu=outputs->read(slot);
-                                bool mismatch=false;
+                                bool mismatch=false,outOfTolerance=false;
                                 for(unsigned p=0;p<3;++p) {
                                     auto cpuHash=hash(cpu.planes[p]),gpuHash=hash(gpu.planes[p]);
+                                    if(!reuse) repeatHashes[p]=gpuHash;
+                                    require(repeatHashes[p]==gpuHash,"FAIL_NONDETERMINISTIC_OUTPUT frame="+std::to_string(frames)+" plane="+std::to_string(p));
                                     log("frame="+std::to_string(frames)+" lifetime="+std::to_string(lifetime)+" pattern="+Presentation::name(pattern)+
                                         " framing="+(fixture==&compatibility ? "compatibility" : "records")+" range="+(limited ? "limited" : "full")+
                                         " plane="+std::to_string(p)+" cpu_sha256="+cpuHash+" gpu_sha256="+gpuHash);
+                                    const auto extent=Stage3::planes(1920,1080)[p];
+                                    const auto d=Stage3::differences(cpu.planes[p],gpu.planes[p],extent.width,extent.height);
+                                    maximumError=std::max(maximumError,d.maxAbsoluteError); outOfTolerance|=!d.numericallyEquivalent();
+                                    log("frame="+std::to_string(frames)+" plane="+std::to_string(p)+" exact_equal="+(cpu.planes[p]==gpu.planes[p] ? "true" : "false")+
+                                        " numerically_equivalent="+(d.numericallyEquivalent() ? "true" : "false")+" metrics="+Stage3::differenceJson(d));
                                     mismatch|=cpu.planes[p]!=gpu.planes[p];
                                 }
-                                if(mismatch) {
+                                allExact=allExact && !mismatch;
+                                if(outOfTolerance || (mismatch && !dumped)) {
                                     Stage3::DiagnosticFixture diagnosticFrame;
                                     diagnosticFrame.name="qualification-first-failure"; diagnosticFrame.pattern=Presentation::name(pattern);
                                     diagnosticFrame.framing=fixture==&compatibility ? "compatibility" : "records";
@@ -225,7 +237,8 @@ int main(int argc,char** argv) {
                                         Stage3::diagnosticBinary(directory/("gpu-plane"+std::to_string(p)+".bin"),gpu.planes[p]);
                                     }
                                     Stage3::diagnosticFile(directory/"comparison-failure.json",Stage3::jsonArray(metrics));
-                                    throw std::runtime_error("CPU/GPU exact output mismatch; all three plane metrics recorded; STOP");
+                                    dumped=true;
+                                    if(outOfTolerance) throw std::runtime_error("FAIL_GPU_OUTPUT_TOLERANCE; frame/fixture/plane and first out-of-bound values recorded; STOP");
                                 }
                                 ++frames; if(frames>3) checkpoint("reused");
                             }
@@ -233,7 +246,7 @@ int main(int argc,char** argv) {
                     }
                 }
             }
-            log("comparison=EXACT_BYTES frames_tested="+std::to_string(frames)+" slots_exercised=3 decoder_lifetimes=3 malformed_recovery=PASS");
+            log("comparison=NUMERIC_EQUIVALENCE stage3_tolerance=1 numerically_equivalent=true exact_equal="+std::string(allExact ? "true" : "false")+" max_absolute_error="+std::to_string(maximumError)+" frames_tested="+std::to_string(frames)+" slots_exercised=3 decoder_lifetimes=3 malformed_recovery=PASS");
             outputs->drain(); candidate.close(); outputs->close(); outputs.reset();
             }
         } catch(...) {
@@ -268,7 +281,7 @@ int main(int argc,char** argv) {
     } else log("validation_status=SKIP");
     owner.reset(); if(window) SDL_DestroyWindow(window); SDL_Vulkan_UnloadLibrary(); SDL_Quit();
     if(!fault.empty() && !injected && result!=77) result=1;
-    log("external_handle_api_usage=NONE runtime_patch=NONE stage3_additional_runtime_patch=NONE");
+    log("external_handle_api_usage=NONE runtime_patch=0004-borrowed-factory-cleanup.patch stage3_additional_runtime_patch=FACTORY_CLEANUP");
     log("overall="+std::string(result==77 ? "SKIP" : diagnosticComplete ? "DIAGNOSTIC_COMPLETE" : result ? "FAIL" : injected ? "FAULT_CLEANUP_PASS" : "API_PASS"));
     return result;
 }

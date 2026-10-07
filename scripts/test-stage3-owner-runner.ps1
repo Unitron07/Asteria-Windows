@@ -21,26 +21,31 @@ $fixture = Join-Path $EvidenceRoot 'Unavailable.cs'
 using System; using System.IO;
 public static class Fixture {
  public static int Main(string[] args) {
-  if (Environment.GetCommandLineArgs()[0].Contains("-tests")) return 0;
-  string log=null;
-  bool diagnostic=false, factory=false;
+  if(Environment.GetCommandLineArgs()[0].Contains("-tests")) return 0;
+  string log=null; bool diagnostic=false,factory=false;
   for(int i=0;i<args.Length;i++) {
-   if((args[i]=="--runtime" || args[i]=="--log") && i+1<args.Length) {
-    if(args[i]=="--log") log=args[i+1];
-    i++;
+   if((args[i]=="--runtime" || args[i]=="--log" || args[i]=="--fail-at") && i+1<args.Length) {
+    if(args[i]=="--log") log=args[i+1]; i++;
    } else if(args[i]=="--diagnostic-suite") diagnostic=true;
    else if(args[i]=="--factory-fault") factory=true;
-   else if(args[i]!="--diagnostic-prefill" && args[i]!="--diagnostic-device-idle") return 2;
+   else if(args[i]!="--diagnostic-prefill" && args[i]!="--diagnostic-device-idle" && args[i]!="--force-compute") return 2;
   }
   if(log==null) return 2;
-  if(Environment.GetEnvironmentVariable("STAGE3_FIXTURE_DIAGNOSTIC")!=null) {
-   if(factory) { File.WriteAllText(log,"fixture=GPU_FREE validation_errors=0 overall=FACTORY_FAULT_DIAGNOSTIC\n"); return 0; }
-   if(!diagnostic) return 2;
-   File.WriteAllText(Path.Combine(Path.GetDirectoryName(log),"diagnostic-summary.json"),"{\"sourceRevision\":\"GPU_FREE_FIXTURE\",\"overall\":\"DIAGNOSTIC_COMPLETE\",\"stage3Qualification\":\"FAIL_FRAGMENT_MISMATCH\",\"autoExact\":false,\"forcedComputeExact\":true}");
-   File.WriteAllText(log,"fixture=GPU_FREE diagnostic_complete=YES validation_errors=0 overall=DIAGNOSTIC_COMPLETE\n"); return 1;
+  string root=Environment.GetEnvironmentVariable("STAGE3_FIXTURE_DATA");
+  if(root==null) { File.WriteAllText(log,"validation_status=SKIP\noverall=SKIP\n"); return 77; }
+  if(diagnostic) {
+   foreach(string name in new string[]{"diagnostic-summary.json","auto-fragment.json","forced-compute.json","repeatability.json"}) {
+    File.Copy(Path.Combine(root,name),Path.Combine(Path.GetDirectoryName(log),name),true);
+    File.SetLastWriteTimeUtc(Path.Combine(Path.GetDirectoryName(log),name),DateTime.UtcNow);
+   }
+   File.WriteAllText(log,"selected_device=GPU_FREE_FIXTURE\ndiagnostic_complete=YES validation_errors=0 validation_status=SKIP overall=DIAGNOSTIC_COMPLETE\n"); return 0;
   }
-  File.WriteAllText(log,"validation_status=SKIP\noverall=SKIP\n");
-  return 77;
+  if(factory) {
+   bool failed=File.Exists(Path.Combine(root,"factory-fail"));
+   File.WriteAllText(log,"factory_failure_cleanup="+(failed ? "FAIL" : "PATCHED_AND_VERIFIED")+" validation_status=SKIP\n"); return failed ? 1 : 0;
+  }
+  bool failedDecode=File.Exists(Path.Combine(root,"decode-fail"));
+  File.WriteAllText(log,"comparison=NUMERIC_EQUIVALENCE stage3_tolerance=1 numerically_equivalent=true exact_equal=false max_absolute_error=1 frames_tested=144 slots_exercised=3 decoder_lifetimes=3 malformed_recovery=PASS\nvalidation_status=SKIP\n"); return failedDecode ? 1 : 0;
  }
 }
 '@ | Set-Content -LiteralPath $fixture
@@ -53,21 +58,60 @@ $shells = @((Get-Command powershell.exe -ErrorAction Stop).Source)
 $pwsh = Get-Command pwsh.exe -ErrorAction SilentlyContinue
 if ($pwsh) { $shells += $pwsh.Source }
 foreach ($shell in $shells) {
-    foreach ($case in @('default','explicit','whitespace','diagnostic-skip','diagnostic-mismatch')) {
+    foreach ($case in @('default','explicit','whitespace','diagnostic-skip','numeric-pass','tolerance-fail','hidden-plane-fail','unstable-fail','idle-fail','device-fail','path-fail','fixture-fail','ownership-fail','timeline-fail','factory-fail','decode-fail')) {
         $package = Join-Path $EvidenceRoot ((Split-Path $shell -Leaf) + " $case package with spaces")
-        New-Item -ItemType Directory -Force -Path $package,(Join-Path $package 'install/bin') | Out-Null
+        New-Item -ItemType Directory -Force -Path $package,(Join-Path $package 'install/bin'),(Join-Path $package 'source-notices/runtime/patches') | Out-Null
         foreach ($name in @('run-stage3-owner-tests.ps1','runtime-provenance.ps1','pe-machine.ps1')) {
             Copy-Item -LiteralPath (Join-Path $PackageRoot $name) -Destination $package
         }
-        foreach ($name in @('pyrowave-vulkan-shared-device.exe','pyrowave-vulkan-shared-device-policy-tests.exe','pyrowave-vulkan-shared-diagnostic-tests.exe')) {
+        foreach ($name in @('pyrowave-vulkan-shared-device.exe','pyrowave-vulkan-shared-device-policy-tests.exe','pyrowave-vulkan-shared-diagnostic-tests.exe','pyrowave-factory-cleanup-tests.exe')) {
             Copy-Item -LiteralPath $fixtureExe -Destination (Join-Path $package $name)
         }
         $runtime = Join-Path $package 'install/bin/libpyrowave-shared-0.dll'
         Copy-Item -LiteralPath $fixtureExe -Destination $runtime
+        $patch = Join-Path $package 'source-notices/runtime/patches/0004-borrowed-factory-cleanup.patch'
+        'GPU_FREE_PATCH_FIXTURE' | Set-Content -LiteralPath $patch
+        $proofPath = Join-Path $package 'install/bin/factory-ownership.json'
+        @{result='PASSED';liveWrappers=0;allocations=30000;destructions=30000;testBinarySha256=(Get-FileHash -LiteralPath $fixtureExe).Hash.ToLowerInvariant()} |
+            ConvertTo-Json | Set-Content -LiteralPath $proofPath
         @{architecture=$fixtureArch;codecCommit='186f0393b77f7755953b5ecde994bb1cec2e4155';bitstreamId='186f0393';apiVersion='0.6.0';
+            factoryCleanupSourceTest='PASSED';factoryCleanupPatch='0004-borrowed-factory-cleanup.patch';
+            factoryCleanupPatchSha256=(Get-FileHash -LiteralPath $patch).Hash.ToLowerInvariant();
+            factoryOwnershipSha256=(Get-FileHash -LiteralPath $proofPath).Hash.ToLowerInvariant();
             sha256=(Get-FileHash -LiteralPath $runtime).Hash.ToLowerInvariant()} |
             ConvertTo-Json | Set-Content -LiteralPath (Join-Path $package 'install/bin/pyrowave-runtime.json')
         @{architecture=$fixtureArch;sourceRevision='GPU_FREE_FIXTURE'} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $package 'build.json')
+        $fixtureData = $null
+        if ($case -notin @('default','explicit','whitespace','diagnostic-skip')) {
+            $fixtureData = Join-Path $package 'fixture-data'; New-Item -ItemType Directory -Path $fixtureData | Out-Null
+            $summary = @{sourceRevision='GPU_FREE_FIXTURE';overall='DIAGNOSTIC_COMPLETE';stage3Qualification='TARGETED_NUMERIC_EQUIVALENCE_FULL_SUITE_PENDING';
+                autoExact=$false;forcedComputeExact=$false;autoNumericallyEquivalent=$true;forcedComputeNumericallyEquivalent=$true;
+                autoMaxAbsoluteError=1;forcedComputeMaxAbsoluteError=1;stage3Tolerance=1;autoActualPath='fragment';forcedComputeActualPath='compute';
+                repeatHashStable=$true;deviceIdleTested=$true;deviceIdleChangedBytes=$false;experimentsStable=$true;sameCallerDevice=$true;
+                identicalEncodedFixtures=$true;fixtureCount=7;callerOwnedR8Images=$true;positiveTimelines=$true;
+                externalMemoryHandles=0;externalSemaphoreHandles=0;d3d11Resources=0;externalHandleApiUsage='NONE'}
+            switch ($case) {
+                'tolerance-fail' { $summary.autoMaxAbsoluteError=2 }
+                'unstable-fail' { $summary.repeatHashStable=$false }
+                'idle-fail' { $summary.deviceIdleChangedBytes=$true }
+                'device-fail' { $summary.sameCallerDevice=$false }
+                'path-fail' { $summary.forcedComputeActualPath='fragment' }
+                'fixture-fail' { $summary.identicalEncodedFixtures=$false }
+                'ownership-fail' { $summary.externalMemoryHandles=1 }
+                'timeline-fail' { $summary.positiveTimelines=$false }
+                'factory-fail' { 'fail' | Set-Content (Join-Path $fixtureData 'factory-fail') }
+                'decode-fail' { 'fail' | Set-Content (Join-Path $fixtureData 'decode-fail') }
+            }
+            $summary | ConvertTo-Json | Set-Content (Join-Path $fixtureData 'diagnostic-summary.json')
+            $comparison = @{exact_equal=$false;metrics=@{max_absolute_error=1;numerically_equivalent=$true;stage3_tolerance=1}}
+            foreach ($name in @('auto-fragment.json','forced-compute.json')) {
+                $planes = @(1..21 | ForEach-Object { $comparison })
+                if ($case -eq 'hidden-plane-fail' -and $name -eq 'auto-fragment.json') { $planes[20]=@{metrics=@{max_absolute_error=2;numerically_equivalent=$false;stage3_tolerance=1}} }
+                @{planes=$planes} | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $fixtureData $name)
+            }
+            @{repeat_hash_stable='YES';records=@(1..294 | ForEach-Object { @{comparison=$comparison} })} |
+                ConvertTo-Json -Depth 6 | Set-Content (Join-Path $fixtureData 'repeatability.json')
+        }
         Get-ChildItem -LiteralPath $package -Recurse -File | ForEach-Object {
             @{file=$_.FullName.Substring($package.Length+1);sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant()}
         } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $package 'sha256.json')
@@ -75,7 +119,7 @@ foreach ($shell in $shells) {
         $arguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $package 'run-stage3-owner-tests.ps1'),'-Verbose')
         if ($case -eq 'explicit') { $expected = Join-Path $EvidenceRoot ((Split-Path $shell -Leaf) + ' explicit evidence'); $arguments += @('-EvidenceRoot',$expected) }
         if ($case -eq 'whitespace') { $arguments += @('-EvidenceRoot','   ') }
-        if ($case -like 'diagnostic-*') { $arguments += @('-Diagnostic','-DiagnosticDeviceIdle','-DiagnosticPrefill') }
+        if ($case -notin @('default','explicit','whitespace')) { $arguments += @('-Diagnostic','-DiagnosticDeviceIdle','-DiagnosticPrefill') }
         # Use PowerShell's native launcher, as in the documented owner command.
         # It handles cross-version module-path hygiene on Windows/ARM64. The CI
         # step bounds shell startup; each actual GPU process has its own timeout.
@@ -83,14 +127,17 @@ foreach ($shell in $shells) {
         Write-Output "Runner case: $(Split-Path $shell -Leaf)/$case fixture_arch=$fixtureArch"
         Push-Location -LiteralPath $unrelated
         try {
-            if ($case -eq 'diagnostic-mismatch') { $env:STAGE3_FIXTURE_DIAGNOSTIC='1' }
+            if ($fixtureData) { $env:STAGE3_FIXTURE_DATA=$fixtureData }
             $output = & $shell @arguments 2>&1 | Out-String; $code = $LASTEXITCODE
-        } finally { Remove-Item Env:\STAGE3_FIXTURE_DIAGNOSTIC -ErrorAction SilentlyContinue; Pop-Location }
+        } finally { Remove-Item Env:\STAGE3_FIXTURE_DATA -ErrorAction SilentlyContinue; Pop-Location }
         $output | Set-Content -LiteralPath (Join-Path $package 'child-output.txt')
         $record = Get-Content -LiteralPath (Join-Path $expected 'owner-result.json') -Raw | ConvertFrom-Json
-        if ($case -eq 'diagnostic-mismatch') {
-            if ($code -ne 1 -or $record.overall -cne 'DIAGNOSTIC_COMPLETE' -or $record.stage3Qualification -cne 'FAIL_FRAGMENT_MISMATCH' -or $record.runs.Count -ne 2) { throw "Diagnostic mismatch was hidden or aborted: $output" }
-            if ($record.diagnostics.autoExact -ne $false -or $record.diagnostics.forcedComputeExact -ne $true) { throw 'Diagnostic path results lost' }
+        if ($case -eq 'numeric-pass') {
+            if ($code -ne 0 -or $record.stage3Qualification -cne 'PASS_NUMERIC_EQUIVALENCE' -or $record.runs.Count -ne 9 -or
+                $record.autoExact -ne $false -or $record.forcedComputeExact -ne $false -or $record.validation -cne 'SKIP') { throw "Bounded non-bitexact PASS lost: $output" }
+        } elseif ($fixtureData) {
+            if ($code -ne 1 -or $record.stage3Qualification -eq 'PASS_NUMERIC_EQUIVALENCE') { throw "Hard gate was hidden: $case $output" }
+            if ($case -notin @('factory-fail','decode-fail') -and $record.runs.Count -ne 2) { throw 'Invalid diagnostic ran the full qualification suite' }
         } else {
             if ($code -ne 77 -or $record.overall -cne 'SKIP') { throw "Runner SKIP fixture returned ${code}: $output" }
         }
@@ -98,5 +145,5 @@ foreach ($shell in $shells) {
         if (Test-Path -LiteralPath (Join-Path $unrelated 'stage3-evidence')) { throw 'Runner wrote relative to CWD' }
     }
 }
-Write-Output 'PASS: packaged Stage 3 runner PS5.1/7, unrelated CWD, spaces/default/explicit roots, SKIP and AUTO mismatch retained after completed diagnostics'
-$global:LASTEXITCODE = 0 # All six intentional exit-77 results were verified above.
+Write-Output 'PASS: PS5.1/7 roots/CWD/SKIP, numeric non-bitexact PASS, +2 and hard-gate failures retained'
+$global:LASTEXITCODE = 0 # All intentional child outcomes verified.

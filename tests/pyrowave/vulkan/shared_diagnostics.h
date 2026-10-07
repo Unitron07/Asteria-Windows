@@ -9,6 +9,7 @@
 #include <vector>
 
 namespace Stage3 {
+inline constexpr unsigned ToleranceLimit=1;
 struct DifferenceSample { uint64_t offset; uint32_t x,y; uint8_t cpu,gpu; int difference; };
 struct Differences {
     uint64_t bytes=0,matching=0,mismatching=0;
@@ -21,6 +22,9 @@ struct Differences {
     uint64_t longestMatching=0,longestMismatching=0;
     std::array<uint64_t,4> regions{}; // TL,TR,BL,BR
     std::vector<DifferenceSample> samples;
+    int64_t firstOutOfTolerance=-1;
+    DifferenceSample toleranceFailure{};
+    bool numericallyEquivalent() const { return bytes && maxAbsoluteError<=ToleranceLimit; }
     double percentage() const { return bytes ? 100.0*double(mismatching)/double(bytes) : 0; }
     double meanAbsoluteError() const { return bytes ? double(absoluteErrorSum)/double(bytes) : 0; }
 };
@@ -35,6 +39,10 @@ inline Differences differences(const std::vector<uint8_t>& cpu,const std::vector
         const int delta=int(gpu[i])-int(cpu[i]); const unsigned absolute=unsigned(delta<0 ? -delta : delta);
         ++d.histogram[std::clamp(delta,-4,4)+4];
         d.absoluteErrorSum+=absolute; d.maxAbsoluteError=std::max(d.maxAbsoluteError,absolute);
+        if(absolute>ToleranceLimit && d.firstOutOfTolerance<0) {
+            d.firstOutOfTolerance=int64_t(i);
+            d.toleranceFailure={i,uint32_t(i%width),uint32_t(i/width),cpu[i],gpu[i],delta};
+        }
         if (!delta) { ++d.matching; ++equalRun; differentRun=0; d.longestMatching=std::max(d.longestMatching,equalRun); continue; }
         ++d.mismatching; ++differentRun; equalRun=0; d.longestMismatching=std::max(d.longestMismatching,differentRun);
         const uint32_t x=uint32_t(i%width),y=uint32_t(i/width);
@@ -55,6 +63,9 @@ inline std::string differenceJson(const Differences& d) {
     s<<"{\"byte_count\":"<<d.bytes<<",\"matching_bytes\":"<<d.matching<<",\"mismatching_bytes\":"<<d.mismatching
      <<",\"mismatch_percentage\":"<<d.percentage()<<",\"cpu_min\":"<<unsigned(d.cpuMin)<<",\"cpu_max\":"<<unsigned(d.cpuMax)
      <<",\"gpu_min\":"<<unsigned(d.gpuMin)<<",\"gpu_max\":"<<unsigned(d.gpuMax)<<",\"max_absolute_error\":"<<d.maxAbsoluteError
+     <<",\"stage3_tolerance\":"<<ToleranceLimit<<",\"numerically_equivalent\":"<<(d.numericallyEquivalent() ? "true" : "false")
+     <<",\"first_out_of_tolerance_offset\":"<<d.firstOutOfTolerance
+     <<",\"out_of_tolerance_cpu_value\":"<<unsigned(d.toleranceFailure.cpu)<<",\"out_of_tolerance_gpu_value\":"<<unsigned(d.toleranceFailure.gpu)
      <<",\"mean_absolute_error\":"<<d.meanAbsoluteError()<<",\"signed_difference\":\"GPU_MINUS_CPU\",\"signed_difference_histogram\":{";
     const char* labels[]={"<=-4","-3","-2","-1","0","+1","+2","+3",">=+4"};
     for (unsigned i=0;i<9;++i) { if(i) s<<','; s<<'\"'<<labels[i]<<"\":"<<d.histogram[i]; }

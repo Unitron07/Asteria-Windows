@@ -1,0 +1,19 @@
+--- a/pyrowave_c.cpp
++++ b/pyrowave_c.cpp
+@@ -223,10 +223,16 @@
+ 	dev->context.set_device_factory(&device);
+ 
+ 	if (!dev->context.init_instance(nullptr, 0))
++	{
++		delete dev;
+ 		return PYROWAVE_ERROR_NO_VULKAN;
++	}
+ 
+ 	if (!dev->context.init_device(info->physical_device, VK_NULL_HANDLE, nullptr, 0))
++	{
++		delete dev;
+ 		return PYROWAVE_ERROR_NO_VULKAN;
++	}
+ 
+ 	ContextOptions context_opts = {};
+ 	context_opts.memory_priorities = false;

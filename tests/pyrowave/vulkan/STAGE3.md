@@ -1,6 +1,6 @@
 # Stage 3: offline shared-device decode
 
-**OFFLINE ONLY. Initial Surface qualification FAILED; diagnostic rerun pending.** This opt-in executable
+**OFFLINE ONLY. Final Surface qualification under the approved numeric contract is pending.** This opt-in executable
 tests direct decode into caller-owned images. It adds no production renderer,
 Session integration, live streaming, YUV-to-RGB shader, video swapchain, overlays,
 HDR, frame pacing, or Stage 4/5 work. Existing interop and CPU fallbacks stay intact.
@@ -14,7 +14,7 @@ flowchart LR
   D --> E[Test-only Vulkan copy to staging]
   E --> F[Consumer-complete timeline]
   F --> B
-  E --> G[Exact comparison with separate CPU reference decode]
+  E --> G[Bounded numerical comparison with separate CPU reference decode]
 ```
 
 ## Architecture checkpoint
@@ -39,9 +39,8 @@ See the [reviewed header](https://github.com/haasn/libplacebo/blob/92b5ac6db79f4
 Codec: `186f0393b77f7755953b5ecde994bb1cec2e4155`; bitstream `186f0393`;
 C API `0.6.0`; Granite: `b6cffd5ce81f540f0855e6778428483e14763d9b`.
 The approved build lock, decoder short-block safety patch and architecture-specific
-Granite portability patch are retained. **`runtime_patch=NONE` means no additional
-Stage 3 patch**, not an assertion that the approved runtime was built without its
-existing recorded patches. No Nonary shared-device/frame-context APIs are used.
+Granite portability patch are retained. The new same-pin borrowed-factory cleanup
+patch is recorded separately below, with its source and binary provenance. No Nonary shared-device/frame-context APIs are used.
 
 Implemented negotiation uses **Vulkan 1.2 plus `VK_KHR_synchronization2` and
 `VK_EXT_subgroup_size_control`**, with the feature bits below. This is a tested
@@ -125,10 +124,14 @@ the exact approved runtime. The same encoded packets are serialized into compati
 and record framing; sequence range metadata supplies full/limited fixtures as in
 existing tests. Three decoder lifetimes and six repetitions per case exercise all
 three slots: **144 valid GPU frames**, each preceded by malformed truncation
-rejection and valid recovery. Each Y/U/V byte must equal synchronous CPU decode
-of that same encoded frame. Per-plane SHA256 values are logged. The older <=8 MAE
-contract compares lossy decoded output to encoder input; it does not justify a
-tolerance between two decodes of the same frame. Unexpected differences fail.
+rejection and valid recovery, in EACH of AUTO and FORCE_COMPUTE. Every Y/U/V
+byte must satisfy `abs(GPU - CPU) <= 1` against synchronous CPU decode of the
+same encoded frame. A single difference of 2 fails; mismatch percentage has no
+acceptance threshold. Exact hashes/equality remain diagnostic fields. Six reuse
+decodes also require identical GPU hashes across the three slots. Out-of-bound
+failures record frame, pattern, framing, range, plane, offset and CPU/GPU values,
+including a first-out-of-tolerance sample independently of the first 32 mismatches.
+This bound is separate from the older encoder-input-versus-lossy-output MAE test.
 
 GPU-free policy/API mocks cover requirements, path usage, plane bounds, bounded
 slots, positive payloads/overflow, callback balance/nonrecursion, missing shared
@@ -138,36 +141,38 @@ Real fault runs cover borrowed initialization, partial images, successful decode
 multiple slot reuses, and parser rejection. Codec API error injection is confined
 to mocks because no safe real-device-loss injection is assumed.
 
-## Confirmed factory cleanup issue — production promotion blocked
+## Same-pin borrowed-factory cleanup safety patch
 
-At the exact codec pin, `pyrowave_c.cpp:221` allocates `pyrowave_device_opaque`.
-The `init_instance` failure at lines **225–226** and `init_device` failure at
-**228–229** return `PYROWAVE_ERROR_NO_VULKAN` without deleting it or returning a
-handle that the public caller can destroy. The early loader failure at lines
-167–168 occurs before allocation and is distinct.
+The independently confirmed leak at pinned `pyrowave_c.cpp:221–229` is now fixed
+by [0004-borrowed-factory-cleanup.patch](../../../scripts/pyrowave/patches/0004-borrowed-factory-cleanup.patch).
+The only changes are `delete dev` before the two `PYROWAVE_ERROR_NO_VULKAN`
+returns from `init_instance` / `init_device` failure. Loader failure still occurs
+before allocation; successful construction, API, ownership, codec pin and bitstream
+are unchanged. Patch SHA256:
+`8fe5906706bb27814ed7344f8932cd5ccf00c368ed24d253839d13cfeeb78c86`.
 
-Local x64 public-binary fault injection used the approved runtime SHA256
-`62f5b8245cbf5c902222687b1aca2eeb1250cac8928d50baff4db5bcc69027d8`.
-A real caller Vulkan 1.0 instance with its matching create-info triggers Granite's
-documented minimum-instance rejection before device fields are inspected.
-Every call returned -5 with a null wrapper. Four batches of 100 calls increased
-private memory by 2,936,832; 2,985,984; 2,990,080; and 2,990,080 bytes.
-This corroborates the source's unreachable allocation; private-memory growth is
-not an exact allocator inventory. The device-init branch is source-confirmed but
-its GPU/device-side allocation consequence has not been measured through this
-public binary. Normal successful initialization/teardown must be tested separately.
+The previous real ARM64 fault diagnostic reported approximately 2.9–3.1 MB private
+growth per 100 failed calls. That is historical supporting evidence, not an exact
+allocator inventory. New builds compile the ACTUAL patched factory and destroy
+function bodies extracted from pinned source, with instrumented Context/Device
+substitutes. Each of 10,000 loader, instance and device failure calls verifies the
+unchanged public error and null output; all allocated wrappers are destroyed.
+Another 10,000 successful create/destroy calls verify callbacks and balanced
+ownership: 30,000 allocations, 30,000 destructions, zero live wrappers.
+The test does not simulate the entire Vulkan driver or Granite implementation.
+Granite's [borrowed factory ownership flags](https://github.com/Themaister/Granite/blob/b6cffd5ce81f540f0855e6778428483e14763d9b/vulkan/context.cpp#L161)
+preserve caller handles during context cleanup. Successful native hardware decode
+and teardown remain required separately.
 
-The smallest proposed same-pin fix is delete-before-return (or local RAII released
-only on success) in those two branches. **No fix is applied.** Such a fix would
-require owner approval, a separately recorded source patch and SHA256, patched-file
-hashes/diff, rebuilds for x64/ARM64, and new runtime SHA256 metadata/artifacts; its
-binary provenance would differ even if codec commit/API/bitstream stayed constant.
-
-The offline proof bounds this failure by exiting the test process, without
-retrying factory failure. `--factory-fault` reproduces repeated early failures
-only in a separate diagnostic process. This does not qualify leak freedom or
-safe production failure/retry handling. **Production promotion is blocked pending
-owner decision; offline successful-path evidence may still be valid.**
+Every architecture runtime build must pass this test before staging. The package
+contains its executable, `factory-ownership.json`, patch and runtime manifest,
+recording patch SHA, patched/extracted source hashes, test binary hash and runtime
+SHA. The owner runner verifies that evidence and reruns the deterministic test.
+It then requires 400 public factory-fault calls to return -5/null on the real loader.
+Private-memory movement remains supporting data; exact equality is not a gate.
+`factoryCleanup=PATCHED_AND_VERIFIED` requires BOTH the deterministic source test
+and successful public fault diagnostic. Production promotion and Stage 4 remain
+unauthorized; removing this leak does not authorize either.
 
 ## Owner procedure
 
@@ -177,7 +182,7 @@ or PowerShell 7:
 
 ```powershell
 .\pyrowave-vulkan-shared-device-policy-tests.exe
-powershell -NoProfile -ExecutionPolicy Bypass -File .\run-stage3-owner-tests.ps1 -Surface
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run-stage3-owner-tests.ps1 -Surface -DiagnosticDeviceIdle
 ```
 
 The runner resolves its own directory after parameter binding and works from an
@@ -187,12 +192,13 @@ unrelated CWD. Surface asserts the executable/package is ARM64 and asserts X1-85
 runs the targeted diagnostic automatically on Surface, and writes
 `stage3-evidence/owner-result.json` plus mode, repeat and comparison JSON/logs.
 Return that directory, including bounded `.bin` plane dumps, for review.
-The broader decode/fault suite runs only if both targeted paths match exactly.
-The independent factory diagnostic still runs after a completed mismatch diagnosis.
+The broader AUTO and forced-compute 144-frame suites run only if both targeted
+paths satisfy the numerical and stability gates. The factory diagnostic also runs
+after a completed failure diagnosis. All evidence is required for final PASS.
 
 `overall=API_PASS` means offline API/correctness success only. `SKIP` (exit 77)
 means no suitable real GPU/loader; it is never a pass. Missing runtime/API exports,
-handle mismatch, codec error, comparison difference, or validation ERROR fails.
+handle mismatch, codec error, out-of-tolerance comparison, unstable hashes, idle-changed output, or validation ERROR fails.
 Validation and synchronization validation enable when available; absent layers
 remain SKIP and do not require installing the SDK. Review all validation warnings.
 Neither offline timings nor API-return duration establish performance or latency.
@@ -205,7 +211,7 @@ under both PowerShell versions from unrelated directories with spaces, and runs
 the actual package procedure with PASS or explicit SKIP. Baseline (upstream and
 Asteria x64/ARM64), existing PyroWave and Stage 2 workflows run on the same head.
 CI links and any real hardware result must refer to that final head. Surface
-qualification remains **FAILED / PENDING DIAGNOSIS** after the initial run below.
+qualification remains **PENDING FINAL OWNER RUN**; earlier exact failures are historical.
 
 ## Initial Surface owner failure (reported by owner)
 
@@ -224,7 +230,7 @@ GPU SHA256:
 Result **FAIL**, validation **SKIP**. Hash inequality alone does not establish
 error magnitude, spatial distribution, repeatability, or the root cause.
 Raw owner plane bytes were not supplied with this continuation request.
-The independent confirmed factory cleanup leak still blocks production promotion.
+The independent factory leak was confirmed at that revision; the new safety patch is separate from the numerical policy.
 
 The same revision's RTX 4070 Ti x64 compute result remains historical evidence:
 144 valid frames, 432 exact plane comparisons, three slots, three decoder
@@ -236,7 +242,7 @@ handles. It does not qualify the failing X1-85 fragment output.
 `--force-compute` uses the existing pinned `fragment_path=false` create-info
 field; AUTO still follows `pyrowave_decoder_device_prefers_fragment_path`.
 The recommendation is logged independently of the actual path. No vendor table,
-CPU candidate output, default candidate device, runtime patch or tolerance is added.
+CPU candidate output or default candidate device is added. The approved numerical gate and separate factory safety patch are explicitly recorded.
 
 Surface mode invokes `--diagnostic-suite`: both modes use the SAME Asteria
 instance/physical/device/queue and the SAME encoded fixtures generated once.
@@ -260,7 +266,7 @@ per mode dumps all three CPU/GPU planes and metadata (about 6 MiB per mode),
 never every repeated frame. CPU vs AUTO, CPU vs forced compute, and AUTO vs
 forced compute are all recorded; the latter labels its left/right outputs.
 
-Each mismatching fixture/path is decoded four more times on slot 0 without
+Every fixture/path is decoded four more times on slot 0 without
 prefill or added idle. Five hashes per plane classify `repeat_hash_stable`.
 Surface then runs a separate optional prefill experiment with 165 and 90:
 new diagnostic images add TRANSFER_DST (19/11), re-query support and synchronize
@@ -278,11 +284,62 @@ Evidence: `auto-fragment.json/log` (filename denotes AUTO, actual path is explic
 `forced-compute.json/log`, `repeatability.json/log`, `cross-comparison.json`,
 `diagnostic-summary.json`, `diagnostic-suite.json/log`, plane dumps, factory
 status, runtime provenance, and `owner-result.json`. A completed investigation
-with unequal bytes is **DIAGNOSTIC_COMPLETE**, exit 1, with a failing
-`stage3Qualification` such as `FAIL_FRAGMENT_MISMATCH`; it is never API_PASS.
-Both targeted paths must be exact before the unchanged broader suite can qualify.
-GPU-free runner fixtures explicitly test that a failing AUTO path cannot be hidden
-by a passing forced-compute path or runner completion.
+reports **DIAGNOSTIC_COMPLETE** before aggregate qualification. Targeted success
+is `TARGETED_NUMERIC_EQUIVALENCE_FULL_SUITE_PENDING`; final success after both
+full suites, all five lifetime faults and factory cleanup is
+`stage3Qualification=PASS_NUMERIC_EQUIVALENCE`. `exact_equal=false` with
+`numerically_equivalent=true`, `stage3_tolerance=1`, `max_absolute_error=1` is
+a valid PASS. Numerical failure is path-neutral `FAIL_GPU_OUTPUT_TOLERANCE`;
+non-bitexact output alone is informational. AUTO versus FORCE_COMPUTE is diagnostic
+and need not be identical, or satisfy the CPU-reference bound against each other.
+The runner independently rejects a claimed successful summary with max error >1,
+invalid per-plane metrics, unstable repeats, changed idle output, device/fixture/
+ownership/path/timeline violations or a failed child process. PS5.1/7 fixtures
+exercise bounded non-bitexact PASS plus these failures, with default/custom roots.
+
+`owner-result.json` exposes architecture/GPU/source/runtime hash and provenance,
+actual paths, identity/zero external resources, each mode's exact and numerical
+verdicts/max errors, repeat stability, idle-change status, factory cleanup,
+validation and final qualification at top level. Validation unavailable stays SKIP.
+Return the entire fresh evidence directory. PR #36 stays draft/unmerged until the
+owner supplies and reviews a new native Surface run of this exact package.
+
+## Owner-reported dual-path evidence and approved portable contract
+
+The owner ran diagnostic head `f08ecabb74e4e8f3270c4f00fa77634fb24f6ad6` on
+Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 / native ARM64.
+AUTO selected fragment; forced compute used compute on the SAME Asteria caller
+device and encoded fixtures. Both were non-bitexact against CPU, and non-bitexact
+against each other. Repeat hashes were stable; diagnostic device idle did not
+change bytes; native caller-owned R8 outputs and positive timeline readback worked,
+with no external memory/semaphore handles, external path or D3D11 resources.
+Validation was SKIP. These are owner-reported measurements; raw new files were
+not supplied with the request.
+
+| Fixture / Y plane | AUTO fragment differing bytes | Forced compute differing bytes | Max error |
+|---|---:|---:|---:|
+| Gradient compatibility/full (2,073,600 bytes) | 101,723 (~4.9056%) | 110,473 (~5.3276%) | 1 |
+| Flat low (16 → 17) | 4,020 (~0.1939%) | 308,045 (~14.8556%) | 1 |
+
+Gradient U/V were exact; differing bars planes also showed only ±1. Thus the
+earlier `FAIL_FRAGMENT_MISMATCH` diagnosis was misleading: differences occur
+in both legitimate paths. Current evidence supports deterministic bounded
+numerical reconstruction variants, consistent with pinned upstream validation.
+It does not prove a Qualcomm instruction, mediump implementation, rounding rule
+or conversion rule as the precise cause, or indicate corruption/synchronization
+failure without additional evidence.
+
+Independently inspected at exact pin:
+[device validation lines 153–168](https://github.com/Themaister/pyrowave/blob/186f0393b77f7755953b5ecde994bb1cec2e4155/pyrowave_device_validation.cpp#L153)
+accepts maximum 1 luma code value and 2 for chroma in roundtrip validation;
+[Vulkan interop validate_mirror_buffer lines 446–456](https://github.com/Themaister/pyrowave/blob/186f0393b77f7755953b5ecde994bb1cec2e4155/pyrowave_c_interop_test.cpp#L446)
+requires `abs(reference - decoded) <= 1`. This upstream tolerance model, plus
+the owner's explicit authorization, supports distinguishing portable numerical
+equivalence from exact identity. Asteria deliberately chooses the conservative
+**±1 for EVERY Y/U/V byte**. There is no mismatch-percentage relaxation: even
+15% differing by exactly one passes; one byte differing by two fails. Device,
+ownership, lifetime, synchronization, determinism, recovery and validation gates
+remain hard requirements.
 
 ## Readback re-audit
 
@@ -320,7 +377,7 @@ uses the specification's float-to-normalized conversion. The
 clamps to [0,1], scales by 255 for eight bits, and permits either of the two closest
 integer values; nearest rounding is recommended. It does not mandate a particular
 half-LSB tie break. This permits numerical differences; it does not prove the
-reported Surface mismatch is rounding, nor justify any acceptance tolerance.
+reported Surface mismatch is rounding, and is not the basis of the approved acceptance bound by itself.
 
 The [decoder render passes](https://github.com/Themaister/pyrowave/blob/186f0393b77f7755953b5ecde994bb1cec2e4155/pyrowave_decoder.cpp#L441)
 store enabled attachments, bind caller views at final output, use opaque sprite
@@ -331,5 +388,4 @@ select DONT_CARE load and STORE when the store mask is set. The Stage 3 view
 and image formats are both R8_UNORM with identity swizzle. No decoder dithering
 flag or shader noise was found in this audited path. Viewport/scissor/fixup
 correctness on X1-85 is not proven by source reading; the spatial metrics and
-prefill experiment specifically probe it. Root cause remains unproven until
-the new owner evidence isolates a subsystem.
+prefill experiment specifically probe it. The precise numerical root cause remains unproven; new dual-path owner evidence supports the bounded conclusion above.
