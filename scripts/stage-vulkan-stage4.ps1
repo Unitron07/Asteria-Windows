@@ -34,13 +34,11 @@ Copy-Item -LiteralPath (Join-Path $source 'tests/pyrowave/vulkan/stage4_policy.h
 $build = Get-Content -LiteralPath (Join-Path $DependencyRoot 'evidence/build.json') -Raw | ConvertFrom-Json
 $dumpbin = Join-Path (Split-Path $build.compiler -Parent) 'dumpbin.exe'
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
-$inventory=@()
 foreach ($binary in @(Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object { $_.Extension -in @('.exe','.dll') })) {
     $pe=Assert-PyroWavePe $binary.FullName $Architecture
     $imports = & $dumpbin /dependents $binary.FullName
     if ($LASTEXITCODE) { throw "Cannot inspect imports: $($binary.Name)" }
     if ($imports -match '(?i)vulkan-1\.dll|libpyrowave-shared|pyrowave-shared|glslang|shaderc|dxcompiler') { throw "Forbidden startup import: $($binary.Name)" }
-    $inventory+=@{file=$binary.FullName.Substring($stage.Length+1);pe=$pe;imports=$imports}
     foreach ($line in $imports) {
         $name = $line.Trim()
         if ($name -notmatch '^(msvcp|vcruntime|concrt)[a-z0-9_]+\.dll$') { continue }
@@ -49,6 +47,15 @@ foreach ($binary in @(Get-ChildItem -LiteralPath $stage -Recurse -File | Where-O
         Assert-PyroWavePe $crt[-1] $Architecture | Out-Null
         Copy-Item -LiteralPath $crt[-1] -Destination (Join-Path $binary.DirectoryName $name) -Force
     }
+}
+# Inventory the final package, including CRT DLLs added during dependency closure.
+$inventory=@()
+foreach ($binary in Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object { $_.Extension -in @('.exe','.dll') }) {
+    $pe=Assert-PyroWavePe $binary.FullName $Architecture
+    $imports = & $dumpbin /dependents $binary.FullName
+    if ($LASTEXITCODE) { throw "Cannot inspect final imports: $($binary.Name)" }
+    if ($imports -match '(?i)vulkan-1\.dll|libpyrowave-shared|pyrowave-shared|glslang|shaderc|dxcompiler') { throw "Forbidden startup import: $($binary.Name)" }
+    $inventory+=@{file=$binary.FullName.Substring($stage.Length+1);pe=$pe;imports=$imports}
 }
 $inventory | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $stage 'pe-inventory.json') -Encoding utf8
 $revision = & git -C $source rev-parse HEAD
