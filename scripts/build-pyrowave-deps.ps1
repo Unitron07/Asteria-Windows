@@ -99,7 +99,7 @@ foreach ($arch in $Architecture) {
             Invoke-Native git @('-C',$source,'apply','--check',$patch)
             if ($entry.apply) { Invoke-Native git @('-C',$source,'apply',$patch) }
             $codecPatches += [pscustomobject]@{file=$entry.file; sha256=$sha;
-                applied=$entry.apply; purpose=$entry.purpose; provenance=$lock.patchSource}
+                applied=$entry.apply; purpose=$entry.purpose; provenance=$(if ($entry.provenance) { $entry.provenance } else { $lock.patchSource })}
         }
         $codecPatches | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $evidence 'codec-patches.json') -Encoding utf8
         Get-Git $source @('diff','--binary') | Set-Content (Join-Path $evidence 'codec-patch.diff')
@@ -161,6 +161,21 @@ foreach ($arch in $Architecture) {
             harnessCommit=(Get-Git (Split-Path $PSScriptRoot -Parent) @('rev-parse','HEAD'));
             workflowRun=$env:GITHUB_RUN_ID} | ConvertTo-Json -Depth 4 |
             Set-Content (Join-Path $evidence 'build.json') -Encoding utf8
+        $phase = 'deterministic factory ownership test'
+        $factoryBuild = Join-Path $root 'factory-tests'
+        $factoryTests = Join-Path (Split-Path $PSScriptRoot -Parent) 'tests/pyrowave/factory'
+        Invoke-Native $cmakePath @('-S',$factoryTests,'-B',$factoryBuild,'-G',$Generator,'-A',$target,
+            "-DPYROWAVE_SOURCE=$source","-DVULKAN_HEADERS=$granite/third_party/khronos/vulkan-headers/include")
+        Invoke-Native $cmakePath @('--build',$factoryBuild,'--config','Release','--parallel','2')
+        Invoke-Native $cmakePath @('--build',$factoryBuild,'--config','Release','--target','RUN_TESTS')
+        $factoryExe = Join-Path $factoryBuild 'Release/pyrowave-factory-cleanup-tests.exe'
+        $factoryProof = @{result='PASSED';codecCommit=$lock.pyrowave.commit;
+            patchedFactorySourceSha256=(Get-FileHash -LiteralPath (Join-Path $source 'pyrowave_c.cpp')).Hash.ToLowerInvariant();
+            extractedFactorySha256=([IO.File]::ReadAllText((Join-Path $factoryBuild 'extracted-source.sha256'))).Trim();
+            testBinarySha256=(Get-FileHash -LiteralPath $factoryExe).Hash.ToLowerInvariant();
+            failuresPerBranch=10000;successfulCreateDestroy=10000;allocations=30000;destructions=30000;liveWrappers=0;
+            limitation='Real patched function bodies with instrumented Context/Device substitutes; public Vulkan failure stress and successful hardware decode are separate evidence'}
+        $factoryProof | ConvertTo-Json | Set-Content (Join-Path $evidence 'factory-ownership.json') -Encoding utf8
         $phase = 'compile/link'
         Invoke-Native $cmakePath @('--build',$build,'--config','Release','--target','pyrowave-shared','--parallel','2')
         $phase = 'stage/inventory'
@@ -183,11 +198,17 @@ foreach ($arch in $Architecture) {
         }
         Copy-Item (Join-Path $PSScriptRoot 'pyrowave/dependencies.json') (Join-Path $install 'source-notices')
         Copy-Item (Join-Path $PSScriptRoot 'pyrowave/patches') (Join-Path $install 'source-notices/patches') -Recurse
+        Copy-Item -LiteralPath $factoryExe -Destination (Join-Path $install 'bin')
+        Copy-Item -LiteralPath (Join-Path $evidence 'factory-ownership.json') -Destination (Join-Path $install 'bin')
         $runtime = Join-Path $install 'bin/libpyrowave-shared-0.dll'
         @{codecCommit=$lock.pyrowave.commit; bitstreamId=$lock.bitstreamId;
           apiVersion=$lock.apiVersion; architecture=$arch;
+          factoryCleanupPatch='0004-borrowed-factory-cleanup.patch';factoryCleanupPatchSha256='8fe5906706bb27814ed7344f8932cd5ccf00c368ed24d253839d13cfeeb78c86';
+          factoryCleanupSourceTest='PASSED';factoryOwnershipSha256=(Get-FileHash -LiteralPath (Join-Path $evidence 'factory-ownership.json')).Hash.ToLowerInvariant();
+          codecPatchManifestSha256=(Get-FileHash -LiteralPath (Join-Path $evidence 'codec-patches.json')).Hash.ToLowerInvariant();graniteCommit=$lock.granite.commit;
+          graniteArm64PatchSha256=$patchHash;
           sha256=(Get-FileHash -LiteralPath $runtime -Algorithm SHA256).Hash.ToLowerInvariant()} |
-            ConvertTo-Json | Set-Content (Join-Path $install 'bin/pyrowave-runtime.json') -Encoding utf8
+            ConvertTo-Json -Depth 8 | Set-Content (Join-Path $install 'bin/pyrowave-runtime.json') -Encoding utf8
         Assert-PyroWavePe $runtime $arch | ConvertTo-Json | Set-Content (Join-Path $evidence 'runtime-pe.json')
         foreach ($kind in @('headers','imports','dependents','exports')) {
             & $dumpbin "/$kind" $runtime | Set-Content (Join-Path $evidence "runtime-$kind.txt")

@@ -203,6 +203,41 @@ bool Runtime::decodeImpl(const std::vector<std::uint8_t>& container, Pixels& out
     output=std::move(pixels);
     return true;
 }
+#ifdef PYROWAVE_VULKAN_SHARED_DEVICE
+bool Runtime::borrowDevice(const pyrowave_device_create_info& info) {
+    if (!m_Module || m_Device || m_Decoder) return fail("borrow requires a loaded runtime without a device");
+    if (!info.GetInstanceProcAddr || !info.instance || !info.physical_device || !info.device ||
+        !info.instance_create_info || !info.device_create_info || !info.queue_info_count ||
+        !info.queue_info || !info.queue_lock_callback || !info.queue_unlock_callback)
+        return fail("incomplete shared-device contract");
+    auto create = reinterpret_cast<decltype(&pyrowave_create_device)>(symbol("pyrowave_create_device"));
+    auto queueType = reinterpret_cast<decltype(&pyrowave_device_set_queue_type)>(symbol("pyrowave_device_set_queue_type"));
+    if (!create || !queueType || !m_Api.decodeGpu) return fail("missing shared-device export; no fallback");
+    // Only System32, including any indirect volk loads in the pinned binary.
+    if (!m_Vulkan) m_Vulkan = LoadLibraryExW(L"vulkan-1.dll",nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (!m_Vulkan) return fail("native system Vulkan loader unavailable");
+    if (!check(create(&info,&m_Device),"borrowed device creation")) return false;
+    if (!m_Device) return fail("borrowed factory returned null");
+    VkInstance instance{}; VkPhysicalDevice physical{}; VkDevice device{};
+    m_Api.deviceHandles(m_Device,&instance,&physical,&device);
+    if (instance != info.instance || physical != info.physical_device || device != info.device) {
+        m_Api.destroyDevice(m_Device); m_Device = nullptr;
+        return fail("borrowed Vulkan handle mismatch; no fallback");
+    }
+    return check(queueType(m_Device,VK_QUEUE_GRAPHICS_BIT),"borrowed graphics queue mode");
+}
+bool Runtime::decodeNative(const std::vector<std::uint8_t>& container,
+                          const pyrowave_gpu_buffers& buffers,
+                          const pyrowave_gpu_sync_operation& acquire,
+                          const pyrowave_gpu_sync_operation& release) {
+    if (acquire.num_images || release.num_images || acquire.images || release.images ||
+        !release.sync.semaphore || !release.sync.value ||
+        (acquire.sync.semaphore && !acquire.sync.value))
+        return fail("native decode requires positive timelines and zero external image references");
+    Pixels unused; // decodeImpl's GPU branch allocates no CPU planes or calls CPU output.
+    return decodeImpl(container,unused,false,nullptr,nullptr,&buffers,&acquire,&release);
+}
+#endif
 bool Runtime::generateProofFrame(std::vector<std::uint8_t>& container, Framing framing) {
     container.clear();
     try {

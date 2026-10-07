@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   # Allows both-target validation before opening the focused presentation PR.
   push:
-    branches: ['codex/m1b-p0-5-*', 'codex/m1b-p1a-*']
+    branches: ['codex/m1b-p0-5-*', 'codex/m1b-p1a-*', 'codex/m1b-vulkan-stage3-*']
   pull_request:
     branches: [main]
     paths:

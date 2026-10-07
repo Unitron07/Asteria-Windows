@@ -45,6 +45,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL Probe::validation(VkDebugUtilsMessageSeverityFlag
         VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT* data, void* user) {
     auto* self = static_cast<Probe*>(user);
     if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) ++self->validationErrors;
+    else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) ++self->validationWarnings;
     self->log(std::string("VALIDATION ") + (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ? "ERROR " : "WARNING ") + data->pMessage);
     return VK_FALSE;
 }
@@ -55,9 +56,15 @@ void Probe::initialize() {
     // Synthetic drawing uses Vulkan 1.0. 1.1 enables core identity queries when
     // available; neither 1.2 nor 1.3 is required. Codec minimum is Stage 3 work.
     application.apiVersion = !options.api10 && loaderVersion >= VK_API_VERSION_1_1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0;
+    if (options.deviceOnly) {
+        if (loaderVersion < options.minimumApi) throw std::runtime_error("no suitable Stage 3 loader API");
+        application.apiVersion = options.minimumApi;
+    }
     application.pApplicationName = "Asteria isolated Stage 2 Vulkan probe";
+    if (options.deviceOnly) application.pApplicationName = "Asteria offline Stage 3 shared-device proof";
     application.applicationVersion = 1;
-    log("loader_api=" + version(loaderVersion) + " requested_instance_api=" + version(application.apiVersion) + " synthetic_core_min=1.0");
+    log("loader_api=" + version(loaderVersion) + " requested_instance_api=" + version(application.apiVersion) +
+        (options.deviceOnly ? " offline_core_policy=1.2_plus_extensions" : " synthetic_core_min=1.0"));
     uint32_t count = 0;
     check(vk.EnumerateInstanceExtensionProperties(nullptr, &count, nullptr), "instance extension count");
     std::vector<VkExtensionProperties> available(count);
@@ -130,11 +137,14 @@ void Probe::initialize() {
     deviceInfo.pEnabledFeatures = &features; // All zero: no synthetic feature requirements.
     deviceInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
     deviceInfo.ppEnabledExtensionNames = deviceExtensions.data();
+    if (options.configure) options.configure(deviceInfo);
     check(vk.CreateDevice(physical, &deviceInfo, nullptr, &device), "vkCreateDevice");
-    vk.device(device);
+    vk.device(device, !options.deviceOnly);
     vk.GetDeviceQueue(device, family, 0, &queue);
-    log("device_extension=VK_KHR_swapchain features=none queue_family=" + std::to_string(family) + " queue_index=0");
+    log(std::string(options.deviceOnly ? "offline_device=YES" : "device_extension=VK_KHR_swapchain features=none")+
+        " queue_family=" + std::to_string(family) + " queue_index=0");
     checkpoint("device");
+    if (options.deviceOnly) return;
     VkCommandPoolCreateInfo pool{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
     pool.queueFamilyIndex = family;
     pool.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -169,6 +179,8 @@ void Probe::selectDevice() {
             " vendor_id=" + std::to_string(properties.vendorID) + " device_id=" + std::to_string(properties.deviceID) +
             " driver_version_raw=" + std::to_string(properties.driverVersion));
         if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU) continue;
+        if (properties.apiVersion < options.minimumApi) continue;
+        if (options.suitable && !options.suitable(candidate)) continue;
         check(vk.EnumerateDeviceExtensionProperties(candidate, nullptr, &count, nullptr), "device extension count");
         std::vector<VkExtensionProperties> extensions(count);
         check(vk.EnumerateDeviceExtensionProperties(candidate, nullptr, &count, extensions.data()), "device extensions");
@@ -208,7 +220,7 @@ void Probe::selectDevice() {
             if (driverAvailable) log("driver_id=" + std::to_string(driver.driverID) + " driver_name=" + driver.driverName + " driver_info=" + driver.driverInfo);
             else log("driver_properties=SKIP unavailable");
         } else log("extended_identity=SKIP properties2 unavailable");
-        log("external_handles=NONE pyrowave_runtime=NOT_LOADED");
+        if (!options.deviceOnly) log("external_handles=NONE pyrowave_runtime=NOT_LOADED");
         return;
     }
     throw std::runtime_error("no non-software physical device with swapchain and graphics+compute+present queue");

@@ -9,12 +9,20 @@ historical-bundle fallback. Builds own separate x64/ARM64 sources and outputs.
 
 Verbatim Vibepollo patches are retained under `patches/` with immutable origin,
 SHA-256 and application decisions in the lock. Every patch is hash-checked and
-checked for applicability on both targets. Only `0003-decoder-reject-short-block`
+checked for applicability on both targets. `0003-decoder-reject-short-block`
 is applied: it prevents malformed duplicate blocks from leaving the parse cursor
 unchanged. `0001` is encoder buffer-pool performance work. `0002` is encoder-only
 4:4:4 allocation safety and must be applied before future 4:4:4 fixtures. Neither
 is needed for the single-image SDR 4:2:0 proof. None changes the bitstream.
 See the [current contract](../../docs/PYROWAVE_VIBEPOLLO.md).
+
+Asteria's separate `0004-borrowed-factory-cleanup.patch` is also applied at the
+same pin. It deletes the wrapper before instance/device initialization failure
+returns, preserving errors and successful ownership. Its own Asteria origin and
+SHA256 are recorded in the lock, separately from the Vibepollo patch origin.
+Every runtime build tests the extracted patched factory/destroy bodies with
+allocation counters; Stage 3 packages carry the proof and require a separate
+real public factory-fault diagnostic. See [Stage 3](../../tests/pyrowave/vulkan/STAGE3.md).
 
 Evidence records unmodified commit/tree/source-archive hashes, codec patch hashes,
 applied diffs, patched-file hashes, compiler/CMake/options and installed inventory.

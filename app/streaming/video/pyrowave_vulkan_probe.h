@@ -9,7 +9,16 @@
 
 namespace PyroWaveVulkan {
 using Log = std::function<void(const std::string&)>;
-struct ProbeOptions { bool vsync = true; bool validation = true; bool api10 = false; std::string failAt; std::string deviceName; };
+struct ProbeOptions {
+    bool vsync = true, validation = true, api10 = false;
+    std::string failAt, deviceName;
+    // Offline Stage 3 hooks: no swapchain or synthetic drawing resources.
+    // Callback-owned feature storage must outlive this owner and the codec wrapper.
+    bool deviceOnly = false;
+    uint32_t minimumApi = VK_API_VERSION_1_0;
+    std::function<bool(VkPhysicalDevice)> suitable;
+    std::function<void(VkDeviceCreateInfo&)> configure;
+};
 // Reusable low-level synthetic owner, deliberately not IVideoDecoder/Session.
 class Probe {
 public:
@@ -23,10 +32,18 @@ public:
     void close() noexcept;
     uint64_t presents = 0, recreations = 0;
     std::atomic<unsigned> validationErrors{0};
+    std::atomic<unsigned> validationWarnings{0};
     bool validationActive = false;
     bool cleanupOkay = true;
     bool injectedFailure = false;
     std::string selectedDevice;
+    VkInstance instanceHandle() const { return instance; }
+    VkPhysicalDevice physicalHandle() const { return physical; }
+    VkDevice deviceHandle() const { return device; }
+    VkQueue queueHandle() const { return queue; }
+    uint32_t queueFamilyIndex() const { return family; }
+    const VkInstanceCreateInfo& instanceCreateInfo() const { return instanceInfo; }
+    const VkDeviceCreateInfo& deviceCreateInfo() const { return deviceInfo; }
 private:
     SDL_Window* window;
     Dispatch& vk;

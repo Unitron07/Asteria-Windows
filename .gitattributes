@@ -1,4 +1,5 @@
 scripts/pyrowave/*.patch text eol=lf
 scripts/pyrowave/common-c-p1a.patch whitespace=-blank-at-eol
 scripts/pyrowave/patches/*.patch text eol=lf
+scripts/pyrowave/patches/0004-borrowed-factory-cleanup.patch whitespace=-blank-at-eol,-space-before-tab
 scripts/pyrowave/*.bundle -text
