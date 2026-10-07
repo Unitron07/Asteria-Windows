@@ -1,9 +1,11 @@
 # Offline Stage 4 native Vulkan presentation
 
-**Stage 4 IMPLEMENTED / OWNER QUALIFICATION PENDING.** See [STAGE4.md](STAGE4.md)
-for the raw/libplacebo checkpoint, color/sampling contract, shader verification,
-exact-head packages, owner commands and visual checklist. Production/live paths
-are unchanged. [Stage 3](STAGE3.md) remains historically qualified.
+**Stage 4 COMPLETE / PASS_OWNER_CONFIRMED.** The exact implementation head
+`7c6bf8e085ffe26fd36d7d72d7405b0ed5aa2e85` was merged through [PR #39](https://github.com/Unitron07/Asteria-Windows/pull/39)
+after Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 native ARM64
+owner qualification. See [STAGE4.md](STAGE4.md) for the final color, sampling,
+shader, lifecycle and provenance record. Production/live paths remain unchanged;
+Stage 5 live integration is the next step.
 
 # Isolated Stage 2 native Vulkan presenter probe
 
