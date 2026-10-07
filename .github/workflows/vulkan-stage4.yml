@@ -77,6 +77,7 @@ jobs:
             if ($LASTEXITCODE -eq 77) { Write-Output "SKIP real GPU fault $fault" }
             elseif ($LASTEXITCODE) { throw "Stage 4 fault cleanup failed: $fault" }
           }
+          exit 0 # Accepted SKIPs must not leave native exit 77 as the shell result.
       - name: Verify PE architecture and no mandatory codec or Vulkan loader import
         shell: pwsh
         run: |
