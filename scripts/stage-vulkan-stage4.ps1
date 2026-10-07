@@ -38,7 +38,7 @@ foreach ($binary in @(Get-ChildItem -LiteralPath $stage -Recurse -File | Where-O
     $pe=Assert-PyroWavePe $binary.FullName $Architecture
     $imports = & $dumpbin /dependents $binary.FullName
     if ($LASTEXITCODE) { throw "Cannot inspect imports: $($binary.Name)" }
-    if ($imports -match '(?i)vulkan-1\.dll|libpyrowave-shared|pyrowave-shared|glslang|shaderc|dxcompiler') { throw "Forbidden startup import: $($binary.Name)" }
+    if ($imports -match '(?i)^\s*(vulkan-1\.dll|(?:lib)?pyrowave-shared[^\s]*\.dll|(?:glslang|shaderc)[^\s]*\.dll|dxcompiler\.dll)\s*$') { throw "Forbidden startup import: $($binary.Name)" }
     foreach ($line in $imports) {
         $name = $line.Trim()
         if ($name -notmatch '^(msvcp|vcruntime|concrt)[a-z0-9_]+\.dll$') { continue }
@@ -54,7 +54,7 @@ foreach ($binary in Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Obj
     $pe=Assert-PyroWavePe $binary.FullName $Architecture
     $imports = & $dumpbin /dependents $binary.FullName
     if ($LASTEXITCODE) { throw "Cannot inspect final imports: $($binary.Name)" }
-    if ($imports -match '(?i)vulkan-1\.dll|libpyrowave-shared|pyrowave-shared|glslang|shaderc|dxcompiler') { throw "Forbidden startup import: $($binary.Name)" }
+    if ($imports -match '(?i)^\s*(vulkan-1\.dll|(?:lib)?pyrowave-shared[^\s]*\.dll|(?:glslang|shaderc)[^\s]*\.dll|dxcompiler\.dll)\s*$') { throw "Forbidden startup import: $($binary.Name)" }
     $inventory+=@{file=$binary.FullName.Substring($stage.Length+1);pe=$pe;imports=$imports}
 }
 $inventory | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $stage 'pe-inventory.json') -Encoding utf8
