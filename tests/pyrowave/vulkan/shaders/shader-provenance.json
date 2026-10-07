@@ -1,0 +1,24 @@
+{
+  "target": "Vulkan 1.0 / SPIR-V 1.0",
+  "embeddedHeaderSha256": "de2330180f0b96b3889a28d6be789e2fe95843c68b2f62d67b9c647e57a489ff",
+  "compilerArchiveSha256": "e4bffacd4a75e1e150c0cf19d5020cfa6893386a1e6dd14ef6426789859eab88",
+  "compilerSha256": "7ef72a2fa46fcaa0a6b0daf621874c9f3b81215c43cdcd4cec4409888a82ff7e",
+  "compilerVersion": "Glslang Version: 8.13.3559\nESSL Version: OpenGL ES GLSL 3.20 glslang Khronos. 13.3559\nGLSL Version: 4.60 glslang Khronos. 13.3559\nSPIR-V Version 0x00010400, Revision 1\nGLSL.std.450 Version 100, Revision 1\nKhronos Tool ID 8\nSPIR-V Generator Version 8\nGL_KHR_vulkan_glsl version 100\nARB_GL_gl_spirv version 100",
+  "compilerArchiveUrl": "https://github.com/KhronosGroup/glslang/releases/download/8.13.3559/glslang-master-windows-x64-Release.zip",
+  "files": [
+    {
+      "spirvSha256": "a6540f8ab04a481e9ba95a73bc2f965e6ab2d3c3908c58a3d26bb5f096595c70",
+      "source": "video.vert",
+      "sourceSha256": "829b14b24a11492d9cba6b3db525c6eaf33322a83131c9c17c912d208a8f5fd4",
+      "arguments": "-V --target-env vulkan1.0",
+      "spirv": "video.vert.spv"
+    },
+    {
+      "spirvSha256": "30a06c0f5642161cb7f75ce3b432160aff3c7ea9d1fe5ca2e35f2ab60a55ef38",
+      "source": "video.frag",
+      "sourceSha256": "be4fb67dd5ff29222a00e99880c4e8cc3f29a19f3b4e6eb1847aeadc1623137a",
+      "arguments": "-V --target-env vulkan1.0",
+      "spirv": "video.frag.spv"
+    }
+  ]
+}

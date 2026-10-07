@@ -4,6 +4,9 @@
 #include <cstring>
 #include <iomanip>
 #include <sstream>
+#ifdef PYROWAVE_VULKAN_STAGE4
+#include <chrono>
+#endif
 
 namespace PyroWaveVulkan {
 namespace {
@@ -56,12 +59,15 @@ void Probe::initialize() {
     // Synthetic drawing uses Vulkan 1.0. 1.1 enables core identity queries when
     // available; neither 1.2 nor 1.3 is required. Codec minimum is Stage 3 work.
     application.apiVersion = !options.api10 && loaderVersion >= VK_API_VERSION_1_1 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0;
-    if (options.deviceOnly) {
+    if (options.deviceOnly || options.minimumApi > VK_API_VERSION_1_1) {
         if (loaderVersion < options.minimumApi) throw std::runtime_error("no suitable Stage 3 loader API");
         application.apiVersion = options.minimumApi;
     }
     application.pApplicationName = "Asteria isolated Stage 2 Vulkan probe";
     if (options.deviceOnly) application.pApplicationName = "Asteria offline Stage 3 shared-device proof";
+#ifdef PYROWAVE_VULKAN_STAGE4
+    if (options.video) application.pApplicationName = "Asteria offline Stage 4 native video proof";
+#endif
     application.applicationVersion = 1;
     log("loader_api=" + version(loaderVersion) + " requested_instance_api=" + version(application.apiVersion) +
         (options.deviceOnly ? " offline_core_policy=1.2_plus_extensions" : " synthetic_core_min=1.0"));
@@ -141,7 +147,7 @@ void Probe::initialize() {
     check(vk.CreateDevice(physical, &deviceInfo, nullptr, &device), "vkCreateDevice");
     vk.device(device, !options.deviceOnly);
     vk.GetDeviceQueue(device, family, 0, &queue);
-    log(std::string(options.deviceOnly ? "offline_device=YES" : "device_extension=VK_KHR_swapchain features=none")+
+    log(std::string(options.deviceOnly ? "offline_device=YES" : (options.configure ? "offline_device=YES device_extension=VK_KHR_swapchain" : "device_extension=VK_KHR_swapchain features=none"))+
         " queue_family=" + std::to_string(family) + " queue_index=0");
     checkpoint("device");
     if (options.deviceOnly) return;
@@ -220,7 +226,7 @@ void Probe::selectDevice() {
             if (driverAvailable) log("driver_id=" + std::to_string(driver.driverID) + " driver_name=" + driver.driverName + " driver_info=" + driver.driverInfo);
             else log("driver_properties=SKIP unavailable");
         } else log("extended_identity=SKIP properties2 unavailable");
-        if (!options.deviceOnly) log("external_handles=NONE pyrowave_runtime=NOT_LOADED");
+        if (!options.deviceOnly && !options.configure) log("external_handles=NONE pyrowave_runtime=NOT_LOADED");
         return;
     }
     throw std::runtime_error("no non-software physical device with swapchain and graphics+compute+present queue");
@@ -262,6 +268,7 @@ bool Probe::recreate() {
         for (auto f : formats) if ((f.format == preferred || f.format == VK_FORMAT_UNDEFINED) && f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR && format.format == VK_FORMAT_UNDEFINED)
             format = {preferred, f.colorSpace};
     if (format.format == VK_FORMAT_UNDEFINED) throw std::runtime_error("no SDR UNORM surface format");
+    swapchainFormat = format.format;
     check(vk.GetPhysicalDeviceSurfacePresentModesKHR(physical, surface, &count, nullptr), "mode count");
     std::vector<VkPresentModeKHR> modes(count);
     check(vk.GetPhysicalDeviceSurfacePresentModesKHR(physical, surface, &count, modes.data()), "present modes");
@@ -350,10 +357,24 @@ void Probe::record(VkCommandBuffer command, uint32_t index) {
     VkClearValue background{};
     background.color.float32[0] = background.color.float32[1] = background.color.float32[2] = 0.15f;
     background.color.float32[3] = 1.0f;
+#ifdef PYROWAVE_VULKAN_STAGE4
+    if (options.video) {
+        background.color.float32[0] = background.color.float32[1] = background.color.float32[2] = 0;
+        if (options.beforeVideo) options.beforeVideo(command);
+    }
+#endif
     VkRenderPassBeginInfo pass{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
     pass.renderPass = renderPass; pass.framebuffer = images[index].framebuffer; pass.renderArea.extent = extent;
     pass.clearValueCount = 1; pass.pClearValues = &background;
     vk.CmdBeginRenderPass(command, &pass, VK_SUBPASS_CONTENTS_INLINE);
+#ifdef PYROWAVE_VULKAN_STAGE4
+    if (options.video) {
+        options.video(command, renderPass, extent);
+        vk.CmdEndRenderPass(command);
+        check(vk.EndCommandBuffer(command), "vkEndCommandBuffer video");
+        return;
+    }
+#endif
     const float colors[6][4] = {{1,0,0,1},{0,1,0,1},{0,0,1,1},{0,1,1,1},{1,0,1,1},{1,1,0,1}};
     for (uint32_t i = 0; i < 6; ++i) {
         const uint32_t left = extent.width * i / 6, right = extent.width * (i + 1) / 6;
@@ -416,11 +437,25 @@ bool Probe::draw() {
     submit.waitSemaphoreCount = 1; submit.pWaitSemaphores = &frame.acquired; submit.pWaitDstStageMask = &waitStage;
     submit.commandBufferCount = 1; submit.pCommandBuffers = &frame.command;
     submit.signalSemaphoreCount = 1; submit.pSignalSemaphores = &images[index].presented;
+#ifdef PYROWAVE_VULKAN_STAGE4
+    if (options.videoSubmit) options.videoSubmit(submit);
+    const auto submitStarted = std::chrono::steady_clock::now();
+#endif
     check(vk.QueueSubmit(queue, 1, &submit, frame.complete), "vkQueueSubmit");
+#ifdef PYROWAVE_VULKAN_STAGE4
+    queueSubmitMs += std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-submitStarted).count();
+    if (options.videoSubmitted) options.videoSubmitted();
+#endif
     VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
     present.waitSemaphoreCount = 1; present.pWaitSemaphores = &images[index].presented;
     present.swapchainCount = 1; present.pSwapchains = &swapchain; present.pImageIndices = &index;
+#ifdef PYROWAVE_VULKAN_STAGE4
+    const auto presentStarted = std::chrono::steady_clock::now();
+#endif
     const VkResult result = vk.QueuePresentKHR(queue, &present);
+#ifdef PYROWAVE_VULKAN_STAGE4
+    presentCallMs += std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-presentStarted).count();
+#endif
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) progress.rebuild = true;
     else check(result, "vkQueuePresentKHR");
     progress.submitted();

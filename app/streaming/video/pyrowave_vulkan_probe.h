@@ -18,6 +18,13 @@ struct ProbeOptions {
     uint32_t minimumApi = VK_API_VERSION_1_0;
     std::function<bool(VkPhysicalDevice)> suitable;
     std::function<void(VkDeviceCreateInfo&)> configure;
+#ifdef PYROWAVE_VULKAN_STAGE4
+    // Isolated Stage 4 callbacks; absent from production and Stage 2/3 builds.
+    std::function<void(VkCommandBuffer)> beforeVideo;
+    std::function<void(VkCommandBuffer,VkRenderPass,VkExtent2D)> video;
+    std::function<void(VkSubmitInfo&)> videoSubmit;
+    std::function<void()> videoSubmitted;
+#endif
 };
 // Reusable low-level synthetic owner, deliberately not IVideoDecoder/Session.
 class Probe {
@@ -31,6 +38,10 @@ public:
     void resize() { progress.rebuild = true; }
     void close() noexcept;
     uint64_t presents = 0, recreations = 0;
+    VkFormat swapchainFormat = VK_FORMAT_UNDEFINED;
+#ifdef PYROWAVE_VULKAN_STAGE4
+    double queueSubmitMs = 0, presentCallMs = 0;
+#endif
     std::atomic<unsigned> validationErrors{0};
     std::atomic<unsigned> validationWarnings{0};
     bool validationActive = false;
@@ -45,6 +56,9 @@ public:
     const VkInstanceCreateInfo& instanceCreateInfo() const { return instanceInfo; }
     const VkDeviceCreateInfo& deviceCreateInfo() const { return deviceInfo; }
 private:
+#ifdef STAGE4_RESOURCE_TEST
+    friend struct ProbeTestAccess;
+#endif
     SDL_Window* window;
     Dispatch& vk;
     Log log;

@@ -1,3 +1,10 @@
+# Offline Stage 4 native Vulkan presentation
+
+**Stage 4 IMPLEMENTED / OWNER QUALIFICATION PENDING.** See [STAGE4.md](STAGE4.md)
+for the raw/libplacebo checkpoint, color/sampling contract, shader verification,
+exact-head packages, owner commands and visual checklist. Production/live paths
+are unchanged. [Stage 3](STAGE3.md) remains historically qualified.
+
 # Isolated Stage 2 native Vulkan presenter probe
 
 This executable presents synthetic RGB diagnostic clears. It does not load

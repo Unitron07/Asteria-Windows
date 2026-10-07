@@ -20,9 +20,10 @@ FORCE_COMPUTE/compute both passed the per-byte ±1 contract; factory cleanup was
 `PATCHED_AND_VERIFIED`. Vulkan validation remained `SKIP` because the layer was
 unavailable. The precise arithmetic cause of the ±1 differences remains unproven.
 
-The next step is **Stage 4: native Vulkan YUV-to-RGB presentation and swapchain
-work**. Stage 3 included no Stage 4, live presentation or production renderer
-changes; the live paths described below are unchanged.
+**Stage 4 IMPLEMENTED / OWNER QUALIFICATION PENDING.** The isolated offline
+native Vulkan presenter, shader verifier and owner package are described in
+[STAGE4.md](../tests/pyrowave/vulkan/STAGE4.md). Stop before merge for exact-head
+Surface qualification. Production rendering and live Session behavior are unchanged.
 
 ## Current state: v0.2.0 released
 
@@ -60,7 +61,8 @@ The next major PyroWave performance milestone is **post-v0.2.0**:
 `PyroWave Vulkan decode -> GPU-resident Y/U/V -> Vulkan presentation shader -> Vulkan swapchain`.
 It aims to avoid Vulkan -> CPU -> D3D11 readback/re-upload and dependence on
 Vulkan/D3D11 external-fence sharing, reduce presentation overhead and improve
-ARM64/Qualcomm viability while retaining safe fallback paths. It is not implemented.
+ARM64/Qualcomm viability while retaining safe fallback paths. Stage 4 implements
+the isolated offline proof; owner qualification and production integration remain pending.
 M1A remains measurement-first; standard codecs and Moonlight behavior are the
 baseline. This is architectural work rather than more CPU-fallback micro-optimization.
 P1b live records/FEC/partial recovery and bandwidth probing remain later work.

@@ -1,0 +1,125 @@
+name: Offline Stage 4 native Vulkan presentation
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/m1b-vulkan-stage4-*']
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/streaming/video/pyrowave_runtime.*'
+      - 'app/streaming/video/pyrowave_vulkan_*'
+      - 'tests/pyrowave/vulkan/**'
+      - 'scripts/*stage4*.ps1'
+      - 'scripts/generate-stage4-shaders.ps1'
+      - 'scripts/stage-vulkan-stage4.ps1'
+      - 'scripts/build-pyrowave-deps.ps1'
+      - 'scripts/pyrowave/**'
+      - 'tests/pyrowave/factory/**'
+      - '.github/workflows/vulkan-stage4.yml'
+permissions:
+  contents: read
+concurrency:
+  group: vulkan-stage4-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  shared:
+    name: Offline native video ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            platform: x64
+            runner: windows-2025
+          - arch: arm64
+            platform: ARM64
+            runner: windows-11-arm
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Build exact approved runtime and pinned SDL dependencies
+        shell: pwsh
+        run: |
+          ./scripts/build-pyrowave-deps.ps1 -Architecture '${{ matrix.arch }}'
+          ./scripts/setup-baseline-deps.ps1 -Architecture '${{ matrix.arch }}'
+      - name: Configure and build isolated Stage 4
+        shell: pwsh
+        run: |
+          $deps = (Resolve-Path 'build/pyrowave/${{ matrix.arch }}').Path
+          cmake -S tests/pyrowave/vulkan -B build/stage4-${{ matrix.arch }} -G 'Visual Studio 18 2026' -A ${{ matrix.platform }} -DPYROWAVE_VULKAN_STAGE4=ON -DPYROWAVE_VULKAN_SHARED_DEVICE=ON -DPYROWAVE_VULKAN_PROBE=ON -DSDL_ARCH=${{ matrix.arch }} "-DSDL_ROOT=$PWD/libs/windows" "-DPYROWAVE_ROOT=$deps/install" "-DVULKAN_HEADERS=$deps/source/Granite/third_party/khronos/vulkan-headers/include"
+          if ($LASTEXITCODE) { throw 'Stage 4 configure failed' }
+          cmake --build build/stage4-${{ matrix.arch }} --config Release --parallel 2
+          if ($LASTEXITCODE) { throw 'Stage 4 build failed' }
+      - name: Reproduce embedded shaders with exact versioned compiler archive
+        shell: pwsh
+        run: |
+          $record = Get-Content tests/pyrowave/vulkan/shaders/shader-provenance.json -Raw | ConvertFrom-Json
+          Invoke-WebRequest $record.compilerArchiveUrl -OutFile build/glslang.zip
+          if ((Get-FileHash build/glslang.zip).Hash.ToLowerInvariant() -cne $record.compilerArchiveSha256) { throw 'Shader compiler archive hash mismatch' }
+          Expand-Archive build/glslang.zip build/glslang
+          ./scripts/generate-stage4-shaders.ps1 -Compiler build/glslang/bin/glslangValidator.exe -OutputRoot build/shader-reproduction -Verify
+      - name: Policy, mocked API and real GPU case (unavailable is explicit SKIP)
+        shell: pwsh
+        run: |
+          ctest --test-dir build/stage4-${{ matrix.arch }} -C Release --output-on-failure
+          if ($LASTEXITCODE) { throw 'Stage 4 tests failed' }
+          git diff --check
+          if ($LASTEXITCODE) { throw 'Whitespace check failed' }
+      - name: Real GPU partial initialization faults (no GPU is SKIP)
+        shell: pwsh
+        run: |
+          $runtime = (Resolve-Path 'build/pyrowave/${{ matrix.arch }}/install/bin').Path
+          foreach ($fault in @('shader-module','sampler','descriptor-layout','descriptor-pool','descriptor-sets','pipeline-layout','pipeline','sampled-view','offscreen-target','swapchain','framebuffer','present-semaphore')) {
+            & 'build/stage4-${{ matrix.arch }}/Release/pyrowave-vulkan-stage4.exe' --runtime $runtime --verify-only --fail $fault --evidence "build/stage4-${{ matrix.arch }}/evidence/fault-$fault"
+            if ($LASTEXITCODE -eq 77) { Write-Output "SKIP real GPU fault $fault" }
+            elseif ($LASTEXITCODE) { throw "Stage 4 fault cleanup failed: $fault" }
+          }
+      - name: Verify PE architecture and no mandatory codec or Vulkan loader import
+        shell: pwsh
+        run: |
+          . ./scripts/pyrowave/pe-machine.ps1
+          $root = 'build/stage4-${{ matrix.arch }}'
+          New-Item -ItemType Directory -Force "$root/evidence" | Out-Null
+          $build = Get-Content 'build/pyrowave/${{ matrix.arch }}/evidence/build.json' -Raw | ConvertFrom-Json
+          $dumpbin = Join-Path (Split-Path $build.compiler -Parent) 'dumpbin.exe'
+          foreach ($file in @('pyrowave-vulkan-stage4.exe','pyrowave-vulkan-stage4-policy-tests.exe','pyrowave-vulkan-stage4-resource-tests.exe','pyrowave-factory-cleanup-tests.exe','SDL2.dll','SDL3.dll')) {
+            $binary = if ($file -eq 'pyrowave-factory-cleanup-tests.exe') { "build/pyrowave/${{ matrix.arch }}/install/bin/$file" } else { "$root/Release/$file" }
+            Assert-PyroWavePe $binary '${{ matrix.arch }}' | ConvertTo-Json | Set-Content "$root/evidence/$file-pe.json"
+            $imports = & $dumpbin /imports $binary
+            if ($LASTEXITCODE) { throw "PE import inspection failed: $file" }
+            $imports | Set-Content "$root/evidence/$file-imports.txt"
+            if ($imports -match '(?i)vulkan-1\.dll|libpyrowave-shared|pyrowave-shared') { throw "Forbidden startup import: $file" }
+          }
+      - name: Package minimal owner test, provenance and notices
+        shell: pwsh
+        run: ./scripts/stage-vulkan-stage4.ps1 -Architecture '${{ matrix.arch }}' -BuildRoot 'build/stage4-${{ matrix.arch }}' -DependencyRoot 'build/pyrowave/${{ matrix.arch }}'
+      - name: Packaged Windows PowerShell 5.1 and PowerShell 7 runner regression
+        timeout-minutes: 15
+        shell: pwsh
+        run: ./scripts/test-stage4-owner-runner.ps1 -PackageRoot 'build/stage4-owner-${{ matrix.arch }}' -EvidenceRoot 'build/stage4-${{ matrix.arch }}/evidence/runner' -FixtureExe 'build/stage4-${{ matrix.arch }}/Release/stage4-owner-runner-fixture.exe'
+      - name: Actual packaged offline owner procedure
+        shell: pwsh
+        run: |
+          $runner = (Resolve-Path 'build/stage4-owner-${{ matrix.arch }}/run-stage4-owner-tests.ps1').Path
+          $evidence = "$PWD/build/stage4-${{ matrix.arch }}/evidence/packaged"
+          Set-Location $env:TEMP
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $runner -NonInteractive -EvidenceRoot $evidence
+          if ($LASTEXITCODE -eq 77) { Write-Output 'SKIP: hosted runner has no suitable real GPU' }
+          elseif ($LASTEXITCODE) { throw 'Packaged Stage 4 owner procedure failed' }
+          exit 0 # An explicitly recorded SKIP is an accepted CI outcome.
+      - name: Upload architecture-specific owner package and evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: vulkan-stage4-${{ matrix.arch }}-${{ github.run_id }}
+          path: |
+            build/stage4-owner-${{ matrix.arch }}.zip
+            build/stage4-${{ matrix.arch }}/evidence/
+            build/stage4-${{ matrix.arch }}/Testing/
+            build/stage4-${{ matrix.arch }}/stage4-gpu-verification/
+            build/stage4-${{ matrix.arch }}/CMakeCache.txt
+            build/pyrowave/${{ matrix.arch }}/evidence/
+          if-no-files-found: error

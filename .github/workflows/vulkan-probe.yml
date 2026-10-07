@@ -2,7 +2,7 @@ name: Isolated Stage 2 Vulkan presenter probe
 on:
   workflow_dispatch:
   push:
-    branches: ['codex/m1b-vulkan-stage2-*', 'codex/m1b-vulkan-stage3-*']
+    branches: ['codex/m1b-vulkan-stage2-*', 'codex/m1b-vulkan-stage3-*', 'codex/m1b-vulkan-stage4-*']
   pull_request:
     branches: [main]
     paths:
