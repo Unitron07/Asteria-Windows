@@ -12,10 +12,17 @@ Qualcomm arithmetic root cause is claimed. The separately recorded same-pin
 factory patch deletes the wrapper on either initialization failure, with source
 ownership tests and public fault diagnostics required for verification.
 
-Final Surface qualification with rebuilt patched-runtime packages is pending.
-PR #36 remains draft/unmerged. Live Vulkan presentation, YUV-to-RGB, production
-renderer changes and Stage 4/5 remain future work. This offline continuation
-does not change the live paths described below.
+Stage 3 is complete. Exact-head Surface Pro 11 / Snapdragon X Plus / Adreno X1-85
+ARM64 owner qualification passed with `PASS_NUMERIC_EQUIVALENCE_OWNER_RUN` on
+`a3cf6b0c59db9465d01178900cd954390728363f`. [PR #36](https://github.com/Unitron07/Asteria-Windows/pull/36)
+merged via `06ea4adb745432842af81b73549f74c696fa5a39`. AUTO/fragment and
+FORCE_COMPUTE/compute both passed the per-byte ±1 contract; factory cleanup was
+`PATCHED_AND_VERIFIED`. Vulkan validation remained `SKIP` because the layer was
+unavailable. The precise arithmetic cause of the ±1 differences remains unproven.
+
+The next step is **Stage 4: native Vulkan YUV-to-RGB presentation and swapchain
+work**. Stage 3 included no Stage 4, live presentation or production renderer
+changes; the live paths described below are unchanged.
 
 ## Current live ARM64 owner result
 
@@ -98,8 +105,9 @@ CPU I420 renderer remains usable. Partial resources are destroyed. A live device
 loss/submission failure ends the stream through normal Session cleanup; it does
 not replay host launch or silently continue with suspect GPU resources.
 
-A dedicated native Vulkan PyroWave presenter (GPU Y/U/V images, conversion shader
-and Vulkan swapchain) is **deferred until after v0.2.0**. It is not implemented.
+A dedicated native Vulkan PyroWave presenter (GPU Y/U/V images, YUV-to-RGB shader
+and Vulkan swapchain) is the **next step, Stage 4, after completed Stage 3**.
+It is not implemented.
 Target architecture: `PyroWave Vulkan decode -> GPU-resident Y/U/V -> Vulkan presentation shader -> Vulkan swapchain`. This avoids Vulkan -> CPU -> D3D11 round-trips and dependence on unsupported external-fence sharing. Unsupported interop currently uses synchronized CPU I420 output. Other Moonlight forks have explored GPU-resident PyroWave interop, but they are not dependencies; Asteria is independently maintained with Vibepollo as its primary protocol target.
 
 ## Lifetime and latency

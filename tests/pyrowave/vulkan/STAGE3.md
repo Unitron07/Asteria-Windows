@@ -1,6 +1,6 @@
 # Stage 3: offline shared-device decode
 
-**OFFLINE ONLY. Final Surface qualification under the approved numeric contract is pending.** This opt-in executable
+**OFFLINE ONLY. Stage 3 is complete; final exact-head Surface owner qualification passed.** This opt-in executable
 tests direct decode into caller-owned images. It adds no production renderer,
 Session integration, live streaming, YUV-to-RGB shader, video swapchain, overlays,
 HDR, frame pacing, or Stage 4/5 work. Existing interop and CPU fallbacks stay intact.
@@ -51,19 +51,22 @@ been implemented or qualified. Stage 2 retains its Vulkan 1.0 synthetic minimum.
 
 | Requirement | Source reason | Core / extension and bit | Fragment output | Compute output | X1-85 support | Enabled here |
 |---|---|---|---|---|---|---|
-| Timeline semaphore | Positive native acquire/release payloads; Granite submission bookkeeping | 1.2, `VkPhysicalDeviceVulkan12Features.timelineSemaphore` | Yes | Yes | Owner query pending | Yes |
-| Synchronization2 | Granite uses `vkQueueSubmit2` and barrier2; context rejects missing extension below 1.3 | 1.3 or KHR; `VkPhysicalDeviceSynchronization2Features.synchronization2` | Yes | Yes | Owner query pending | KHR feature |
-| Subgroup BASIC, VOTE, BALLOT, ARITHMETIC, SHUFFLE, SHUFFLE_RELATIVE in compute | Decoder init checks all six; fragment path still uses compute dequantization | 1.1 properties, no enable bit | Yes | Yes | Prior pinned decode is indirect evidence; query pending | Checked |
-| Subgroup size control | Decoder checks Granite `supports_subgroup_size_log2(true,2,7)` | 1.3 or EXT; `subgroupSizeControl` | Yes | Yes | Owner query pending | EXT feature |
-| Full subgroups | That same Granite check requires full subgroups even for fragment output | `computeFullSubgroups` in same struct | Yes | Yes | Owner query pending | Yes |
-| Compatible subgroup range | 4..128 range covering device range, or overlapping range with compute required-size support | Subgroup-size-control properties | Yes | Yes | Owner query pending | Checked, not a feature |
-| 8/16-bit storage OR large texel buffers | Decoder's dequant shader STORAGE_MODE 0 uses both buffer storage widths; alternate mode reads texel buffers | 1.2 `storageBuffer8BitAccess`; 1.1 `storageBuffer16BitAccess`; or `maxTexelBufferElements >= 16 Mi` with R8/R16/R32 UINT texel formats | Alternative | Alternative | Owner query pending | Storage bits only when texel fallback unavailable |
-| Unformatted storage image writes | `wavelet_dequant.comp` and compute iDWT declare write-only images without format qualifiers | Core `shaderStorageImageWriteWithoutFormat` | Yes, internal dequant | Yes | Owner query pending | Yes |
+| Timeline semaphore | Positive native acquire/release payloads; Granite submission bookkeeping | 1.2, `VkPhysicalDeviceVulkan12Features.timelineSemaphore` | Yes | Yes | Final owner run passed | Yes |
+| Synchronization2 | Granite uses `vkQueueSubmit2` and barrier2; context rejects missing extension below 1.3 | 1.3 or KHR; `VkPhysicalDeviceSynchronization2Features.synchronization2` | Yes | Yes | Final owner run passed | KHR feature |
+| Subgroup BASIC, VOTE, BALLOT, ARITHMETIC, SHUFFLE, SHUFFLE_RELATIVE in compute | Decoder init checks all six; fragment path still uses compute dequantization | 1.1 properties, no enable bit | Yes | Yes | Final owner run passed | Checked |
+| Subgroup size control | Decoder checks Granite `supports_subgroup_size_log2(true,2,7)` | 1.3 or EXT; `subgroupSizeControl` | Yes | Yes | Final owner run passed | EXT feature |
+| Full subgroups | That same Granite check requires full subgroups even for fragment output | `computeFullSubgroups` in same struct | Yes | Yes | Final owner run passed | Yes |
+| Compatible subgroup range | 4..128 range covering device range, or overlapping range with compute required-size support | Subgroup-size-control properties | Yes | Yes | Final owner run passed | Checked, not a feature |
+| 8/16-bit storage OR large texel buffers | Decoder's dequant shader STORAGE_MODE 0 uses both buffer storage widths; alternate mode reads texel buffers | 1.2 `storageBuffer8BitAccess`; 1.1 `storageBuffer16BitAccess`; or `maxTexelBufferElements >= 16 Mi` with R8/R16/R32 UINT texel formats | Alternative | Alternative | Final owner run passed | Storage bits only when texel fallback unavailable |
+| Unformatted storage image writes | `wavelet_dequant.comp` and compute iDWT declare write-only images without format qualifiers | Core `shaderStorageImageWriteWithoutFormat` | Yes, internal dequant | Yes | Final owner run passed | Yes |
 | Shader float16 | Optional shader variant; FP32 math with packed half storage fallback exists in `dwt_common.h` | 1.2 `shaderFloat16` | Optional | Optional | Not asserted | Disabled |
 | Shader int16 arithmetic | Encoder requirement, not used by decoder's texel variant | Core `shaderInt16` | No | No | Not asserted | Disabled |
-| Internal R16/R32 SFLOAT sampled/storage images | Wavelet buffers in approved FP32-math / reduced-storage configuration | Format and image support queries | Yes | Yes | Owner query pending | Queried |
-| Internal R16 / RG16 SFLOAT sampled color attachments | Fragment iDWT intermediate targets | Format support | Yes | No | Owner query pending | Queried for fragment |
-| R8_UNORM caller output | UNORM final planes; transfer source solely for verification | Selected image usage/extent/sample-count query | COLOR_ATTACHMENT + TRANSFER_SRC | STORAGE + TRANSFER_SRC | Owner query pending | Selected path only |
+| Internal R16/R32 SFLOAT sampled/storage images | Wavelet buffers in approved FP32-math / reduced-storage configuration | Format and image support queries | Yes | Yes | Final owner run passed | Queried |
+| Internal R16 / RG16 SFLOAT sampled color attachments | Fragment iDWT intermediate targets | Format support | Yes | No | Final owner run passed | Queried for fragment |
+| R8_UNORM caller output | UNORM final planes; transfer source solely for verification | Selected image usage/extent/sample-count query | COLOR_ATTACHMENT + TRANSFER_SRC | STORAGE + TRANSFER_SRC | Final owner run passed | Selected path only |
+
+The X1-85 column records successful final owner-run negotiation and decode, not
+a separate inventory of every queried property or which storage alternative was used.
 
 Source locations: [decoder initialization](https://github.com/Themaister/pyrowave/blob/186f0393b77f7755953b5ecde994bb1cec2e4155/pyrowave_decoder.cpp#L994),
 [payload fallback](https://github.com/Themaister/pyrowave/blob/186f0393b77f7755953b5ecde994bb1cec2e4155/pyrowave_common.cpp#L241),
@@ -210,8 +213,39 @@ checks PE machines/imports, packages provenance/notices, tests the packaged runn
 under both PowerShell versions from unrelated directories with spaces, and runs
 the actual package procedure with PASS or explicit SKIP. Baseline (upstream and
 Asteria x64/ARM64), existing PyroWave and Stage 2 workflows run on the same head.
-CI links and any real hardware result must refer to that final head. Surface
-qualification remains **PENDING FINAL OWNER RUN**; earlier exact failures are historical.
+CI links and any real hardware result must refer to that final head. The final
+Surface owner qualification below supersedes the earlier exact failures, which
+remain historical evidence.
+
+### Final exact-head Surface owner qualification
+
+Surface Pro 11 / Snapdragon X Plus / Adreno X1-85 / native Windows ARM64 passed
+with **`PASS_NUMERIC_EQUIVALENCE_OWNER_RUN`** on
+`a3cf6b0c59db9465d01178900cd954390728363f`.
+[PR #36](https://github.com/Unitron07/Asteria-Windows/pull/36) merged via
+`06ea4adb745432842af81b73549f74c696fa5a39`.
+
+AUTO selected fragment and FORCE_COMPUTE selected compute on the same
+Asteria-owned Vulkan instance / physical device / device / queue. Both passed
+`abs(GPU_BYTE - CPU_BYTE) <= 1` for every tested Y/U/V byte, including each
+144-frame shared-device suite with three output slots, three decoder lifetimes
+and malformed-frame recovery. Maximum observed absolute error was 1; exact
+equality remained diagnostic. Repeat hashes were stable and diagnostic
+`vkDeviceWaitIdle` changed zero output bytes.
+
+Borrowed handle identities matched; outputs were native caller-owned R8 Y/U/V
+images with positive timeline synchronization. External-memory handles,
+external-semaphore handles and D3D11 resources were all zero. Factory cleanup
+reported `PATCHED_AND_VERIFIED`. The final aggregate reported `overall=API_PASS`
+and `stage3Qualification=PASS_NUMERIC_EQUIVALENCE`.
+
+Vulkan validation remained **`SKIP`**, because the validation layer was unavailable;
+it was not a validation PASS. The precise arithmetic cause of the observed ±1
+differences remains unproven. This qualifies offline shared-device decode only:
+no Stage 4, live presentation, YUV-to-RGB shader or video swapchain was included.
+
+The next step is **Stage 4: native Vulkan YUV-to-RGB presentation and swapchain
+work**, separately implemented and qualified.
 
 ## Initial Surface owner failure (reported by owner)
 
@@ -301,8 +335,9 @@ exercise bounded non-bitexact PASS plus these failures, with default/custom root
 actual paths, identity/zero external resources, each mode's exact and numerical
 verdicts/max errors, repeat stability, idle-change status, factory cleanup,
 validation and final qualification at top level. Validation unavailable stays SKIP.
-Return the entire fresh evidence directory. PR #36 stays draft/unmerged until the
-owner supplies and reviews a new native Surface run of this exact package.
+For reproduction or future qualification, return the entire fresh evidence
+directory. PR #36 is merged; its completed exact-head Surface qualification is
+recorded above. A future source/runtime revision requires its own qualification.
 
 ## Owner-reported dual-path evidence and approved portable contract
 
