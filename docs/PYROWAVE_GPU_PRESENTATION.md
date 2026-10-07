@@ -20,10 +20,14 @@ FORCE_COMPUTE/compute both passed the per-byte ±1 contract; factory cleanup was
 `PATCHED_AND_VERIFIED`. Vulkan validation remained `SKIP` because the layer was
 unavailable. The precise arithmetic cause of the ±1 differences remains unproven.
 
-**Stage 4 IMPLEMENTED / OWNER QUALIFICATION PENDING.** The isolated offline
-native Vulkan presenter, shader verifier and owner package are described in
-[STAGE4.md](../tests/pyrowave/vulkan/STAGE4.md). Stop before merge for exact-head
-Surface qualification. Production rendering and live Session behavior are unchanged.
+**Stage 4 is COMPLETE and qualified.** The exact implementation head
+`7c6bf8e085ffe26fd36d7d72d7405b0ed5aa2e85` was merged through [PR #39](https://github.com/Unitron07/Asteria-Windows/pull/39)
+with `PASS_OWNER_CONFIRMED` on Surface Pro 11 / Snapdragon X Plus / Qualcomm
+Adreno X1-85 native ARM64. The isolated presenter proved same-device PyroWave
+GPU decode, caller-owned Y/U/V, explicit BT.709 FULL/LIMITED conversion, CENTER
+chroma, visible swapchain output, stable recreation and clean teardown. No CPU
+YUV readback, D3D11 resources or external handles entered presentation. Validation
+was `SKIP` because the layer was unavailable. Production/live paths remain unchanged.
 
 ## Current live ARM64 owner result
 
@@ -106,10 +110,13 @@ CPU I420 renderer remains usable. Partial resources are destroyed. A live device
 loss/submission failure ends the stream through normal Session cleanup; it does
 not replay host launch or silently continue with suspect GPU resources.
 
-A dedicated native Vulkan PyroWave presenter (GPU Y/U/V images, YUV-to-RGB shader
-and Vulkan swapchain) is the **next step, Stage 4, after completed Stage 3**.
-Stage 4 is implemented offline; owner qualification and live integration remain pending.
-Target architecture: `PyroWave Vulkan decode -> GPU-resident Y/U/V -> Vulkan presentation shader -> Vulkan swapchain`. This avoids Vulkan -> CPU -> D3D11 round-trips and dependence on unsupported external-fence sharing. Unsupported interop currently uses synchronized CPU I420 output. Other Moonlight forks have explored GPU-resident PyroWave interop, but they are not dependencies; Asteria is independently maintained with Vibepollo as its primary protocol target.
+A dedicated native Vulkan PyroWave presenter is now the qualified Stage 4 boundary.
+The next step is **Stage 5 live integration**: `live PyroWave stream -> existing
+packet/parser path -> same-device GPU decode -> qualified Stage 4 presenter ->
+swapchain`. Stage 5 will retain standard codecs, safe CPU fallback and capability
+gating, then separately qualify overlays, live resize/reconnect/device-loss and
+performance. Automatic codec selection remains unchanged unless separately
+authorized. MultiSeat and VR are outside this scope.
 
 ## Lifetime and latency
 

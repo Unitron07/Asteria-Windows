@@ -174,8 +174,9 @@ SHA. The owner runner verifies that evidence and reruns the deterministic test.
 It then requires 400 public factory-fault calls to return -5/null on the real loader.
 Private-memory movement remains supporting data; exact equality is not a gate.
 `factoryCleanup=PATCHED_AND_VERIFIED` requires BOTH the deterministic source test
-and successful public fault diagnostic. Production promotion and Stage 4 remain
-unauthorized; removing this leak does not authorize either.
+and successful public fault diagnostic. Production promotion remains unauthorized;
+Stage 4 is now complete through PR #39, while live integration remains a separate
+Stage 5 task.
 
 ## Owner procedure
 
@@ -241,11 +242,12 @@ and `stage3Qualification=PASS_NUMERIC_EQUIVALENCE`.
 
 Vulkan validation remained **`SKIP`**, because the validation layer was unavailable;
 it was not a validation PASS. The precise arithmetic cause of the observed ±1
-differences remains unproven. This qualifies offline shared-device decode only:
-no Stage 4, live presentation, YUV-to-RGB shader or video swapchain was included.
+differences remains unproven. This qualified offline shared-device decode only;
+live presentation and production-renderer qualification were still separate at
+that stage.
 
-The next step is **Stage 4: native Vulkan YUV-to-RGB presentation and swapchain
-work**, separately implemented and qualified.
+Stage 4 is now complete through PR #39. The next step is **Stage 5: live native
+Vulkan PyroWave integration**, which remains unimplemented.
 
 ## Initial Surface owner failure (reported by owner)
 

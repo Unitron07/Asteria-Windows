@@ -1,9 +1,24 @@
 # Stage 4: offline native PyroWave presentation
 
-Status: **Stage 4 IMPLEMENTED / OWNER QUALIFICATION PENDING.**
-No Session integration, production renderer selection, codec pin update, overlays,
-or Stage 5 work is authorized by this implementation. Stage 2 and Stage 3
-historical qualification remains in QUALIFICATION.md and STAGE3.md.
+Status: **Stage 4 COMPLETE / PASS_OWNER_CONFIRMED.**
+The exact implementation head `7c6bf8e085ffe26fd36d7d72d7405b0ed5aa2e85`
+was merged through [PR #39](https://github.com/Unitron07/Asteria-Windows/pull/39)
+after final Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 native
+ARM64 owner qualification. No Session integration, production renderer selection,
+codec pin update, overlays or Stage 5 implementation is included.
+
+The final visible owner run recorded `stage4Qualification=PASS_OWNER_CONFIRMED`
+and `ownerVisualConfirmed=true`: AUTO selected fragment, borrowed handles matched,
+caller-owned R8 Y/U/V reached the explicit BT.709 shader and Vulkan swapchain,
+FULL/LIMITED and CENTER chroma passed, all ten visible patterns were confirmed,
+resize/minimize/restore/maximize/rebuild passed, three decode slots reused cleanly,
+and teardown passed. Presentation used no CPU YUV readback, external handles or
+D3D11 resources. Validation was `SKIP` with zero reported errors and warnings.
+
+The independent verifier covered 80 cases and 81,957,240 pixels, max RGB error 1,
+zero failed components, with 3,699,262 CENTER-vs-LEFT negative-control differences.
+The visible run accumulated approximately 1,861 decoded/presented frames and 75
+swapchain recreations; these are lifecycle evidence, not performance benchmarks.
 
 ## Architecture checkpoint (before presenter implementation)
 
@@ -186,8 +201,9 @@ samplers, descriptor resources, modules, layout, pipeline and offscreen target
 exercise cleanup; Stage 2 swapchain/framebuffer/present-semaphore faults remain.
 
 The proof terminates on device loss or fatal submit/present error. No CPU/D3D11
-fallback or Session recovery is added. Validation availability, exact-head real
-GPU results and explicit Surface visible confirmation remain separate gates.
-The swapchain retirement limitation described above remains. This stage proves
-offline correctness only; it does not qualify live integration, performance,
-frame pacing, overlays, HDR, 10-bit, 4:4:4, BT.2020 or calibrated display transfer.
+fallback or Session recovery is added. Stage 4 is qualified for the isolated
+offline presenter. Remaining limitations are live Session integration, production
+renderer selection, overlays, HDR, 10-bit, 4:4:4, BT.2020, calibrated display/
+ICC management, and Stage 4 performance/latency qualification. The rare X1-85
+WSI recreation/final drains remain because the relevant maintenance present-fence
+extension is unavailable. Vulkan validation was unavailable during the owner run.

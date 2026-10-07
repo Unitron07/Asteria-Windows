@@ -1,4 +1,4 @@
-# Next step: Stage 4 native Vulkan YUV-to-RGB presentation and swapchain
+# Next step: Stage 5 live native Vulkan PyroWave integration
 
 [Stage 3 offline shared-device proof](../tests/pyrowave/vulkan/STAGE3.md) now
 distinguishes exact identity from approved numerical equivalence: every decoded
@@ -20,10 +20,15 @@ FORCE_COMPUTE/compute both passed the per-byte ±1 contract; factory cleanup was
 `PATCHED_AND_VERIFIED`. Vulkan validation remained `SKIP` because the layer was
 unavailable. The precise arithmetic cause of the ±1 differences remains unproven.
 
-**Stage 4 IMPLEMENTED / OWNER QUALIFICATION PENDING.** The isolated offline
-native Vulkan presenter, shader verifier and owner package are described in
-[STAGE4.md](../tests/pyrowave/vulkan/STAGE4.md). Stop before merge for exact-head
-Surface qualification. Production rendering and live Session behavior are unchanged.
+**Stage 4 is COMPLETE and qualified.** The exact implementation head
+`7c6bf8e085ffe26fd36d7d72d7405b0ed5aa2e85` was merged through [PR #39](https://github.com/Unitron07/Asteria-Windows/pull/39)
+with `PASS_OWNER_CONFIRMED` on Surface Pro 11 / Snapdragon X Plus / Qualcomm
+Adreno X1-85 native ARM64. It proved PyroWave Vulkan decode into caller-owned
+GPU Y/U/V, explicit BT.709 FULL/LIMITED conversion, CENTER chroma, correct
+aspect fit, stable swapchain recreation, bounded slot reuse and clean visible
+teardown. CPU YUV readback, D3D11 resources and external handles were absent from
+the presentation path. Validation was `SKIP` because the layer was unavailable.
+See [STAGE4.md](../tests/pyrowave/vulkan/STAGE4.md) for the final evidence.
 
 ## Current state: v0.2.0 released
 
@@ -57,12 +62,16 @@ PyroWave CI. See the [release record](VALIDATION.md#asteria-v020-release-record)
 for commit, run IDs, checksums and hardware-validation limits. Future releases
 repeat their own qualification; this evidence is specific to v0.2.0.
 
-The next major PyroWave performance milestone is **post-v0.2.0**:
-`PyroWave Vulkan decode -> GPU-resident Y/U/V -> Vulkan presentation shader -> Vulkan swapchain`.
-It aims to avoid Vulkan -> CPU -> D3D11 readback/re-upload and dependence on
-Vulkan/D3D11 external-fence sharing, reduce presentation overhead and improve
-ARM64/Qualcomm viability while retaining safe fallback paths. Stage 4 implements
-the isolated offline proof; owner qualification and production integration remain pending.
+The next architectural target is **Stage 5 live native Vulkan PyroWave integration**:
+
+`live PyroWave stream -> existing packet/parser path -> same-device GPU decode -> qualified Stage 4 Vulkan presenter -> swapchain`.
+
+Stage 5 remains unimplemented. Its high-level scope is to wire the qualified
+presenter into the live decoder/session lifecycle, retain standard-codec behavior,
+safe PyroWave CPU fallback and capability gating, integrate overlays separately,
+qualify live resize/reconnect/device-loss/fallback behavior, and measure real
+performance after correctness. Automatic codec selection remains unchanged unless
+separately authorized. MultiSeat and VR are outside this step.
 M1A remains measurement-first; standard codecs and Moonlight behavior are the
 baseline. This is architectural work rather than more CPU-fallback micro-optimization.
 P1b live records/FEC/partial recovery and bandwidth probing remain later work.
