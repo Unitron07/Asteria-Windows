@@ -1,4 +1,4 @@
-# Next step: post-v0.2.0 native Vulkan presentation
+# Next step: Stage 4 native Vulkan YUV-to-RGB presentation and swapchain
 
 [Stage 3 offline shared-device proof](../tests/pyrowave/vulkan/STAGE3.md) now
 distinguishes exact identity from approved numerical equivalence: every decoded
@@ -12,10 +12,17 @@ Qualcomm arithmetic root cause is claimed. The separately recorded same-pin
 factory patch deletes the wrapper on either initialization failure, with source
 ownership tests and public fault diagnostics required for verification.
 
-Final Surface qualification with rebuilt patched-runtime packages is pending.
-PR #36 remains draft/unmerged. Live Vulkan presentation, YUV-to-RGB, production
-renderer changes and Stage 4/5 remain future work. This offline continuation
-does not change the live paths described below.
+Stage 3 is complete. Exact-head Surface Pro 11 / Snapdragon X Plus / Adreno X1-85
+ARM64 owner qualification passed with `PASS_NUMERIC_EQUIVALENCE_OWNER_RUN` on
+`a3cf6b0c59db9465d01178900cd954390728363f`. [PR #36](https://github.com/Unitron07/Asteria-Windows/pull/36)
+merged via `06ea4adb745432842af81b73549f74c696fa5a39`. AUTO/fragment and
+FORCE_COMPUTE/compute both passed the per-byte ±1 contract; factory cleanup was
+`PATCHED_AND_VERIFIED`. Vulkan validation remained `SKIP` because the layer was
+unavailable. The precise arithmetic cause of the ±1 differences remains unproven.
+
+The next step is **Stage 4: native Vulkan YUV-to-RGB presentation and swapchain
+work**. Stage 3 included no Stage 4, live presentation or production renderer
+changes; the live paths described below are unchanged.
 
 ## Current state: v0.2.0 released
 
