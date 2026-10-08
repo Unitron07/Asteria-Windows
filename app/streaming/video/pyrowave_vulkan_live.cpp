@@ -175,10 +175,13 @@ void NativePresentation::shutdown() noexcept {
     p.stopped=true;
     if(p.owner && p.owner->deviceHandle()) {
         try {
-            if(p.presenter) p.slots.suspend([&p](int i) { p.retire(i); });
-            Stage3::QueueLock::Guard queue(p.queue);
-            const auto result=p.vk.DeviceWaitIdle(p.owner->deviceHandle());
-            if(result!=VK_SUCCESS) { diagnostics.cleanupOkay=false; if(p.initialized) ++diagnostics.fatalErrors; }
+            PyroWaveVulkan::retireAndDrain([&] {
+                if(p.presenter) p.slots.suspend([&p](int i) { p.retire(i); });
+            },[&] {
+                Stage3::QueueLock::Guard queue(p.queue);
+                const auto result=p.vk.DeviceWaitIdle(p.owner->deviceHandle());
+                if(result!=VK_SUCCESS) { diagnostics.cleanupOkay=false; if(p.initialized) ++diagnostics.fatalErrors; }
+            });
         } catch(const std::exception& e) { diagnostics.cleanupOkay=false; p.log(std::string("native teardown: ")+e.what()); }
     }
     // Consumer work is drained before codec/wrapper destruction. The wrapper

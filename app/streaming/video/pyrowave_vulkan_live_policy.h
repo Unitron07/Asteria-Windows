@@ -2,12 +2,21 @@
 #include "pyrowave_vulkan_shared_policy.h"
 #include <functional>
 #include <optional>
+#include <exception>
 
 namespace PyroWaveVulkan {
 // Used by decode, overlay-only and window notifications under the decoder mutex.
 // A failed SDL publication must remain retryable, without another video frame.
 template<class Publish> void wakeFrame(bool& queued,Publish publish) {
     if(!queued) queued=publish();
+}
+// Destruction must still drain outstanding consumers if drop retirement fails.
+// Preserve the original error only after the independent drain was attempted.
+template<class Retire,class Drain> void retireAndDrain(Retire retire,Drain drain) {
+    std::exception_ptr failure;
+    try { retire(); } catch(...) { failure=std::current_exception(); }
+    try { drain(); } catch(...) { if(!failure) failure=std::current_exception(); }
+    if(failure) std::rethrow_exception(failure);
 }
 enum class Backend { Native, Legacy, Cpu };
 // Initialization only. A selected backend never hot-switches after packets start.

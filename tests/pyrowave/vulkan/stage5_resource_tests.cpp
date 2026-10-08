@@ -12,6 +12,8 @@ Stage3::QueueLock* queueLock=nullptr;
 struct Submission { VkSemaphore semaphore; uint64_t wait,signal; };
 std::vector<Submission> submissions;
 bool submitFailure=false;
+bool drainGuardExpected=false;
+unsigned drains=0;
 std::map<VkSemaphore,uint64_t> completed;
 std::array<uint8_t,64> staging{};
 unsigned barriers=0,copies=0;
@@ -117,6 +119,11 @@ int main() {
         PyroWaveVulkan::Dispatch vk; Stage3::NativeDispatch native; Stage3::QueueLock queue; queueLock=&queue;
         vk.DestroyDevice=[](VkDevice,const VkAllocationCallbacks*) {};
         vk.DestroySemaphore=[](VkDevice,VkSemaphore,const VkAllocationCallbacks*) {};
+        vk.DeviceWaitIdle=[](VkDevice) {
+            ++drains;
+            if(drainGuardExpected) rejects([] { queueLock->lock(true); });
+            return VK_SUCCESS;
+        };
         vk.QueueSubmit=[](VkQueue,uint32_t count,const VkSubmitInfo* info,VkFence) {
             require(count==1); rejects([] { queueLock->lock(true); }); // REAL retirement uses queue lock.
             if(submitFailure) return VK_ERROR_DEVICE_LOST;
@@ -149,7 +156,11 @@ int main() {
                 require(completed[submissions.back().semaphore]==0);
             }
             p.decoded(0,PyroWave::YuvRange::Limited,Stage4::Filter::Linear);
-            submitFailure=true; rejects([&] { p.retire(0); }); submitFailure=false;
+            submitFailure=true; drainGuardExpected=true;
+            rejects([&] { PyroWaveVulkan::retireAndDrain([&] { p.retire(0); },[&] {
+                Stage3::QueueLock::Guard guard(queue); require(vk.DeviceWaitIdle(owner.deviceHandle())==VK_SUCCESS);
+            }); });
+            require(drains==1); drainGuardExpected=false; submitFailure=false;
             require(p.consumerValue(0)==3); rejects([&] { p.acquire(0); }); // Failed submit cannot free payload.
             p.retire(0); require(p.consumerValue(0)==5);
             for(unsigned n=0;n<1000;++n) {

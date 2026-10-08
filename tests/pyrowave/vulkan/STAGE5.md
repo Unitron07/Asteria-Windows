@@ -115,6 +115,8 @@ destroy Asteria device/surface/instance; release its System32 loader. Owner
 create-info/queue callback storage survives wrapper destruction. Cleanup is
 idempotent and does not rely on process exit. The Vulkan dispatch retains its
 loader until the final caller handles are gone.
+The initial consumer drain is attempted even when GPU drop retirement throws;
+retirement/drain faults are recorded without skipping the resource safety gate.
 
 Every native decoder lifetime logs PYROWAVE_NATIVE_STREAM_SUMMARY JSON with
 testOnly, exact source/runtime identities, backend/path/handle matches, lifetime

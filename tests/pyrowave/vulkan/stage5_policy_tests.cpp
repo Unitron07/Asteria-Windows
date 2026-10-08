@@ -15,6 +15,16 @@ int main() {
         queued=false; overlayNotification(); require(queued && publications==2);
         queued=false; wakeFrame(queued,[&] { ++publications; return false; });
         require(!queued); overlayNotification(); require(queued && publications==4);
+        for(bool retirementFails:{false,true}) for(bool drainFails:{false,true}) {
+            std::vector<int> teardown;
+            const auto run=[&] { retireAndDrain([&] {
+                teardown.push_back(1); if(retirementFails) throw std::runtime_error("retirement failure");
+            },[&] {
+                teardown.push_back(2); if(drainFails) throw std::runtime_error("drain failure");
+            }); };
+            if(retirementFails || drainFails) rejects(run); else run();
+            require(teardown==std::vector<int>({1,2}));
+        }
         for(int successful=0;successful<3;++successful) {
             std::vector<int> attempts; BackendSelection selection;
             const auto attempt=[&](int i) { attempts.push_back(i); return i==successful; };
