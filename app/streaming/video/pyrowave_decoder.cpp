@@ -31,8 +31,10 @@ bool verifyProvenance(const QString& directory, QString& reason) {
     if (object["codecCommit"].toString() != PyroWave::CodecCommit ||
         object["bitstreamId"].toString() != PyroWave::BitstreamId ||
         object["apiVersion"].toString() != "0.6.0" ||
+        object["graniteCommit"].toString() != "b6cffd5ce81f540f0855e6778428483e14763d9b" ||
+        object["factoryCleanupPatchSha256"].toString() != "8fe5906706bb27814ed7344f8932cd5ccf00c368ed24d253839d13cfeeb78c86" ||
         object["architecture"].toString() != architecture) {
-        reason = "runtime provenance must match codec 186f0393, API 0.6.0 and target " + architecture;
+        reason = "runtime provenance must match codec 186f0393, API 0.6.0, pinned Granite/factory cleanup and target " + architecture;
         return false;
     }
     QFile dll(directory + "/libpyrowave-shared-0.dll");

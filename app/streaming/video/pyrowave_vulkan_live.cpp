@@ -193,8 +193,9 @@ void NativePresentation::shutdown() noexcept {
     p.presenter.reset();
     if(p.owner) {
         diagnostics.recreations=p.owner->recreations; diagnostics.validationActive=p.owner->validationActive;
+        p.owner->close(); // Include destruction-time validation in the lifetime summary.
         diagnostics.validationErrors=p.owner->validationErrors; diagnostics.validationWarnings=p.owner->validationWarnings;
-        p.owner->close(); diagnostics.cleanupOkay=diagnostics.cleanupOkay && p.owner->cleanupOkay; p.owner.reset();
+        diagnostics.cleanupOkay=diagnostics.cleanupOkay && p.owner->cleanupOkay; p.owner.reset();
     }
     diagnostics.cleanupOkay=diagnostics.cleanupOkay && p.queue.balanced();
 }

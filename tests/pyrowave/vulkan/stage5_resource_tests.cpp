@@ -67,6 +67,10 @@ struct PresenterTestAccess {
 }
 int main() {
     try {
+        const auto historical=Stage4::fitVideo(1280,800);
+        const auto negotiated=Stage4::fitVideo(1280,800,1440,1080);
+        require(historical.x==0 && historical.y==40 && historical.w==1280 && historical.h==720);
+        require(negotiated.x==107 && negotiated.y==0 && negotiated.w==1066 && negotiated.h==800);
         PyroWaveVulkan::Dispatch vk; Stage3::NativeDispatch native; Stage3::QueueLock queue; queueLock=&queue;
         vk.DestroyDevice=[](VkDevice,const VkAllocationCallbacks*) {};
         vk.DestroySemaphore=[](VkDevice,VkSemaphore,const VkAllocationCallbacks*) {};
@@ -124,7 +128,8 @@ int main() {
             std::unique_ptr<SDL_Surface,decltype(&SDL_FreeSurface)> free(input,SDL_FreeSurface);
             auto* pixels=static_cast<uint32_t*>(input->pixels);
             pixels[0]=SDL_MapRGBA(input->format,1,2,3,127); pixels[1]=SDL_MapRGBA(input->format,4,5,6,255);
-            overlays.update(0,input,true); PyroWaveVulkan::OverlayTestAccess::inspect(overlays);
+            require(overlays.update(0,input,true)); PyroWaveVulkan::OverlayTestAccess::inspect(overlays);
+            require(!overlays.update(0,nullptr,true));
             const auto timeline=handle<VkSemaphore>(77);
             for(unsigned i=0;i<3;++i) {
                 overlays.update(0,input,true); overlays.before({}); overlays.submitted(timeline,i+1);
@@ -135,7 +140,8 @@ int main() {
             completed[timeline]=1; overlays.before({}); overlays.submitted(timeline,4); require(!overlays.pending() && copies==4);
             for(unsigned i=0;i<100;++i) { overlays.before({}); overlays.submitted(timeline,5+i); }
             require(copies==4 && overlays.uploads==4); // Redraws don't re-upload.
-            overlays.update(0,nullptr,false); PyroWaveVulkan::OverlayTestAccess::state(overlays,-1,false);
+            require(overlays.update(0,nullptr,false)); PyroWaveVulkan::OverlayTestAccess::state(overlays,-1,false);
+            require(!overlays.update(0,nullptr,false));
             require(!overlays.pending()); PyroWaveVulkan::OverlayTestAccess::blendAndPlacement(overlays);
             overlays.close(); overlays.close();
         }
