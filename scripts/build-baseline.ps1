@@ -138,6 +138,9 @@ This unsigned development baseline is not a qualified Asteria release.
             -ClientExecutable $clientExecutable
     }
     # Inspect the final ZIP, including nested Qt plugins, before any artifact upload.
+    if ($clientExecutable -eq 'Asteria.exe') {
+        & (Join-Path $PSScriptRoot 'stage5-package-manifest.ps1') -PackagePath $package[0].FullName -Architecture $Architecture -SourceRevision $sha
+    }
     & (Join-Path $PSScriptRoot 'test-package-architecture.ps1') `
         -PackagePath $package[0].FullName -Architecture $Architecture `
         -ReportPath (Join-Path $evidence 'package-architecture.json') `

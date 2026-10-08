@@ -2,9 +2,9 @@
 
 [Stage 3 offline shared-device proof](../tests/pyrowave/vulkan/STAGE3.md) now
 distinguishes exact identity from approved numerical equivalence: every decoded
-Y/U/V byte must be within ±1 of CPU decode; a single ±2 fails. Exact hashes and
+Y/U/V byte must be within Â±1 of CPU decode; a single Â±2 fails. Exact hashes and
 all diagnostic metrics remain recorded. At diagnostic head f08ecabb, the owner
-found deterministic ±1 variants in BOTH AUTO fragment and forced compute on
+found deterministic Â±1 variants in BOTH AUTO fragment and forced compute on
 Surface X1-85, using identical fixtures and the same caller device. Repeats were
 stable, device idle did not change bytes, and external handles/D3D11 stayed zero.
 Pinned upstream validation permits bounded reconstruction error; no exact
@@ -16,9 +16,9 @@ Stage 3 is complete. Exact-head Surface Pro 11 / Snapdragon X Plus / Adreno X1-8
 ARM64 owner qualification passed with `PASS_NUMERIC_EQUIVALENCE_OWNER_RUN` on
 `a3cf6b0c59db9465d01178900cd954390728363f`. [PR #36](https://github.com/Unitron07/Asteria-Windows/pull/36)
 merged via `06ea4adb745432842af81b73549f74c696fa5a39`. AUTO/fragment and
-FORCE_COMPUTE/compute both passed the per-byte ±1 contract; factory cleanup was
+FORCE_COMPUTE/compute both passed the per-byte Â±1 contract; factory cleanup was
 `PATCHED_AND_VERIFIED`. Vulkan validation remained `SKIP` because the layer was
-unavailable. The precise arithmetic cause of the ±1 differences remains unproven.
+unavailable. The precise arithmetic cause of the Â±1 differences remains unproven.
 
 **Stage 4 is COMPLETE and qualified.** The exact implementation head
 `7c6bf8e085ffe26fd36d7d72d7405b0ed5aa2e85` was merged through [PR #39](https://github.com/Unitron07/Asteria-Windows/pull/39)
@@ -66,7 +66,11 @@ The next architectural target is **Stage 5 live native Vulkan PyroWave integrati
 
 `live PyroWave stream -> existing packet/parser path -> same-device GPU decode -> qualified Stage 4 Vulkan presenter -> swapchain`.
 
-Stage 5 remains unimplemented. Its high-level scope is to wire the qualified
+**Stage 5 IMPLEMENTED / LIVE OWNER QUALIFICATION PENDING.** See the
+[implementation/lifecycle contract](../tests/pyrowave/vulkan/STAGE5.md) and
+[real Surface procedure](../tests/pyrowave/vulkan/STAGE5-OWNER-TEST.md). Exact-head
+CI and owner evidence are required before merging the draft PR. No release is
+authorized. Stage 5 does not replace the historical Stage 4 qualification. Its high-level scope is to wire the qualified
 presenter into the live decoder/session lifecycle, retain standard-codec behavior,
 safe PyroWave CPU fallback and capability gating, integrate overlays separately,
 qualify live resize/reconnect/device-loss/fallback behavior, and measure real
@@ -80,7 +84,7 @@ feature area, followed by Asteria VR. Session-lifecycle work may benefit VR but
 is not a hard dependency, and VR does not require PyroWave. Both need a separate
 Asteria-oriented Vibepollo fork/host extension;
 see [the roadmap](PORTING_PLAN.md#host-dependent-roadmap-boundaries).
-Old M2–M4 Apollo convenience work is deprioritized; its notes are retained as
+Old M2â€“M4 Apollo convenience work is deprioritized; its notes are retained as
 possible supporting integrations rather than standalone active milestones.
 
 ## Historical P0/P0.5 evidence

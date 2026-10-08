@@ -29,5 +29,5 @@ jobs:
     uses: ./.github/workflows/build-windows-baseline.yml
     with:
       architecture: ${{ matrix.architecture }}
-      source-ref: ${{ github.sha }}
+      source-ref: ${{ github.event.pull_request.head.sha || github.sha }}
       label: asteria

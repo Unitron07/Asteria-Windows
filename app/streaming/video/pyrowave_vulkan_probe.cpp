@@ -1,5 +1,6 @@
 #include "pyrowave_vulkan_probe.h"
 #include <SDL_vulkan.h>
+#include <SDL_syswm.h>
 #include <algorithm>
 #include <cstring>
 #include <iomanip>
@@ -38,6 +39,20 @@ Probe::~Probe() { close(); }
 void Probe::mainThread() const {
     if (thread != GetCurrentThreadId()) throw std::runtime_error("Vulkan/WSI call outside owning SDL main thread");
 }
+void Probe::drawableSize(int& width,int& height) const {
+    if(!options.existingWin32Window) { SDL_Vulkan_GetDrawableSize(window,&width,&height); return; }
+    SDL_SysWMinfo wm{}; SDL_VERSION(&wm.version);
+    if(!SDL_GetWindowWMInfo(window,&wm) || wm.subsystem!=SDL_SYSWM_WINDOWS)
+        throw std::runtime_error("native PyroWave requires an existing Windows HWND");
+    RECT rect{};
+    if(!GetClientRect(wm.info.win.window,&rect)) throw std::runtime_error("GetClientRect failed");
+    width=rect.right-rect.left; height=rect.bottom-rect.top;
+}
+VkResult Probe::queueOperation(const std::function<VkResult()>& operation) {
+    if(options.lockQueue) options.lockQueue();
+    struct Unlock { std::function<void()>& callback; ~Unlock() { if(callback) callback(); } } unlock{options.unlockQueue};
+    return operation();
+}
 void Probe::checkpoint(const char* name) {
     if (options.failAt == name) {
         injectedFailure = true;
@@ -67,6 +82,7 @@ void Probe::initialize() {
     if (options.deviceOnly) application.pApplicationName = "Asteria offline Stage 3 shared-device proof";
 #ifdef PYROWAVE_VULKAN_STAGE4
     if (options.video) application.pApplicationName = "Asteria offline Stage 4 native video proof";
+    if (options.existingWin32Window) application.pApplicationName = "Asteria live native PyroWave";
 #endif
     application.applicationVersion = 1;
     log("loader_api=" + version(loaderVersion) + " requested_instance_api=" + version(application.apiVersion) +
@@ -75,10 +91,14 @@ void Probe::initialize() {
     check(vk.EnumerateInstanceExtensionProperties(nullptr, &count, nullptr), "instance extension count");
     std::vector<VkExtensionProperties> available(count);
     check(vk.EnumerateInstanceExtensionProperties(nullptr, &count, available.data()), "instance extensions");
-    unsigned sdlCount = 0;
-    if (!SDL_Vulkan_GetInstanceExtensions(window, &sdlCount, nullptr)) throw std::runtime_error(SDL_GetError());
-    instanceExtensions.resize(sdlCount);
-    if (!SDL_Vulkan_GetInstanceExtensions(window, &sdlCount, instanceExtensions.data())) throw std::runtime_error(SDL_GetError());
+    if(options.existingWin32Window) {
+        instanceExtensions={VK_KHR_SURFACE_EXTENSION_NAME,VK_KHR_WIN32_SURFACE_EXTENSION_NAME};
+    } else {
+        unsigned sdlCount=0;
+        if(!SDL_Vulkan_GetInstanceExtensions(window,&sdlCount,nullptr)) throw std::runtime_error(SDL_GetError());
+        instanceExtensions.resize(sdlCount);
+        if(!SDL_Vulkan_GetInstanceExtensions(window,&sdlCount,instanceExtensions.data())) throw std::runtime_error(SDL_GetError());
+    }
     for (auto name : instanceExtensions) if (!has(available, name)) throw std::runtime_error(std::string("missing surface extension ") + name);
     // Optional 1.0 diagnostic property queries, not new presentation features.
     if (application.apiVersion < VK_API_VERSION_1_1 && has(available, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME))
@@ -130,7 +150,16 @@ void Probe::initialize() {
         if (!vk.CreateDebugUtilsMessengerEXT || !vk.DestroyDebugUtilsMessengerEXT) throw std::runtime_error("debug messenger exports missing");
         check(vk.CreateDebugUtilsMessengerEXT(instance, &debugInfo, nullptr, &messenger), "vkCreateDebugUtilsMessengerEXT");
     }
-    if (!SDL_Vulkan_CreateSurface(window, instance, &surface)) throw std::runtime_error(std::string("SDL surface: ") + SDL_GetError());
+    if(options.existingWin32Window) {
+        SDL_SysWMinfo wm{}; SDL_VERSION(&wm.version);
+        if(!SDL_GetWindowWMInfo(window,&wm) || wm.subsystem!=SDL_SYSWM_WINDOWS)
+            throw std::runtime_error("existing HWND unavailable");
+        auto create=reinterpret_cast<PFN_vkCreateWin32SurfaceKHR>(vk.GetInstanceProcAddr(instance,"vkCreateWin32SurfaceKHR"));
+        if(!create) throw std::runtime_error("vkCreateWin32SurfaceKHR unavailable");
+        VkWin32SurfaceCreateInfoKHR info{VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR};
+        info.hwnd=wm.info.win.window; info.hinstance=GetModuleHandleW(nullptr);
+        check(create(instance,&info,nullptr,&surface),"existing HWND Vulkan surface");
+    } else if (!SDL_Vulkan_CreateSurface(window, instance, &surface)) throw std::runtime_error(std::string("SDL surface: ") + SDL_GetError());
     log("surface_created=YES on existing SDL window");
     checkpoint("surface");
     selectDevice();
@@ -246,10 +275,10 @@ void Probe::destroySwapchain() noexcept {
 bool Probe::recreate() {
     mainThread();
     int width = 0, height = 0;
-    SDL_Vulkan_GetDrawableSize(window, &width, &height);
+    drawableSize(width,height);
     if (width <= 0 || height <= 0 || (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED)) return false;
     // Rare resize/teardown drain only, never in the per-frame submission path.
-    if (swapchain) check(vk.DeviceWaitIdle(device), "resize vkDeviceWaitIdle");
+    if (swapchain) check(queueOperation([&] { return vk.DeviceWaitIdle(device); }), "resize vkDeviceWaitIdle");
     destroySwapchain();
     VkSurfaceCapabilitiesKHR capabilities{};
     check(vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(physical, surface, &capabilities), "surface capabilities");
@@ -399,7 +428,7 @@ void Probe::record(VkCommandBuffer command, uint32_t index) {
 bool Probe::draw() {
     mainThread();
     int width = 0, height = 0;
-    SDL_Vulkan_GetDrawableSize(window, &width, &height);
+    drawableSize(width,height);
     if (width <= 0 || height <= 0 || (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED)) return false;
     if (progress.rebuild || !swapchain) { recreate(); return false; }
     auto& frame = frames[progress.frameResource];
@@ -441,7 +470,7 @@ bool Probe::draw() {
     if (options.videoSubmit) options.videoSubmit(submit);
     const auto submitStarted = std::chrono::steady_clock::now();
 #endif
-    check(vk.QueueSubmit(queue, 1, &submit, frame.complete), "vkQueueSubmit");
+    check(queueOperation([&] { return vk.QueueSubmit(queue,1,&submit,frame.complete); }), "vkQueueSubmit");
 #ifdef PYROWAVE_VULKAN_STAGE4
     queueSubmitMs += std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-submitStarted).count();
     if (options.videoSubmitted) options.videoSubmitted();
@@ -452,7 +481,7 @@ bool Probe::draw() {
 #ifdef PYROWAVE_VULKAN_STAGE4
     const auto presentStarted = std::chrono::steady_clock::now();
 #endif
-    const VkResult result = vk.QueuePresentKHR(queue, &present);
+    const VkResult result = queueOperation([&] { return vk.QueuePresentKHR(queue,&present); });
 #ifdef PYROWAVE_VULKAN_STAGE4
     presentCallMs += std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-presentStarted).count();
 #endif
@@ -463,10 +492,12 @@ bool Probe::draw() {
     return true;
 }
 void Probe::close() noexcept {
+    // Every production deletion is excluded from decode by Session::m_DecoderLock.
+    if(thread!=GetCurrentThreadId()) std::terminate();
     // Main-thread-only owner; close is idempotent, including partial initialize.
     if (device) {
         if (vk.DeviceWaitIdle) {
-            const auto result = vk.DeviceWaitIdle(device);
+            const auto result = queueOperation([&] { return vk.DeviceWaitIdle(device); });
             log("teardown_device_drain=" + std::to_string(result));
             cleanupOkay = cleanupOkay && result == VK_SUCCESS;
         }

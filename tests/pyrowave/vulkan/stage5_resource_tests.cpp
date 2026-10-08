@@ -1,0 +1,119 @@
+#define SDL_MAIN_HANDLED
+#include "pyrowave_vulkan_overlays.h"
+#include <iostream>
+#include <thread>
+#include <map>
+static void require(bool condition) { if(!condition) throw std::runtime_error("Stage 5 real resource assertion"); }
+template<class F> void rejects(F operation) { bool rejected=false; try { operation(); } catch(const std::exception&) { rejected=true; } require(rejected); }
+template<class T> T handle(uintptr_t n) { return reinterpret_cast<T>(n); }
+namespace {
+Stage3::QueueLock* queueLock=nullptr;
+struct Submission { VkSemaphore semaphore; uint64_t wait,signal; };
+std::vector<Submission> submissions;
+bool submitFailure=false;
+std::map<VkSemaphore,uint64_t> completed;
+std::array<uint8_t,64> staging{};
+unsigned barriers=0,copies=0;
+}
+namespace PyroWaveVulkan {
+struct ProbeTestAccess { static void device(Probe& p) { p.device=handle<VkDevice>(900); } };
+struct OverlayTestAccess {
+    static void inspect(Overlays& o) {
+        auto& surface=o.surfaces[0];
+        require(surface.width==2 && surface.height==1 && surface.updated);
+        require(surface.rgba==std::vector<uint8_t>({1,2,3,127,4,5,6,255}));
+        for(unsigned i=0;i<3;++i) {
+            auto& g=surface.generations[i]; g.width=2; g.height=1;
+            g.image=handle<VkImage>(100+i); g.stagingMemory=handle<VkDeviceMemory>(200+i);
+            g.staging=handle<VkBuffer>(300+i); g.coherent=true;
+        }
+        o.counter=[](VkDevice,VkSemaphore semaphore,uint64_t* value) { *value=completed[semaphore]; return VK_SUCCESS; };
+        o.gpu.CmdCopyBufferToImage=[](VkCommandBuffer,VkBuffer,VkImage,VkImageLayout,uint32_t,const VkBufferImageCopy*) { ++copies; };
+    }
+    static void state(Overlays& o,int current,bool pending) { require(o.surfaces[0].current==current && o.pending()==pending); }
+};
+}
+namespace Stage4 {
+struct PresenterTestAccess {
+    static void seed(Presenter& p) { for(unsigned i=0;i<3;++i) p.slots[i].timeline=handle<VkSemaphore>(i+1); }
+    static void overflow(Presenter& p) { p.slots[0].payload.consumed=UINT64_MAX; }
+};
+}
+int main() {
+    try {
+        PyroWaveVulkan::Dispatch vk; Stage3::NativeDispatch native; Stage3::QueueLock queue; queueLock=&queue;
+        vk.DestroyDevice=[](VkDevice,const VkAllocationCallbacks*) {};
+        vk.DestroySemaphore=[](VkDevice,VkSemaphore,const VkAllocationCallbacks*) {};
+        vk.QueueSubmit=[](VkQueue,uint32_t count,const VkSubmitInfo* info,VkFence) {
+            require(count==1); rejects([] { queueLock->lock(true); }); // REAL retirement uses queue lock.
+            if(submitFailure) return VK_ERROR_DEVICE_LOST;
+            auto* values=static_cast<const VkTimelineSemaphoreSubmitInfo*>(info->pNext);
+            require(values && values->sType==VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO);
+            require(values->waitSemaphoreValueCount==info->waitSemaphoreCount && values->signalSemaphoreValueCount==info->signalSemaphoreCount);
+            const auto i=info->waitSemaphoreCount-1;
+            require(info->pWaitDstStageMask[i]==VK_PIPELINE_STAGE_ALL_COMMANDS_BIT || info->pWaitDstStageMask[i]==VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+            submissions.push_back({info->pWaitSemaphores[i],values->pWaitSemaphoreValues[i],values->pSignalSemaphoreValues[i]});
+            return VK_SUCCESS;
+        };
+        native.CmdPipelineBarrier=[](VkCommandBuffer,VkPipelineStageFlags,VkPipelineStageFlags,uint32_t,uint32_t,const VkMemoryBarrier*,uint32_t,const VkBufferMemoryBarrier*,uint32_t,const VkImageMemoryBarrier*) { ++barriers; };
+        native.MapMemory=[](VkDevice,VkDeviceMemory,VkDeviceSize,VkDeviceSize,uint32_t,void** data) { *data=staging.data(); return VK_SUCCESS; };
+        native.UnmapMemory=[](VkDevice,VkDeviceMemory) {};
+        native.DestroyImage=[](VkDevice,VkImage,const VkAllocationCallbacks*) {};
+        native.DestroyBuffer=[](VkDevice,VkBuffer,const VkAllocationCallbacks*) {};
+        native.FreeMemory=[](VkDevice,VkDeviceMemory,const VkAllocationCallbacks*) {};
+        PyroWaveVulkan::Probe owner(nullptr,vk,[](const auto&) {},{}); PyroWaveVulkan::ProbeTestAccess::device(owner);
+        bool wrongThread=false;
+        std::thread worker([&] { try { owner.draw(); } catch(const std::exception&) { wrongThread=true; } }); worker.join(); require(wrongThread);
+        {
+            Stage4::Presenter p(owner,vk,native,queue,[](const auto&) {},Stage3::Path::Fragment,"",2560,1440,true);
+            Stage4::PresenterTestAccess::seed(p);
+            for(unsigned i=0;i<3;++i) {
+                require(p.acquire(i).sync.value==1 && p.release(i).sync.value==2);
+                p.decoded(i,PyroWave::YuvRange::Full,Stage4::Filter::Linear); p.retire(i);
+                require(submissions.back().wait==2 && submissions.back().signal==3 && p.acquire(i).sync.value==3);
+                // Queued retirement is NOT completion; the next decode's acquire
+                // waits on 3, even though our asynchronous GPU has completed zero.
+                require(completed[submissions.back().semaphore]==0);
+            }
+            p.decoded(0,PyroWave::YuvRange::Limited,Stage4::Filter::Linear);
+            submitFailure=true; rejects([&] { p.retire(0); }); submitFailure=false;
+            require(p.consumerValue(0)==3); rejects([&] { p.acquire(0); }); // Failed submit cannot free payload.
+            p.retire(0); require(p.consumerValue(0)==5);
+            for(unsigned n=0;n<1000;++n) {
+                const auto prior=p.consumerValue(0); p.select(0,PyroWave::YuvRange::Limited,Stage4::Filter::Linear); p.before(handle<VkCommandBuffer>(88));
+                VkSemaphore acquired=handle<VkSemaphore>(91),presented=handle<VkSemaphore>(92);
+                VkPipelineStageFlags stage=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO}; submit.waitSemaphoreCount=submit.signalSemaphoreCount=1;
+                submit.pWaitSemaphores=&acquired; submit.pSignalSemaphores=&presented; submit.pWaitDstStageMask=&stage;
+                p.submission(submit);
+                { Stage3::QueueLock::Guard guard(queue); require(vk.QueueSubmit({},1,&submit,{})==VK_SUCCESS); }
+                p.submitted(); require(submissions.back().wait==prior && submissions.back().signal==prior+1);
+                require(p.acquire(0).sync.value==prior+1);
+            }
+            Stage4::PresenterTestAccess::overflow(p); rejects([&] { p.select(0,PyroWave::YuvRange::Full,Stage4::Filter::Linear); });
+        }
+        {
+            PyroWaveVulkan::Overlays overlays(owner,vk,native);
+            SDL_Surface* input=SDL_CreateRGBSurfaceWithFormat(0,2,1,32,SDL_PIXELFORMAT_BGRA32); require(input!=nullptr);
+            std::unique_ptr<SDL_Surface,decltype(&SDL_FreeSurface)> free(input,SDL_FreeSurface);
+            auto* pixels=static_cast<uint32_t*>(input->pixels);
+            pixels[0]=SDL_MapRGBA(input->format,1,2,3,127); pixels[1]=SDL_MapRGBA(input->format,4,5,6,255);
+            overlays.update(0,input,true); PyroWaveVulkan::OverlayTestAccess::inspect(overlays);
+            const auto timeline=handle<VkSemaphore>(77);
+            for(unsigned i=0;i<3;++i) {
+                overlays.update(0,input,true); overlays.before({}); overlays.submitted(timeline,i+1);
+                PyroWaveVulkan::OverlayTestAccess::state(overlays,int(i),false);
+            }
+            require(copies==3 && overlays.uploads==3);
+            overlays.update(0,input,true); overlays.before({}); require(overlays.pending() && copies==3);
+            completed[timeline]=1; overlays.before({}); overlays.submitted(timeline,4); require(!overlays.pending() && copies==4);
+            for(unsigned i=0;i<100;++i) { overlays.before({}); overlays.submitted(timeline,5+i); }
+            require(copies==4 && overlays.uploads==4); // Redraws don't re-upload.
+            overlays.update(0,nullptr,false); PyroWaveVulkan::OverlayTestAccess::state(overlays,-1,false);
+            require(!overlays.pending()); overlays.close(); overlays.close();
+        }
+        require(queue.balanced());
+        std::cout<<"PASS REAL production dispatch: GPU-only dropped retirement; failure preserves payload; 1000 monotonic retained redraws; WSI owner thread; RGBA surface conversion; 3 bounded overlay generations; deferred newest update; no redraw uploads; disable/idempotent teardown\n";
+        return 0;
+    } catch(const std::exception& e) { std::cerr<<e.what()<<'\n'; return 1; }
+}

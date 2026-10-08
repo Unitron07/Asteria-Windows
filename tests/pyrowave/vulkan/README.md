@@ -134,3 +134,8 @@ state handling. CI cannot replace mandatory Surface visual owner execution.
 The GPU-free packaged runner regression exercises Windows PowerShell 5.1 and
 pwsh from an unrelated directory, with default, explicit and whitespace evidence
 paths. It uses an unavailable CPU-only fixture and never records an owner pass.
+# Live Stage 5 integration
+
+[Stage 5](STAGE5.md) is implemented in the draft integration and awaits exact-head
+CI plus [real Surface live owner qualification](STAGE5-OWNER-TEST.md).
+Stage 2/3/4 remain historical qualified/offline boundaries. Do not merge yet.

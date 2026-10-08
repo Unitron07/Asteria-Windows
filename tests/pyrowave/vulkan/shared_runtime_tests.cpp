@@ -52,6 +52,19 @@ int main(int argc,char** argv) {
                 require(runtime.decodeNative(bytes,buffers,a,r)==(mode==0));
                 auto bad=bytes; bad.pop_back(); require(!runtime.decodeNative(bad,buffers,a,r) && runtime.frameRejected());
                 configure(0,fragment); require(runtime.decodeNative(bytes,buffers,a,r));
+                size_t packets=0; PyroWave::DecodeTiming timing;
+                require(runtime.decodeLiveNative(bytes,buffers,a,r,packets,timing) && packets==1);
+                auto left=bytes; left.back()|=0x80;
+                require(!runtime.decodeLiveNative(left,buffers,a,r,packets,timing) && runtime.frameRejected());
+                auto limited=bytes; limited.back()|=0x40;
+                require(!runtime.decodeLiveNative(limited,buffers,a,r,packets,timing) && runtime.frameRejected());
+                require(runtime.liveRange()==PyroWave::YuvRange::Full);
+                configure(5,fragment);
+                require(!runtime.decodeLiveNative(bytes,buffers,a,r,packets,timing) && runtime.frameRejected());
+                configure(0,fragment); require(runtime.decodeLiveNative(bytes,buffers,a,r,packets,timing));
+                PyroWave::Pixels forbidden;
+                require(!runtime.decodeLive(bytes,forbidden,packets,&timing) && runtime.cpuYuvReadbackFrames()==0);
+                require(runtime.decodeLiveNative(bytes,buffers,a,r,packets,timing));
                 r.sync.value=0; require(!runtime.decodeNative(bytes,buffers,a,r)); r.sync.value=2;
                 r.num_images=1; require(!runtime.decodeNative(bytes,buffers,a,r));
                 { Stage3::QueueLock::Guard caller(lock); }

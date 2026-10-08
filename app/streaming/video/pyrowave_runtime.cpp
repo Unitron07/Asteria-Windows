@@ -6,6 +6,7 @@
 #include <memory>
 #include <new>
 #include <chrono>
+#include <algorithm>
 
 static_assert(PYROWAVE_API_VERSION_MAJOR == 0 && PYROWAVE_API_VERSION_MINOR == 6 &&
               PYROWAVE_API_VERSION_PATCH == 0, "P0 requires pinned API 0.6.0 headers");
@@ -28,7 +29,7 @@ void* Runtime::symbol(const char* name) {
 }
 bool Runtime::load(const std::filesystem::path& directory) {
     close();
-    m_Error.clear();
+    m_Error.clear(); m_CpuReadbacks=0;
     if (!directory.is_absolute()) return fail("dependency directory must be absolute");
     std::error_code ec;
     const auto dll = std::filesystem::canonical(directory / L"libpyrowave-shared-0.dll", ec);
@@ -84,7 +85,7 @@ void Runtime::discardFrame() {
 void Runtime::close() {
     resetDecoder();
     if (m_Device) m_Api.destroyDevice(m_Device);
-    m_Device = nullptr;
+    m_Device = nullptr; m_Borrowed = false;
     if (m_Module) FreeLibrary(static_cast<HMODULE>(m_Module));
     m_Module = nullptr; m_Api = {};
     if (m_Vulkan) FreeLibrary(static_cast<HMODULE>(m_Vulkan));
@@ -161,6 +162,16 @@ bool Runtime::decodeImpl(const std::vector<std::uint8_t>& container, Pixels& out
         m_Error = error; // Live caller rate-limits malformed-frame diagnostics.
         return live ? false : fail(error);
     }
+    if (live && m_Borrowed) {
+        const auto sequence=std::find_if(frame.records.begin(),frame.records.end(),
+            [](const auto& r) { return r.kind==RecordKind::Sequence; });
+        if(sequence==frame.records.end() || sequence->offset+8>container.size() ||
+           (container[sequence->offset+7]&0x80)) {
+            m_FrameRejected=true;
+            m_Error="native PyroWave requires SDR 8-bit 4:2:0 BT.709 CENTER metadata; LEFT rejected";
+            return false;
+        }
+    }
     if (live) {
         if (m_LiveRange && *m_LiveRange != frame.sequence.range) {
             m_FrameRejected = true;
@@ -170,8 +181,13 @@ bool Runtime::decodeImpl(const std::vector<std::uint8_t>& container, Pixels& out
         m_LiveRange = frame.sequence.range;
     }
     if (packetCount) *packetCount = frame.packets.size();
-    for (const auto& p : frame.packets)
-        if (!check(m_Api.push(m_Decoder,container.data()+p.offset,p.size),"packet push")) return false;
+    for (const auto& p : frame.packets) {
+        const auto result=m_Api.push(m_Decoder,container.data()+p.offset,p.size);
+        if(live && m_Borrowed && result==PYROWAVE_ERROR_INVALID_ARGUMENT) {
+            m_FrameRejected=true; m_Error="native codec rejected malformed independent frame packet"; return false;
+        }
+        if(!check(result,"packet push")) return false;
+    }
     if (!m_Api.ready(m_Decoder,false)) return fail("complete frame is not decode-ready");
     if (gpu) {
         if (!m_Api.decodeGpu) return fail("missing GPU decode API");
@@ -181,6 +197,7 @@ bool Runtime::decodeImpl(const std::vector<std::uint8_t>& container, Pixels& out
         if (timing) timing->decodeUs = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-start).count();
         return ok;
     }
+    if(m_Borrowed) return fail("CPU video readback forbidden on borrowed native device");
     Pixels pixels; pixels.width=m_Width; pixels.height=m_Height;
     pixels.range=frame.sequence.range;
     pyrowave_cpu_buffer buffer{};
@@ -197,6 +214,7 @@ bool Runtime::decodeImpl(const std::vector<std::uint8_t>& container, Pixels& out
     } catch (const std::bad_alloc&) { return fail("I420 output allocation failed"); }
     const auto start = std::chrono::steady_clock::now();
     if (timing) timing->preparationUs = std::chrono::duration_cast<std::chrono::microseconds>(start-preparationStart).count();
+    ++m_CpuReadbacks;
     const bool ok = check(m_Api.decode(m_Decoder,&buffer),"synchronous CPU decode");
     if (timing) timing->decodeUs = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-start).count();
     if (!ok) return false;
@@ -224,7 +242,20 @@ bool Runtime::borrowDevice(const pyrowave_device_create_info& info) {
         m_Api.destroyDevice(m_Device); m_Device = nullptr;
         return fail("borrowed Vulkan handle mismatch; no fallback");
     }
+    m_Borrowed=true;
     return check(queueType(m_Device,VK_QUEUE_GRAPHICS_BIT),"borrowed graphics queue mode");
+}
+bool Runtime::decodeLiveNative(const std::vector<std::uint8_t>& container,
+                          const pyrowave_gpu_buffers& buffers,
+                          const pyrowave_gpu_sync_operation& acquire,
+                          const pyrowave_gpu_sync_operation& release,
+                          std::size_t& packets,DecodeTiming& timing) {
+    packets=0;
+    if(!m_Borrowed || acquire.num_images || release.num_images || acquire.images || release.images ||
+       !acquire.sync.semaphore || !acquire.sync.value || !release.sync.semaphore || !release.sync.value)
+        return fail("invalid native live same-device timeline contract");
+    Pixels unused;
+    return decodeImpl(container,unused,true,&packets,&timing,&buffers,&acquire,&release);
 }
 bool Runtime::decodeNative(const std::vector<std::uint8_t>& container,
                           const pyrowave_gpu_buffers& buffers,

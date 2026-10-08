@@ -50,10 +50,13 @@ bool verifyProvenance(const QString& directory, QString& reason) {
 PyroWaveVideoDecoder::~PyroWaveVideoDecoder() {
     // Session holds its decoder lock while destroying us, then stops common-c.
     if (!m_TestOnly) Session::get()->getOverlayManager().setOverlayRenderer(nullptr);
+    if(m_RetryTimer) SDL_RemoveTimer(m_RetryTimer);
+    const bool native=bool(m_Native);
+    if(m_Native) { m_Native->shutdown(); logNativeSummary(); m_Native.reset(); }
     for (auto texture : m_OverlayTextures) if (texture) SDL_DestroyTexture(texture);
     m_Runtime.resetDecoder();
     // Decoder destruction drains its Vulkan work; report while the device lives.
-    if (!m_FirstFrame) reportGpuTiming();
+    if (!native && !m_FirstFrame) reportGpuTiming();
     m_Gpu.reset();
     if (m_Texture) SDL_DestroyTexture(m_Texture);
     if (m_Renderer) SDL_DestroyRenderer(m_Renderer);
@@ -69,7 +72,8 @@ bool PyroWaveVideoDecoder::fail(const QString& reason) {
     std::lock_guard<std::mutex> guard(m_Mutex);
     if (!m_Failed) {
         m_Error = reason;
-        m_Failed = true;
+        m_Failed = true; m_BackendSelection.fatal();
+        if(m_Native) m_Native->fatal(reason.toStdString());
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"PyroWave: %s",qPrintable(reason));
         if (!m_TestOnly) wakeRenderer();
     }
@@ -78,7 +82,7 @@ bool PyroWaveVideoDecoder::fail(const QString& reason) {
 
 bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
     // Even test-only preflight on Session's hidden main-thread window must
-    // actually create and upload to the SDL renderer, before any host launch.
+    // prove presentation on the selected backend before any host launch.
     if (params->videoFormat != VIDEO_FORMAT_PYROWAVE || !params->window ||
         !PyroWave::validLiveExtent(params->width,params->height))
         return fail("unsupported PyroWave profile or dimensions");
@@ -90,6 +94,33 @@ bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
     const QString directory = QCoreApplication::applicationDirPath() + "/pyrowave";
     QString reason;
     if (!verifyProvenance(directory,reason)) return fail(reason);
+    if(!m_Runtime.load(std::filesystem::path(directory.toStdWString()))) return fail(QString::fromStdString(m_Runtime.error()));
+    try {
+        m_BackendSelection.initialize([&] {
+    m_Native=std::make_unique<PyroWave::NativePresentation>(m_Runtime);
+    if(m_Native->initialize(params->window,m_Width,m_Height,params->enableVsync)) {
+        return true;
+    }
+    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"PyroWave native initialization unavailable: %s; trying legacy D3D11/Vulkan interop",m_Native->error().c_str());
+    // Initialization fallback only: native wrapper, WSI and device are gone before
+    // the default device and historical SDL/D3D11 backend can be constructed.
+    m_Native.reset();
+            return false;
+        },[&] { return initializeLegacy(params); },[&] { return initializeCpu(); });
+    } catch(const std::exception& e) { return fail(QString::fromUtf8(e.what())); }
+    m_TestOnly=params->testOnly;
+    if(!m_TestOnly) {
+        auto& overlays=Session::get()->getOverlayManager(); overlays.setOverlayRenderer(this);
+        if(m_Native) for(int i=0;i<Overlay::OverlayMax;++i) {
+            const auto type=static_cast<Overlay::OverlayType>(i);
+            if(overlays.isOverlayEnabled(type)) overlays.setOverlayTextUpdated(type);
+        }
+    }
+    return true;
+}
+
+bool PyroWaveVideoDecoder::initializeLegacy(PDECODER_PARAMETERS params) {
+    const QString directory=QCoreApplication::applicationDirPath()+"/pyrowave";
     if (!m_Runtime.load(std::filesystem::path(directory.toStdWString())) ||
         !m_Runtime.createDecoder(m_Width,m_Height,true))
         return fail(QString::fromStdString(m_Runtime.error()));
@@ -129,21 +160,35 @@ bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave SDL presentation initialized: %s I420; live sequence range pending",
                 info.name ? info.name : "unknown");
     m_Gpu = std::make_unique<PyroWave::GpuPresentation>(m_Runtime);
-    if (!m_Gpu->initialize(m_Renderer,m_Width,m_Height)) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU presentation unavailable: %s; retaining CPU I420 fallback",
-            m_Gpu->error().c_str());
-        m_Gpu.reset();
-        // CPU readback uses the default compute path, independently of vendor.
-        // No packets have been submitted during the presentation probe.
-        if (!m_Runtime.createDecoder(m_Width,m_Height))
-            return fail(QString::fromStdString(m_Runtime.error()));
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave CPU fallback decoder path: %s",m_Runtime.decoderPath());
-    } else SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU presentation initialized: shared D3D11 R8 planes, timeline fences, 3 slots");
-    m_TestOnly = params->testOnly;
-    if (!m_TestOnly) Session::get()->getOverlayManager().setOverlayRenderer(this);
+    if(!m_Gpu->initialize(m_Renderer,m_Width,m_Height)) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU presentation unavailable: %s; retaining CPU I420 fallback",m_Gpu->error().c_str());
+        m_Gpu.reset(); return false;
+    }
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU presentation initialized: shared D3D11 R8 planes, timeline fences, 3 slots backend=LEGACY_D3D11_INTEROP");
+    return true;
+}
+bool PyroWaveVideoDecoder::initializeCpu() {
+    if(m_Failed || !m_Renderer || !m_Texture) return false;
+    if(!m_Runtime.createDecoder(m_Width,m_Height)) return fail(QString::fromStdString(m_Runtime.error()));
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave CPU fallback decoder path: %s backend=CPU_I420_FALLBACK",m_Runtime.decoderPath());
     return true;
 }
 
+void PyroWaveVideoDecoder::retryRenderer() {
+    if(m_RetryTimer || m_TestOnly) return;
+    m_RetryTimer=SDL_AddTimer(16,[](Uint32,void*) -> Uint32 {
+        // No decoder pointer crosses the timer callback; teardown can cancel the
+        // timer and an already posted event is harmless to Session's null check.
+        SDL_Event event{}; event.type=SDL_USEREVENT; event.user.code=SDL_CODE_FRAME_READY;
+        SDL_PushEvent(&event); return 0;
+    },nullptr);
+    if(!m_RetryTimer) fail(QString("native render retry timer: ")+SDL_GetError());
+}
+void PyroWaveVideoDecoder::notifyNativeWindowEvent() {
+    if(!m_Native) return;
+    m_Native->windowChanged();
+    std::lock_guard<std::mutex> guard(m_Mutex); wakeRenderer();
+}
 void PyroWaveVideoDecoder::wakeRenderer() {
     if (m_EventQueued) return;
     SDL_Event event{};
@@ -155,6 +200,7 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
     {
         std::lock_guard<std::mutex> guard(m_Mutex);
         if (m_Failed) { wakeRenderer(); return DR_OK; }
+        m_BackendSelection.beginLive();
         const uint64_t now = LiGetMicroseconds();
         if (!m_Stats.measurementStartUs) m_Stats.measurementStartUs = now;
         if (m_LastFrameNumber && du->frameNumber > m_LastFrameNumber + 1) {
@@ -186,7 +232,7 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
                 if (dropped) ++m_Stats.pacerDroppedFrames;
             }
             if (m_Gpu && slot<0) { fail("GPU frame slot invariant failed"); return DR_OK; }
-            const bool decoded = m_Gpu ? m_Gpu->decode(slot,bytes,packets,timing) : m_Runtime.decodeLive(bytes,pixels,packets,&timing);
+            const bool decoded = m_Native ? m_Native->decode(bytes,packets,timing) : m_Gpu ? m_Gpu->decode(slot,bytes,packets,timing) : m_Runtime.decodeLive(bytes,pixels,packets,&timing);
             if (m_FirstSequence && m_Runtime.liveRange()) {
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave sequence: BT.709 %s-range, SDR 4:2:0",
                     *m_Runtime.liveRange() == PyroWave::YuvRange::Full ? "full" : "limited");
@@ -197,7 +243,7 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
                 else { fail(QString::fromStdString(m_Runtime.error())); return DR_OK; }
             }
         }
-    } catch (const std::bad_alloc&) { fail("live frame allocation failed"); return DR_OK; }
+    } catch (const std::exception& e) { fail(QString::fromUtf8(e.what())); return DR_OK; }
     if (!rejection.empty()) {
         // Includes reassembly rejection before any runtime packet submission.
         m_Runtime.discardFrame();
@@ -215,7 +261,7 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
         if (m_FirstFrame) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "First valid PyroWave decode unit: %d bytes, compatibility packets=%zu; first %s decode succeeded",
-                        du->fullLength,packets,m_Gpu ? "GPU output" : "I420");
+                        du->fullLength,packets,(m_Native || m_Gpu) ? "GPU output" : "I420");
             m_FirstFrame = false;
             m_PerformanceStartUs = LiGetMicroseconds();
         }
@@ -223,7 +269,9 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
         m_Stats.totalDecodeTimeUs += timing.decodeUs;
         m_Pipeline.preparationUs += timing.preparationUs;
         m_Pipeline.assemblyUs += assemblyUs;
-        if (m_Gpu) {
+        if(m_Native) {
+            // Native decode already published its bounded GPU slot.
+        } else if (m_Gpu) {
             m_GpuReadyUs[slot]=LiGetMicroseconds();
             if (m_Slots.publish(slot)) ++m_Stats.pacerDroppedFrames;
         } else {
@@ -275,11 +323,16 @@ void PyroWaveVideoDecoder::updateStats() {
         pipeline.preparationUs=m_LastPipeline.preparationUs+m_Pipeline.preparationUs;
         pipeline.assemblyUs=m_LastPipeline.assemblyUs+m_Pipeline.assemblyUs;
         pipeline.decoderQueueUs=m_LastPipeline.decoderQueueUs+m_Pipeline.decoderQueueUs;
+        PyroWave::addStats(m_Stats,m_StreamStats);
+        m_StreamPipeline.bytes+=m_Pipeline.bytes;
+        m_StreamPipeline.preparationUs+=m_Pipeline.preparationUs;
+        m_StreamPipeline.assemblyUs+=m_Pipeline.assemblyUs;
+        m_StreamPipeline.decoderQueueUs+=m_Pipeline.decoderQueueUs;
         m_LastStats=m_Stats; m_LastPipeline=m_Pipeline;
         m_Stats={}; m_Stats.measurementStartUs=now; m_Pipeline={};
     }
     if (!LiGetEstimatedRttInfo(&stats.lastRtt,&stats.lastRttVariance)) stats.lastRtt=stats.lastRttVariance=0;
-    const auto text=PyroWave::formatStats(stats,pipeline,m_Width,m_Height,now,bool(m_Gpu));
+    const auto text=PyroWave::formatStats(stats,pipeline,m_Width,m_Height,now,bool(m_Native || m_Gpu));
     auto& overlays = Session::get()->getOverlayManager();
     if (overlays.isOverlayEnabled(Overlay::OverlayDebug)) overlays.updateOverlayText(Overlay::OverlayDebug,text.c_str());
 }
@@ -306,6 +359,30 @@ void PyroWaveVideoDecoder::renderOverlays() {
 }
 
 void PyroWaveVideoDecoder::renderFrameOnMainThread() {
+    if(m_RetryTimer) { SDL_RemoveTimer(m_RetryTimer); m_RetryTimer=0; }
+    if(m_Native) {
+        { std::lock_guard<std::mutex> guard(m_Mutex); m_EventQueued=false; if(m_Failed) return; }
+        try {
+            updateStats();
+            auto& manager=Session::get()->getOverlayManager();
+            for(unsigned i=0;i<Overlay::OverlayMax;++i) {
+                const auto type=static_cast<Overlay::OverlayType>(i);
+                std::unique_ptr<SDL_Surface,decltype(&SDL_FreeSurface)> surface(manager.getUpdatedOverlaySurface(type),SDL_FreeSurface);
+                m_Native->updateOverlay(i,surface.get(),manager.isOverlayEnabled(type));
+            }
+            const auto start=LiGetMicroseconds(); const auto result=m_Native->render();
+            const uint64_t nativeDrops=m_Native->presentationDrops();
+            { std::lock_guard<std::mutex> guard(m_Mutex);
+              m_Stats.pacerDroppedFrames+=uint32_t(nativeDrops-m_LastNativeDrops); m_LastNativeDrops=nativeDrops; }
+            if(result.newFrame) {
+                std::lock_guard<std::mutex> guard(m_Mutex);
+                ++m_Stats.renderedFrames; m_Stats.totalPacerTimeUs+=result.readyUs;
+                m_Stats.totalRenderTimeUs+=PyroWave::elapsed(LiGetMicroseconds(),start);
+            }
+            if(result.retry) retryRenderer();
+        } catch(const std::exception& e) { fail(QString::fromUtf8(e.what())); }
+        return;
+    }
     PyroWave::Pixels pixels;
     int slot=-1,displayed=-1;
     uint64_t readyUs=0;
@@ -375,6 +452,34 @@ void PyroWaveVideoDecoder::notifyOverlayUpdated(Overlay::OverlayType) {
 }
 
 bool PyroWaveVideoDecoder::notifyWindowChanged(PWINDOW_STATE_CHANGE_INFO info) {
+    if(m_Native) { notifyNativeWindowEvent(); return true; }
     // Output size and aspect fit are recalculated on the main thread each render.
     return !(info->stateChangeFlags & ~(WINDOW_STATE_CHANGE_SIZE | WINDOW_STATE_CHANGE_DISPLAY));
+}
+
+void PyroWaveVideoDecoder::logNativeSummary() {
+    const auto& d=m_Native->diagnostics;
+    VIDEO_STATS stats=m_StreamStats; PyroWave::addStats(m_Stats,stats);
+    QJsonObject o{{"backend","NATIVE_VULKAN"},{"presentationPath","GPU_DECODE_CALLER_YUV_SHADER_SWAPCHAIN"},
+        {"preferredDecoderPath",QString::fromStdString(d.preferredPath)},{"actualDecoderPath",QString::fromStdString(d.actualPath)},
+        {"selectedGpu",QString::fromStdString(d.gpu)},{"runtimeCommit",PyroWave::CodecCommit},{"bitstreamId",PyroWave::BitstreamId},
+        {"apiVersion","0.6.0"},{"graniteCommit","b6cffd5ce81f540f0855e6778428483e14763d9b"},
+        {"sourceRevision",ASTERIA_PYROWAVE_SOURCE_REVISION},{"testOnly",m_TestOnly},
+        {"borrowedInstanceMatch",d.borrowedMatch},{"borrowedPhysicalDeviceMatch",d.borrowedMatch},{"borrowedDeviceMatch",d.borrowedMatch},
+        {"externalMemoryHandles",0},{"externalSemaphoreHandles",0},{"d3d11Resources",0},{"slots",3},
+        {"validation",d.validationActive ? "ENABLED" : "SKIP"},{"cleanupOkay",d.cleanupOkay}};
+    const auto number=[&o](const char* key,uint64_t value) { o[key]=qint64(value); };
+    number("receivedFrames",stats.receivedFrames); number("decodedFrames",d.decoded); number("renderedFrames",d.rendered);
+    number("networkDrops",stats.networkDroppedFrames); number("presentationDrops",d.presentationDrops);
+    number("nativeRetiredDrops",d.retiredDrops); number("cpuYuvReadbackFrames",d.cpuReadbacks);
+    number("swapchainRecreations",d.recreations); number("overlayUploads",d.overlayUploads); number("overlayRedraws",d.overlayRedraws);
+    number("fatalPresenterErrors",d.fatalErrors); number("slotReuse",d.slotReuse); number("decodeTimelineWaits",d.decodeWaits);
+    number("consumerTimelineSignals",d.consumerSignals); number("timelineErrors",d.timelineErrors);
+    number("validationErrors",d.validationErrors); number("validationWarnings",d.validationWarnings);
+    number("decodeApiSubmissionUs",d.decodeSubmitUs); number("presenterQueueSubmitUs",d.queueSubmitUs);
+    number("queuePresentCallUs",d.presentCallUs); number("renderLoopCpuUs",d.renderLoopUs);
+    number("assemblyUs",m_StreamPipeline.assemblyUs+m_Pipeline.assemblyUs);
+    number("parserPreparationUs",m_StreamPipeline.preparationUs+m_Pipeline.preparationUs);
+    number("decoderQueueWaitUs",m_StreamPipeline.decoderQueueUs+m_Pipeline.decoderQueueUs);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PYROWAVE_NATIVE_STREAM_SUMMARY %s",QJsonDocument(o).toJson(QJsonDocument::Compact).constData());
 }
