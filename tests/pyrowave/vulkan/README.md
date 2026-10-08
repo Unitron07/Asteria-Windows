@@ -4,8 +4,9 @@
 `7c6bf8e085ffe26fd36d7d72d7405b0ed5aa2e85` was merged through [PR #39](https://github.com/Unitron07/Asteria-Windows/pull/39)
 after Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 native ARM64
 owner qualification. See [STAGE4.md](STAGE4.md) for the final color, sampling,
-shader, lifecycle and provenance record. Production/live paths remain unchanged;
-Stage 5 live integration is the next step.
+shader, lifecycle and provenance record. Stage 4 left production/live paths
+unchanged. This draft now implements Stage 5 live integration; live Surface
+qualification is pending. See [STAGE5.md](STAGE5.md).
 
 # Isolated Stage 2 native Vulkan presenter probe
 

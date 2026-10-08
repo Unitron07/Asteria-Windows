@@ -8,7 +8,7 @@ class NativePresentation {
 public:
     struct Diagnostics {
         uint64_t retiredDrops=0,presentationDrops=0,slotReuse=0,decodeWaits=0,consumerSignals=0;
-        uint64_t recreations=0,overlayUploads=0,overlayRedraws=0,fatalErrors=0,cpuReadbacks=0;
+        uint64_t recreations=0,overlayUploads=0,overlayRedraws=0,retainedFrameRedraws=0,fatalErrors=0,cpuReadbacks=0;
         uint64_t decodeSubmitUs=0,renderLoopUs=0,queueSubmitUs=0,presentCallUs=0;
         uint64_t decoded=0,rendered=0,timelineErrors=0;
         unsigned validationErrors=0,validationWarnings=0;

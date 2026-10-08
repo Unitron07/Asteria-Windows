@@ -229,7 +229,7 @@ void Presenter::draw(VkCommandBuffer cmd,VkRenderPass pass,VkFormat format,VkExt
         check(gpu.CreateGraphicsPipelines(owner.deviceHandle(),VK_NULL_HANDLE,1,&info,nullptr,&pipelines[index]),"Stage 4 pipeline"); checkpoint("pipeline");
     }
     if(!ready) return; // Preflight still creates the qualified pipeline, then presents black.
-    const auto fit=fitVideo(int(extent.width),int(extent.height)); if(!fit.w || !fit.h) return;
+    const auto fit=fitVideo(int(extent.width),int(extent.height),int(width),int(height)); if(!fit.w || !fit.h) return;
     VkViewport viewport{float(fit.x),float(fit.y),float(fit.w),float(fit.h),0,1};
     VkRect2D scissor{{fit.x,fit.y},{uint32_t(fit.w),uint32_t(fit.h)}};
     gpu.CmdSetViewport(cmd,0,1,&viewport); gpu.CmdSetScissor(cmd,0,1,&scissor);

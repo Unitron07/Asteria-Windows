@@ -77,10 +77,10 @@ void Overlays::allocate(Generation& g,int width,int height) {
     gpu.UpdateDescriptorSets(device,1,&wi,0,nullptr);
     g.width=width; g.height=height;
 }
-void Overlays::update(unsigned index,SDL_Surface* input,bool enabled) {
-    auto& s=surfaces.at(index); s.enabled=enabled;
-    if(!enabled) { s.rgba.clear(); s.updated=false; s.current=-1; return; }
-    if(!input) return;
+bool Overlays::update(unsigned index,SDL_Surface* input,bool enabled) {
+    auto& s=surfaces.at(index); const bool changed=s.enabled!=enabled; s.enabled=enabled;
+    if(!enabled) { s.rgba.clear(); s.updated=false; s.current=-1; return changed; }
+    if(!input) return changed;
     const size_t bytes=overlayBytes(input->w,input->h);
     SDL_Surface* rgba=SDL_ConvertSurfaceFormat(input,SDL_PIXELFORMAT_RGBA32,0);
     if(!rgba) throw std::runtime_error(std::string("overlay RGBA conversion: ")+SDL_GetError());
@@ -92,6 +92,7 @@ void Overlays::update(unsigned index,SDL_Surface* input,bool enabled) {
             static_cast<const uint8_t*>(rgba->pixels)+size_t(y)*rgba->pitch,size_t(rgba->w)*4);
     } catch(...) { SDL_UnlockSurface(rgba); throw; }
     SDL_UnlockSurface(rgba); s.width=rgba->w; s.height=rgba->h; s.updated=true;
+    return true;
 }
 void Overlays::prepare(Surface& s) {
     if(!s.enabled || !s.updated) return;

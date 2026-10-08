@@ -15,7 +15,7 @@ struct NativePresentation::Impl {
     SDL_Window* window=nullptr;
     std::mutex mutex; // State/data, separate from the nonrecursive VkQueue lock.
     std::string error;
-    bool stopped=false,initialized=false;
+    bool stopped=false,initialized=false,overlayChanged=false;
     PyroWaveVulkan::Dispatch vk;
     Stage3::NativeDispatch native;
     Stage3::QueueLock queue;
@@ -65,7 +65,16 @@ bool NativePresentation::initialize(SDL_Window* window,int width,int height,bool
         options.unlockQueue=[&p] { p.queue.unlock(false); };
         options.suitable=[&p](VkPhysicalDevice physical) { p.native.loadInstance(p.vk,p.owner->instanceHandle()); return p.requirements.suitable(physical); };
         options.configure=[&p](VkDeviceCreateInfo& info) { p.requirements.configure(info); info.enabledExtensionCount=3; info.ppEnabledExtensionNames=p.extensions.data(); };
-        options.beforeVideo=[&p](VkCommandBuffer cmd) { if(p.presenter) p.presenter->before(cmd); if(p.overlays) p.overlays->before(cmd); };
+        options.beforeVideo=[&p](VkCommandBuffer cmd) {
+            // Begin a retained redraw only after WSI has acquired an image.
+            // A retry before recording must not leave the displayed payload
+            // pending when a newer decoded frame supersedes it.
+            if(p.presenter) {
+                if(p.selected>=0) p.presenter->select(unsigned(p.selected),*p.runtime.liveRange(),Stage4::Filter::Linear);
+                p.presenter->before(cmd);
+            }
+            if(p.overlays) p.overlays->before(cmd);
+        };
         options.video=[&p](VkCommandBuffer cmd,VkRenderPass pass,VkExtent2D extent) { if(p.presenter) p.presenter->record(cmd,pass,extent); if(p.overlays) p.overlays->record(cmd,pass,extent); };
         options.videoSubmit=[&p](VkSubmitInfo& submit) { if(p.presenter) p.presenter->submission(submit); };
         options.videoSubmitted=[&p] {
@@ -137,11 +146,15 @@ NativePresentation::RenderResult NativePresentation::render() {
     if(rect.right<=rect.left || rect.bottom<=rect.top) { p.slots.suspend([&p](int i) { p.retire(i); }); return result; }
     p.selected=p.slots.current(); if(p.selected<0) return result;
     const bool newFrame=p.slots.pending>=0;
-    p.presenter->select(unsigned(p.selected),*p.runtime.liveRange(),Stage4::Filter::Linear);
+    const bool overlayWork=p.overlayChanged || p.overlays->pending();
     const auto started=micros();
     if(p.owner->draw()) {
         if(newFrame) { result.newFrame=true; result.readyUs=micros()-p.readyUs[p.selected]; ++diagnostics.rendered; }
-        else ++diagnostics.overlayRedraws;
+        else {
+            ++diagnostics.retainedFrameRedraws;
+            if(overlayWork) ++diagnostics.overlayRedraws;
+        }
+        p.overlayChanged=false;
         p.slots.presented(p.selected);
         result.retry=p.overlays->pending();
     } else result.retry=true; // Serviced by a bounded SDL timer, never busy reposting.
@@ -152,7 +165,8 @@ NativePresentation::RenderResult NativePresentation::render() {
     return result;
 }
 void NativePresentation::updateOverlay(unsigned index,SDL_Surface* surface,bool enabled) {
-    auto& p=*impl; p.mainThread(); std::lock_guard<std::mutex> guard(p.mutex); p.overlays->update(index,surface,enabled);
+    auto& p=*impl; p.mainThread(); std::lock_guard<std::mutex> guard(p.mutex);
+    p.overlayChanged=p.overlays->update(index,surface,enabled) || p.overlayChanged;
 }
 void NativePresentation::windowChanged() { auto& p=*impl; p.mainThread(); p.owner->resize(); }
 void NativePresentation::shutdown() noexcept {

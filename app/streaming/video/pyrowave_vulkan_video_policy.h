@@ -21,11 +21,11 @@ inline double chromaUv(double lumaIndex, unsigned width, bool left = false) {
 }
 inline bool withinTolerance(int observed, int reference) { return std::abs(observed-reference) <= int(RgbTolerance); }
 struct Fit { int x,y,w,h; };
-inline Fit fitVideo(int width,int height) {
-    if(width<=0 || height<=0) return {0,0,0,0};
+inline Fit fitVideo(int width,int height,int sourceWidth=1920,int sourceHeight=1080) {
+    if(width<=0 || height<=0 || sourceWidth<=0 || sourceHeight<=0) return {0,0,0,0};
     int w=width,h=height;
-    if(int64_t(width)*9>int64_t(height)*16) w=int(int64_t(height)*16/9);
-    else h=int(int64_t(width)*9/16);
+    if(int64_t(width)*sourceHeight>int64_t(height)*sourceWidth) w=int(int64_t(height)*sourceWidth/sourceHeight);
+    else h=int(int64_t(width)*sourceHeight/sourceWidth);
     return {(width-w)/2,(height-h)/2,w,h};
 }
 struct FrameMetadata { PyroWave::YuvRange range; };

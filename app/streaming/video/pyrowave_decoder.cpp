@@ -473,6 +473,7 @@ void PyroWaveVideoDecoder::logNativeSummary() {
     number("networkDrops",stats.networkDroppedFrames); number("presentationDrops",d.presentationDrops);
     number("nativeRetiredDrops",d.retiredDrops); number("cpuYuvReadbackFrames",d.cpuReadbacks);
     number("swapchainRecreations",d.recreations); number("overlayUploads",d.overlayUploads); number("overlayRedraws",d.overlayRedraws);
+    number("retainedFrameRedraws",d.retainedFrameRedraws);
     number("fatalPresenterErrors",d.fatalErrors); number("slotReuse",d.slotReuse); number("decodeTimelineWaits",d.decodeWaits);
     number("consumerTimelineSignals",d.consumerSignals); number("timelineErrors",d.timelineErrors);
     number("validationErrors",d.validationErrors); number("validationWarnings",d.validationWarnings);

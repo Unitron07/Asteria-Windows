@@ -79,6 +79,10 @@ payload unavailable and stop the stream.
 
 Displayed planes remain protected until superseded. Every redraw waits the latest
 consumer value and advances it again. Overflow and invalid progression fail.
+Retained redraw publication starts only after successful WSI acquisition; a
+pre-record retry cannot strand a displayed slot's payload when a newer frame
+supersedes it. Aspect fitting uses negotiated video dimensions and preserves the
+qualified 16:9 fixture geometry.
 Minimize/zero drawable retires new pending frames and retains bounded state;
 restore resumes recreation/rendering. Hot-path fences are queried and finite
 acquire retries are timer-serviced. Device idle is limited to recreation/teardown.

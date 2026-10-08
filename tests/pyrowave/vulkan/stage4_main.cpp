@@ -1,5 +1,6 @@
 #define SDL_MAIN_HANDLED
 #include "stage4_presenter.h"
+#include "stage4_policy.h"
 #include <SDL_vulkan.h>
 #include <chrono>
 #include <iostream>

@@ -16,8 +16,34 @@ std::array<uint8_t,64> staging{};
 unsigned barriers=0,copies=0;
 }
 namespace PyroWaveVulkan {
-struct ProbeTestAccess { static void device(Probe& p) { p.device=handle<VkDevice>(900); } };
+struct ProbeTestAccess { static void device(Probe& p) { p.device=handle<VkDevice>(900); p.swapchainFormat=VK_FORMAT_R8G8B8A8_UNORM; } };
 struct OverlayTestAccess {
+    static void blendAndPlacement(Overlays& o) {
+        unsigned draws=0; std::vector<float> positions;
+        o.surfaces[0].enabled=true;
+        o.surfaces[0].current=0;
+        auto& status=o.surfaces[1]; status.enabled=true; status.current=0;
+        status.generations[0].width=500; status.generations[0].height=10;
+        o.gpu.CreateGraphicsPipelines=[](VkDevice,VkPipelineCache,uint32_t,const VkGraphicsPipelineCreateInfo* info,const VkAllocationCallbacks*,VkPipeline* out) {
+            const auto& a=info->pColorBlendState->pAttachments[0];
+            require(a.blendEnable && a.srcColorBlendFactor==VK_BLEND_FACTOR_SRC_ALPHA && a.dstColorBlendFactor==VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA);
+            require(a.srcAlphaBlendFactor==VK_BLEND_FACTOR_ONE && a.dstAlphaBlendFactor==VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA && a.colorBlendOp==VK_BLEND_OP_ADD);
+            *out=handle<VkPipeline>(999); return VK_SUCCESS;
+        };
+        o.gpu.DestroyPipeline=[](VkDevice,VkPipeline,const VkAllocationCallbacks*) {};
+        // Capturing state lives across the synchronous real record() invocation.
+        capturePositions=&positions; captureDraws=&draws;
+        o.gpu.CmdSetViewport=[](VkCommandBuffer,uint32_t,uint32_t,const VkViewport* v) { capturePositions->push_back(v->y); };
+        o.gpu.CmdSetScissor=[](VkCommandBuffer,uint32_t,uint32_t,const VkRect2D*) {};
+        o.gpu.CmdBindPipeline=[](VkCommandBuffer,VkPipelineBindPoint,VkPipeline) {};
+        o.gpu.CmdBindDescriptorSets=[](VkCommandBuffer,VkPipelineBindPoint,VkPipelineLayout,uint32_t,uint32_t,const VkDescriptorSet*,uint32_t,const uint32_t*) {};
+        o.gpu.CmdDraw=[](VkCommandBuffer,uint32_t,uint32_t,uint32_t,uint32_t) { ++*captureDraws; };
+        o.record({},handle<VkRenderPass>(500),{1280,720});
+        require(draws==2 && positions==std::vector<float>({0,710}));
+        capturePositions=nullptr; captureDraws=nullptr;
+    }
+    inline static std::vector<float>* capturePositions=nullptr;
+    inline static unsigned* captureDraws=nullptr;
     static void inspect(Overlays& o) {
         auto& surface=o.surfaces[0];
         require(surface.width==2 && surface.height==1 && surface.updated);
@@ -110,7 +136,8 @@ int main() {
             for(unsigned i=0;i<100;++i) { overlays.before({}); overlays.submitted(timeline,5+i); }
             require(copies==4 && overlays.uploads==4); // Redraws don't re-upload.
             overlays.update(0,nullptr,false); PyroWaveVulkan::OverlayTestAccess::state(overlays,-1,false);
-            require(!overlays.pending()); overlays.close(); overlays.close();
+            require(!overlays.pending()); PyroWaveVulkan::OverlayTestAccess::blendAndPlacement(overlays);
+            overlays.close(); overlays.close();
         }
         require(queue.balanced());
         std::cout<<"PASS REAL production dispatch: GPU-only dropped retirement; failure preserves payload; 1000 monotonic retained redraws; WSI owner thread; RGBA surface conversion; 3 bounded overlay generations; deferred newest update; no redraw uploads; disable/idempotent teardown\n";

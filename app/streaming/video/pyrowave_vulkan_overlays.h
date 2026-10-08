@@ -46,7 +46,7 @@ public:
     Overlays(Probe& o,PyroWaveVulkan::Dispatch& v,Stage3::NativeDispatch& n):owner(o),vk(v),native(n) {}
     ~Overlays() { close(); }
     void initialize();
-    void update(unsigned index,SDL_Surface* surface,bool enabled);
+    bool update(unsigned index,SDL_Surface* surface,bool enabled);
     void before(VkCommandBuffer command);
     void record(VkCommandBuffer command,VkRenderPass pass,VkExtent2D extent);
     void submitted(VkSemaphore timeline,uint64_t value);
