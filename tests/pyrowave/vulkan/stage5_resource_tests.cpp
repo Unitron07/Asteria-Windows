@@ -3,6 +3,7 @@
 #include <iostream>
 #include <thread>
 #include <map>
+#include <type_traits>
 static void require(bool condition) { if(!condition) throw std::runtime_error("Stage 5 real resource assertion"); }
 template<class F> void rejects(F operation) { bool rejected=false; try { operation(); } catch(const std::exception&) { rejected=true; } require(rejected); }
 template<class T> T handle(uintptr_t n) { return reinterpret_cast<T>(n); }
@@ -14,10 +15,52 @@ bool submitFailure=false;
 std::map<VkSemaphore,uint64_t> completed;
 std::array<uint8_t,64> staging{};
 unsigned barriers=0,copies=0;
+std::map<uintptr_t,std::string> liveResources;
+std::map<uintptr_t,uintptr_t> resourceParent;
+bool cleanupOkay=true;
+template<class T> void destroyTracked(T object,const char* kind) {
+    const auto id=reinterpret_cast<uintptr_t>(object);
+    if(!liveResources.count(id) || liveResources[id]!=kind) { cleanupOkay=false; return; }
+    for(const auto& pair:resourceParent) if(pair.second==id && liveResources.count(pair.first)) cleanupOkay=false;
+    liveResources.erase(id);
+}
 }
 namespace PyroWaveVulkan {
 struct ProbeTestAccess { static void device(Probe& p) { p.device=handle<VkDevice>(900); p.swapchainFormat=VK_FORMAT_R8G8B8A8_UNORM; } };
 struct OverlayTestAccess {
+    static unsigned seedCleanup(Overlays& o,unsigned prefix) {
+        unsigned count=0;
+        const auto add=[&](auto& field,const char* kind,uintptr_t dependency=0) {
+            const auto id=uintptr_t(++count);
+            if(count<=prefix) {
+                field=handle<std::remove_reference_t<decltype(field)>>(id); liveResources[id]=kind;
+                if(dependency) resourceParent[id]=dependency;
+            }
+            return id;
+        };
+        for(auto& s:o.surfaces) for(auto& g:s.generations) {
+            const auto image=add(g.image,"image"),memory=add(g.imageMemory,"memory");
+            if(memory<=prefix) resourceParent[image]=memory;
+            add(g.view,"view",image);
+            const auto buffer=add(g.staging,"buffer"),staging=add(g.stagingMemory,"memory");
+            if(staging<=prefix) resourceParent[buffer]=staging;
+        }
+        add(o.sampler,"sampler"); add(o.descriptors,"descriptor-layout"); add(o.descriptorPool,"descriptor-pool");
+        add(o.layout,"pipeline-layout"); add(o.vertex,"module"); add(o.fragment,"module");
+        for(auto& pipeline:o.pipelines) add(pipeline,"pipeline");
+        o.gpu.DestroyPipeline=[](VkDevice,VkPipeline h,const VkAllocationCallbacks*) { destroyTracked(h,"pipeline"); };
+        o.gpu.DestroyDescriptorPool=[](VkDevice,VkDescriptorPool h,const VkAllocationCallbacks*) { destroyTracked(h,"descriptor-pool"); };
+        o.gpu.DestroyDescriptorSetLayout=[](VkDevice,VkDescriptorSetLayout h,const VkAllocationCallbacks*) { destroyTracked(h,"descriptor-layout"); };
+        o.gpu.DestroyPipelineLayout=[](VkDevice,VkPipelineLayout h,const VkAllocationCallbacks*) { destroyTracked(h,"pipeline-layout"); };
+        o.gpu.DestroyShaderModule=[](VkDevice,VkShaderModule h,const VkAllocationCallbacks*) { destroyTracked(h,"module"); };
+        o.gpu.DestroySampler=[](VkDevice,VkSampler h,const VkAllocationCallbacks*) { destroyTracked(h,"sampler"); };
+        return count;
+    }
+    static void replacement(Overlays& o) {
+        auto& g=o.surfaces[0].generations[0]; g.set=handle<VkDescriptorSet>(440);
+        o.destroy(g); // Same destruction primitive used by extent replacement.
+        require(!g.image && !g.staging && !g.stagingMemory && !g.width && g.set==handle<VkDescriptorSet>(440));
+    }
     static void blendAndPlacement(Overlays& o) {
         unsigned draws=0; std::vector<float> positions;
         o.surfaces[0].enabled=true;
@@ -143,8 +186,21 @@ int main() {
             require(overlays.update(0,nullptr,false)); PyroWaveVulkan::OverlayTestAccess::state(overlays,-1,false);
             require(!overlays.update(0,nullptr,false));
             require(!overlays.pending()); PyroWaveVulkan::OverlayTestAccess::blendAndPlacement(overlays);
+            PyroWaveVulkan::OverlayTestAccess::replacement(overlays);
             overlays.close(); overlays.close();
         }
+        vk.DestroyImageView=[](VkDevice,VkImageView h,const VkAllocationCallbacks*) { destroyTracked(h,"view"); };
+        native.DestroyImage=[](VkDevice,VkImage h,const VkAllocationCallbacks*) { destroyTracked(h,"image"); };
+        native.DestroyBuffer=[](VkDevice,VkBuffer h,const VkAllocationCallbacks*) { destroyTracked(h,"buffer"); };
+        native.FreeMemory=[](VkDevice,VkDeviceMemory h,const VkAllocationCallbacks*) { destroyTracked(h,"memory"); };
+        unsigned resources=100;
+        for(unsigned prefix=0;prefix<=resources;++prefix) {
+            liveResources.clear(); resourceParent.clear();
+            PyroWaveVulkan::Overlays overlay(owner,vk,native);
+            resources=PyroWaveVulkan::OverlayTestAccess::seedCleanup(overlay,prefix);
+            overlay.close(); overlay.close(); require(cleanupOkay && liveResources.empty());
+        }
+        std::cout<<"PASS overlay partial cleanup: "<<resources+1<<" prefixes, idempotent, views/images/buffers before memory\n";
         require(queue.balanced());
         std::cout<<"PASS REAL production dispatch: GPU-only dropped retirement; failure preserves payload; 1000 monotonic retained redraws; WSI owner thread; RGBA surface conversion; 3 bounded overlay generations; deferred newest update; no redraw uploads; disable/idempotent teardown\n";
         return 0;

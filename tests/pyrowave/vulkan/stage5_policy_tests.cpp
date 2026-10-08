@@ -8,6 +8,13 @@ static void require(bool condition) { if(!condition) throw std::runtime_error("S
 template<class F> void rejects(F operation) { bool rejected=false; try { operation(); } catch(const std::exception&) { rejected=true; } require(rejected); }
 int main() {
     try {
+        bool queued=false; unsigned publications=0;
+        const auto overlayNotification=[&] { wakeFrame(queued,[&] { ++publications; return true; }); };
+        for(unsigned i=0;i<1000;++i) overlayNotification();
+        require(queued && publications==1); // Overlay-only updates coalesce without any decode.
+        queued=false; overlayNotification(); require(queued && publications==2);
+        queued=false; wakeFrame(queued,[&] { ++publications; return false; });
+        require(!queued); overlayNotification(); require(queued && publications==4);
         for(int successful=0;successful<3;++successful) {
             std::vector<int> attempts; BackendSelection selection;
             const auto attempt=[&](int i) { attempts.push_back(i); return i==successful; };
@@ -54,7 +61,7 @@ int main() {
         decoder.join(); require(queue.balanced());
         require(overlayBytes(31,17)==31*17*4); rejects([&] { overlayBytes(4096,4096); });
         require(overlayRect(500,70,720,false).y==0 && overlayRect(500,70,720,true).y==650);
-        std::cout<<"PASS Stage 5: fallback/no hot switch; 200000 bounded slot operations; retirement failure retains state; redraws="<<redraws<<" drops="<<retirements<<" reuses="<<reuses<<"; overflow; cross-thread nonrecursive queue lock\n";
+        std::cout<<"PASS Stage 5: overlay-only wake coalescing/retry; fallback/no hot switch; 200000 bounded slot operations; retirement failure retains state; redraws="<<redraws<<" drops="<<retirements<<" reuses="<<reuses<<"; overflow; cross-thread nonrecursive queue lock\n";
         return 0;
     } catch(const std::exception& e) { std::cerr<<e.what()<<'\n'; return 1; }
 }

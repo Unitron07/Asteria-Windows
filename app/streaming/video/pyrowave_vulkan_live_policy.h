@@ -4,6 +4,11 @@
 #include <optional>
 
 namespace PyroWaveVulkan {
+// Used by decode, overlay-only and window notifications under the decoder mutex.
+// A failed SDL publication must remain retryable, without another video frame.
+template<class Publish> void wakeFrame(bool& queued,Publish publish) {
+    if(!queued) queued=publish();
+}
 enum class Backend { Native, Legacy, Cpu };
 // Initialization only. A selected backend never hot-switches after packets start.
 template<class Native,class Legacy,class Cpu>

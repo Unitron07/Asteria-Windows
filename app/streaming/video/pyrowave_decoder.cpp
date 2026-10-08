@@ -192,10 +192,11 @@ void PyroWaveVideoDecoder::notifyNativeWindowEvent() {
     std::lock_guard<std::mutex> guard(m_Mutex); wakeRenderer();
 }
 void PyroWaveVideoDecoder::wakeRenderer() {
-    if (m_EventQueued) return;
-    SDL_Event event{};
-    event.type = SDL_USEREVENT; event.user.code = SDL_CODE_FRAME_READY;
-    m_EventQueued = SDL_PushEvent(&event) == 1;
+    PyroWaveVulkan::wakeFrame(m_EventQueued,[] {
+        SDL_Event event{};
+        event.type = SDL_USEREVENT; event.user.code = SDL_CODE_FRAME_READY;
+        return SDL_PushEvent(&event) == 1;
+    });
 }
 
 int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
