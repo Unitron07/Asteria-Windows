@@ -14,12 +14,14 @@ struct ProbeOptions {
     std::string failAt, deviceName;
     // Offline Stage 3 hooks: no swapchain or synthetic drawing resources.
     // Callback-owned feature storage must outlive this owner and the codec wrapper.
+    bool existingWin32Window = false;
+    std::function<void()> lockQueue, unlockQueue;
     bool deviceOnly = false;
     uint32_t minimumApi = VK_API_VERSION_1_0;
     std::function<bool(VkPhysicalDevice)> suitable;
     std::function<void(VkDeviceCreateInfo&)> configure;
 #ifdef PYROWAVE_VULKAN_STAGE4
-    // Isolated Stage 4 callbacks; absent from production and Stage 2/3 builds.
+    // Qualified video hooks shared by Stage 4 and production native PyroWave.
     std::function<void(VkCommandBuffer)> beforeVideo;
     std::function<void(VkCommandBuffer,VkRenderPass,VkExtent2D)> video;
     std::function<void(VkSubmitInfo&)> videoSubmit;
@@ -56,7 +58,7 @@ public:
     const VkInstanceCreateInfo& instanceCreateInfo() const { return instanceInfo; }
     const VkDeviceCreateInfo& deviceCreateInfo() const { return deviceInfo; }
 private:
-#ifdef STAGE4_RESOURCE_TEST
+#if defined(STAGE4_RESOURCE_TEST) || defined(STAGE5_RESOURCE_TEST)
     friend struct ProbeTestAccess;
 #endif
     SDL_Window* window;
@@ -97,6 +99,8 @@ private:
     VkValidationFeatureEnableEXT syncValidation = VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT;
     VkValidationFeaturesEXT validationInfo{VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT};
     void mainThread() const;
+    void drawableSize(int& width,int& height) const;
+    VkResult queueOperation(const std::function<VkResult()>& operation);
     void checkpoint(const char* name);
     void selectDevice();
     bool recreate();

@@ -1,0 +1,78 @@
+name: Stage 5 native live PyroWave integration
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/m1b-vulkan-stage5-*']
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/streaming/video/pyrowave*'
+      - 'app/streaming/video/shaders/pyrowave/**'
+      - 'app/streaming/session.*'
+      - 'tests/pyrowave/**'
+      - 'scripts/*stage5*.ps1'
+      - '.github/workflows/vulkan-stage5.yml'
+permissions:
+  contents: read
+concurrency:
+  group: vulkan-stage5-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  integration:
+    name: Production native core ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            platform: x64
+            runner: windows-2025
+          - arch: arm64
+            platform: ARM64
+            runner: windows-11-arm
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Build pinned patched runtime and verified SDL dependencies
+        shell: pwsh
+        run: |
+          ./scripts/build-pyrowave-deps.ps1 -Architecture '${{ matrix.arch }}'
+          ./scripts/setup-baseline-deps.ps1 -Architecture '${{ matrix.arch }}'
+      - name: Compile production core and historical presenters
+        shell: pwsh
+        run: |
+          $deps=(Resolve-Path 'build/pyrowave/${{ matrix.arch }}').Path
+          cmake -S tests/pyrowave/vulkan -B build/stage5-${{ matrix.arch }} -G 'Visual Studio 18 2026' -A ${{ matrix.platform }} -DPYROWAVE_VULKAN_STAGE5=ON -DPYROWAVE_VULKAN_STAGE4=ON -DPYROWAVE_VULKAN_SHARED_DEVICE=ON -DPYROWAVE_VULKAN_PROBE=ON -DSDL_ARCH=${{ matrix.arch }} "-DSDL_ROOT=$PWD/libs/windows" "-DPYROWAVE_ROOT=$deps/install" "-DVULKAN_HEADERS=$deps/source/Granite/third_party/khronos/vulkan-headers/include"
+          if($LASTEXITCODE) { throw 'Stage 5 configure failed' }
+          cmake --build build/stage5-${{ matrix.arch }} --config Release --parallel 2
+          if($LASTEXITCODE) { throw 'Stage 5 build failed' }
+      - name: Bounded slot/drop/redraw/fallback/overlay and historical regressions
+        shell: pwsh
+        run: |
+          ctest --test-dir build/stage5-${{ matrix.arch }} -C Release --output-on-failure
+          if($LASTEXITCODE) { throw 'Stage 5 or historical regressions failed' }
+          git diff --check
+          if($LASTEXITCODE) { throw 'Whitespace check failed' }
+      - name: Reproduce unchanged qualified video and separate overlay shaders
+        shell: pwsh
+        run: |
+          $record=Get-Content app/streaming/video/shaders/pyrowave/shader-provenance.json -Raw | ConvertFrom-Json
+          Invoke-WebRequest $record.compilerArchiveUrl -OutFile build/glslang.zip
+          if((Get-FileHash build/glslang.zip).Hash.ToLowerInvariant() -cne $record.compilerArchiveSha256) { throw 'Compiler archive hash mismatch' }
+          Expand-Archive build/glslang.zip build/glslang
+          ./scripts/verify-stage5-shaders.ps1 -Compiler build/glslang/bin/glslangValidator.exe -OutputRoot build/stage5-${{ matrix.arch }}/shader-reproduction
+      - name: Upload exact-head integration evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: vulkan-stage5-${{ matrix.arch }}-${{ github.run_id }}
+          path: |
+            build/stage5-${{ matrix.arch }}/Testing/
+            build/stage5-${{ matrix.arch }}/stage4-gpu-verification/
+            build/stage5-${{ matrix.arch }}/shader-reproduction/
+            build/pyrowave/${{ matrix.arch }}/evidence/
+          if-no-files-found: error

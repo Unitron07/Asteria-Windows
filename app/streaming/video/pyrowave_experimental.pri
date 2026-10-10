@@ -12,6 +12,12 @@ pyrowave_experimental {
     HEADERS += $$PWD/pyrowave_frame.h $$PWD/pyrowave_runtime.h
     # Offline probe includes this pri too; only the actual app owns Session/Qt.
     equals(TARGET, Asteria) {
+        DEFINES += PYROWAVE_VULKAN_SHARED_DEVICE PYROWAVE_VULKAN_STAGE4
+        PYROWAVE_SOURCE_SHA = $$system(git rev-parse HEAD)
+        isEmpty(PYROWAVE_SOURCE_SHA): error("Cannot determine native PyroWave source revision")
+        DEFINES += ASTERIA_PYROWAVE_SOURCE_REVISION=\\\"$$PYROWAVE_SOURCE_SHA\\\"
+        SOURCES += $$PWD/pyrowave_vulkan_dispatch.cpp $$PWD/pyrowave_vulkan_probe.cpp $$PWD/pyrowave_vulkan_shared.cpp $$PWD/pyrowave_vulkan_presenter.cpp $$PWD/pyrowave_vulkan_overlays.cpp $$PWD/pyrowave_vulkan_live.cpp
+        HEADERS += $$PWD/pyrowave_vulkan_shared.h $$PWD/pyrowave_vulkan_shared_policy.h $$PWD/pyrowave_vulkan_video_policy.h $$PWD/pyrowave_vulkan_presenter.h $$PWD/pyrowave_vulkan_overlays.h $$PWD/pyrowave_vulkan_live.h $$PWD/pyrowave_vulkan_live_policy.h
         SOURCES += $$PWD/pyrowave_decoder.cpp $$PWD/pyrowave_sdl.cpp $$PWD/pyrowave_gpu.cpp
         HEADERS += $$PWD/pyrowave_decoder.h $$PWD/pyrowave_pixels.h $$PWD/pyrowave_sdl.h $$PWD/pyrowave_gpu.h $$PWD/pyrowave_queue.h $$PWD/pyrowave_stats.h
     }

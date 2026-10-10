@@ -4,8 +4,9 @@
 `7c6bf8e085ffe26fd36d7d72d7405b0ed5aa2e85` was merged through [PR #39](https://github.com/Unitron07/Asteria-Windows/pull/39)
 after Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 native ARM64
 owner qualification. See [STAGE4.md](STAGE4.md) for the final color, sampling,
-shader, lifecycle and provenance record. Production/live paths remain unchanged;
-Stage 5 live integration is the next step.
+shader, lifecycle and provenance record. Stage 4 left production/live paths
+unchanged. This draft now implements Stage 5 live integration; live Surface
+qualification is pending. See [STAGE5.md](STAGE5.md).
 
 # Isolated Stage 2 native Vulkan presenter probe
 
@@ -134,3 +135,8 @@ state handling. CI cannot replace mandatory Surface visual owner execution.
 The GPU-free packaged runner regression exercises Windows PowerShell 5.1 and
 pwsh from an unrelated directory, with default, explicit and whitespace evidence
 paths. It uses an unavailable CPU-only fixture and never records an owner pass.
+# Live Stage 5 integration
+
+[Stage 5](STAGE5.md) is implemented in the draft integration and awaits exact-head
+CI plus [real Surface live owner qualification](STAGE5-OWNER-TEST.md).
+Stage 2/3/4 remain historical qualified/offline boundaries. Do not merge yet.

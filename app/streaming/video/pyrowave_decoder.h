@@ -3,6 +3,8 @@
 #include "overlaymanager.h"
 #include "pyrowave_runtime.h"
 #include "pyrowave_gpu.h"
+#include "pyrowave_vulkan_live.h"
+#include "pyrowave_vulkan_live_policy.h"
 #include "pyrowave_queue.h"
 #include "pyrowave_stats.h"
 #include <mutex>
@@ -27,9 +29,18 @@ public:
     bool notifyWindowChanged(PWINDOW_STATE_CHANGE_INFO info) override;
     void notifyOverlayUpdated(Overlay::OverlayType) override;
     QString getError() override;
+    bool usesNativeVulkan() const { return bool(m_Native); }
+    void notifyNativeWindowEvent();
+    void abortNative(const QString& reason) { if(m_Native) fail(reason); }
 
 private:
     bool fail(const QString& reason);
+    bool initializeLegacy(PDECODER_PARAMETERS params);
+    bool initializeCpu();
+    PyroWaveVulkan::BackendSelection m_BackendSelection;
+    uint64_t m_LastNativeDrops=0;
+    void retryRenderer();
+    void logNativeSummary();
     void wakeRenderer(); // m_Mutex held
     void updateStats();
     void renderOverlays();
@@ -42,6 +53,10 @@ private:
     std::mutex m_Mutex;
     PyroWave::Pixels m_Pending;
     uint64_t m_PendingReadyUs = 0;
+    std::unique_ptr<PyroWave::NativePresentation> m_Native;
+    SDL_TimerID m_RetryTimer=0;
+    VIDEO_STATS m_StreamStats={};
+    PyroWave::PipelineStats m_StreamPipeline;
     std::unique_ptr<PyroWave::GpuPresentation> m_Gpu;
     PyroWave::FrameSlots m_Slots;
     uint64_t m_GpuReadyUs[PyroWave::FrameSlots::Count] = {};

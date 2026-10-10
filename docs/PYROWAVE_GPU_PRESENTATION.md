@@ -2,9 +2,9 @@
 
 [Stage 3 offline shared-device proof](../tests/pyrowave/vulkan/STAGE3.md) now
 distinguishes exact identity from approved numerical equivalence: every decoded
-Y/U/V byte must be within ±1 of CPU decode; a single ±2 fails. Exact hashes and
+Y/U/V byte must be within Ãƒâ€šÃ‚Â±1 of CPU decode; a single Ãƒâ€šÃ‚Â±2 fails. Exact hashes and
 all diagnostic metrics remain recorded. At diagnostic head f08ecabb, the owner
-found deterministic ±1 variants in BOTH AUTO fragment and forced compute on
+found deterministic Ãƒâ€šÃ‚Â±1 variants in BOTH AUTO fragment and forced compute on
 Surface X1-85, using identical fixtures and the same caller device. Repeats were
 stable, device idle did not change bytes, and external handles/D3D11 stayed zero.
 Pinned upstream validation permits bounded reconstruction error; no exact
@@ -16,9 +16,9 @@ Stage 3 is complete. Exact-head Surface Pro 11 / Snapdragon X Plus / Adreno X1-8
 ARM64 owner qualification passed with `PASS_NUMERIC_EQUIVALENCE_OWNER_RUN` on
 `a3cf6b0c59db9465d01178900cd954390728363f`. [PR #36](https://github.com/Unitron07/Asteria-Windows/pull/36)
 merged via `06ea4adb745432842af81b73549f74c696fa5a39`. AUTO/fragment and
-FORCE_COMPUTE/compute both passed the per-byte ±1 contract; factory cleanup was
+FORCE_COMPUTE/compute both passed the per-byte Ãƒâ€šÃ‚Â±1 contract; factory cleanup was
 `PATCHED_AND_VERIFIED`. Vulkan validation remained `SKIP` because the layer was
-unavailable. The precise arithmetic cause of the ±1 differences remains unproven.
+unavailable. The precise arithmetic cause of the Ãƒâ€šÃ‚Â±1 differences remains unproven.
 
 **Stage 4 is COMPLETE and qualified.** The exact implementation head
 `7c6bf8e085ffe26fd36d7d72d7405b0ed5aa2e85` was merged through [PR #39](https://github.com/Unitron07/Asteria-Windows/pull/39)
@@ -27,7 +27,10 @@ Adreno X1-85 native ARM64. The isolated presenter proved same-device PyroWave
 GPU decode, caller-owned Y/U/V, explicit BT.709 FULL/LIMITED conversion, CENTER
 chroma, visible swapchain output, stable recreation and clean teardown. No CPU
 YUV readback, D3D11 resources or external handles entered presentation. Validation
-was `SKIP` because the layer was unavailable. Production/live paths remain unchanged.
+was `SKIP` because the layer was unavailable. The draft [Stage 5 live integration](../tests/pyrowave/vulkan/STAGE5.md) now
+shares this presenter with production PyroWave. Stage 5 IMPLEMENTED / LIVE OWNER
+QUALIFICATION PENDING; exact-head CI and the real Surface procedure are required.
+Standard codecs, Automatic and legacy fallbacks retain their behavior.
 
 ## Current live ARM64 owner result
 
@@ -111,11 +114,11 @@ loss/submission failure ends the stream through normal Session cleanup; it does
 not replay host launch or silently continue with suspect GPU resources.
 
 A dedicated native Vulkan PyroWave presenter is now the qualified Stage 4 boundary.
-The next step is **Stage 5 live integration**: `live PyroWave stream -> existing
+The draft **Stage 5 live integration** implements: `live PyroWave stream -> existing
 packet/parser path -> same-device GPU decode -> qualified Stage 4 presenter ->
-swapchain`. Stage 5 will retain standard codecs, safe CPU fallback and capability
-gating, then separately qualify overlays, live resize/reconnect/device-loss and
-performance. Automatic codec selection remains unchanged unless separately
+swapchain`. Stage 5 retains standard codecs, legacy GPU/CPU fallbacks and capability
+gating. Native overlays, live resize/reconnect/device-loss and performance await
+real Surface owner qualification; see the dedicated lifecycle and test document. Automatic codec selection remains unchanged unless separately
 authorized. MultiSeat and VR are outside this scope.
 
 ## Lifetime and latency

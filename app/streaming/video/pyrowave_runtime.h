@@ -33,6 +33,7 @@ public:
     bool decode(const std::vector<std::uint8_t>& container, Pixels& output);
     bool decodeLive(const std::vector<std::uint8_t>& container, Pixels& output,
                     std::size_t& packetCount, DecodeTiming* timing = nullptr);
+    uint64_t cpuYuvReadbackFrames() const { return m_CpuReadbacks; }
     bool frameRejected() const { return m_FrameRejected; }
     std::optional<YuvRange> liveRange() const { return m_LiveRange; }
     void discardFrame();
@@ -51,6 +52,11 @@ public:
     // Only compiled by the isolated offline project; caller retains all Vulkan
     // create-info storage, queue userdata and handles until close() finishes.
     bool borrowDevice(const pyrowave_device_create_info& info);
+    bool decodeLiveNative(const std::vector<std::uint8_t>& container,
+                          const pyrowave_gpu_buffers& buffers,
+                          const pyrowave_gpu_sync_operation& acquire,
+                          const pyrowave_gpu_sync_operation& release,
+                          std::size_t& packets,DecodeTiming& timing);
     bool nativePrefersFragment() const { return m_Device && m_Api.prefersFragment(m_Device); }
     bool decodeNative(const std::vector<std::uint8_t>& container,
                       const pyrowave_gpu_buffers& buffers,
@@ -66,6 +72,8 @@ private:
                     const pyrowave_gpu_buffers* gpu = nullptr,
                     const pyrowave_gpu_sync_operation* acquire = nullptr,
                     const pyrowave_gpu_sync_operation* release = nullptr);
+    bool m_Borrowed = false;
+    uint64_t m_CpuReadbacks = 0;
     bool m_FrameRejected = false;
     std::optional<YuvRange> m_LiveRange;
     bool fail(const std::string& reason);

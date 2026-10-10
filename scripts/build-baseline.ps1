@@ -138,6 +138,9 @@ This unsigned development baseline is not a qualified Asteria release.
             -ClientExecutable $clientExecutable
     }
     # Inspect the final ZIP, including nested Qt plugins, before any artifact upload.
+    if ($clientExecutable -eq 'Asteria.exe') {
+        & (Join-Path $PSScriptRoot 'stage5-package-manifest.ps1') -PackagePath $package[0].FullName -Architecture $Architecture -SourceRevision $sha
+    }
     & (Join-Path $PSScriptRoot 'test-package-architecture.ps1') `
         -PackagePath $package[0].FullName -Architecture $Architecture `
         -ReportPath (Join-Path $evidence 'package-architecture.json') `
@@ -146,6 +149,14 @@ This unsigned development baseline is not a qualified Asteria release.
         & (Join-Path $PSScriptRoot 'test-pyrowave-package.ps1') `
             -PackagePath $package[0].FullName -Architecture $Architecture `
             -ReportPath (Join-Path $evidence 'pyrowave-package.json')
+        $ownerVerificationRoot = Join-Path $SourceRoot "build/stage5-owner-verification-$Architecture"
+        New-Item -ItemType Directory -Force -Path $ownerVerificationRoot | Out-Null
+        Expand-Archive -LiteralPath $package[0].FullName -DestinationPath $ownerVerificationRoot -Force
+        & (Join-Path $ownerVerificationRoot 'verify-stage5-owner-package.ps1') `
+            -ExpectedSourceRevision $sha -Architecture $Architecture `
+            -PackageRoot $ownerVerificationRoot -ArchivePath $package[0].FullName `
+            -ExpectedArchiveSha256 (Get-FileHash -LiteralPath $package[0].FullName).Hash |
+            Tee-Object -FilePath (Join-Path $evidence 'stage5-owner-package-verification.txt')
     }
     tar -czf (Join-Path $evidence 'source.tar.gz') --exclude=.git --exclude=./build --exclude=./libs -C $SourceRoot .
     if ($LASTEXITCODE -ne 0) { throw 'Unable to archive source and submodules' }

@@ -1582,8 +1582,15 @@ void Session::toggleFullscreen()
     // to deadlock when transitioning out of fullscreen. Destroy the decoder before
     // exiting fullscreen as a workaround. See issue #973.
     SDL_LockMutex(m_DecoderLock);
-    delete m_VideoDecoder;
-    m_VideoDecoder = nullptr;
+#ifdef PYROWAVE_EXPERIMENTAL
+    const bool retainNative=m_VideoDecoder && m_ActiveVideoFormat==VIDEO_FORMAT_PYROWAVE &&
+        static_cast<PyroWaveVideoDecoder*>(m_VideoDecoder)->usesNativeVulkan();
+    if(!retainNative)
+#endif
+    {
+        delete m_VideoDecoder;
+        m_VideoDecoder = nullptr;
+    }
     SDL_UnlockMutex(m_DecoderLock);
 #endif
 
@@ -2166,6 +2173,26 @@ void Session::exec()
                 needsFirstEnterCapture = false;
             }
 
+#ifdef PYROWAVE_EXPERIMENTAL
+            if(m_VideoDecoder && m_ActiveVideoFormat==VIDEO_FORMAT_PYROWAVE &&
+               static_cast<PyroWaveVideoDecoder*>(m_VideoDecoder)->usesNativeVulkan()) {
+                switch(event.window.event) {
+                case SDL_WINDOWEVENT_SIZE_CHANGED: case SDL_WINDOWEVENT_EXPOSED:
+                case SDL_WINDOWEVENT_MINIMIZED: case SDL_WINDOWEVENT_MAXIMIZED:
+                case SDL_WINDOWEVENT_RESTORED: case SDL_WINDOWEVENT_SHOWN:
+#if SDL_VERSION_ATLEAST(2,0,18)
+                case SDL_WINDOWEVENT_DISPLAY_CHANGED:
+#endif
+                    static_cast<PyroWaveVideoDecoder*>(m_VideoDecoder)->notifyNativeWindowEvent();
+                    break;
+                }
+                const int newDisplayIndex=SDL_GetWindowDisplayIndex(m_Window);
+                if(newDisplayIndex>=0 && newDisplayIndex!=currentDisplayIndex) {
+                    currentDisplayIndex=newDisplayIndex; updateOptimalWindowDisplayMode();
+                }
+                break;
+            }
+#endif
             // We want to recreate the decoder for resizes (full-screen toggles) and the initial shown event.
             // We use SDL_WINDOWEVENT_SIZE_CHANGED rather than SDL_WINDOWEVENT_RESIZED because the latter doesn't
             // seem to fire when switching from windowed to full-screen on X11.
@@ -2260,6 +2287,13 @@ void Session::exec()
 
             // Fall through
         case SDL_RENDER_DEVICE_RESET:
+#ifdef PYROWAVE_EXPERIMENTAL
+            if(m_VideoDecoder && m_ActiveVideoFormat==VIDEO_FORMAT_PYROWAVE &&
+               static_cast<PyroWaveVideoDecoder*>(m_VideoDecoder)->usesNativeVulkan()) {
+                static_cast<PyroWaveVideoDecoder*>(m_VideoDecoder)->abortNative("native presentation device reset; reconnect required");
+                break;
+            }
+#endif
 
             if (event.type != SDL_WINDOWEVENT) {
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,

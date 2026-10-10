@@ -25,6 +25,11 @@ foreach ($notice in @(
 }
 Copy-Item -LiteralPath (Join-Path $sourceRoot 'tests/pyrowave/LIVE-OWNER-TEST.md') -Destination (Join-Path $DeployDirectory 'PYROWAVE-OWNER-TEST.md')
 Copy-Item -LiteralPath (Join-Path $sourceRoot 'scripts/collect-pyrowave-logs.ps1') -Destination $DeployDirectory
+$shaderStage=Join-Path $stage 'shaders'
+New-Item -ItemType Directory -Force $shaderStage | Out-Null
+Copy-Item -Path (Join-Path $sourceRoot 'app/streaming/video/shaders/pyrowave/*') -Destination $shaderStage
+Copy-Item -LiteralPath (Join-Path $sourceRoot 'tests/pyrowave/vulkan/STAGE5-OWNER-TEST.md') -Destination (Join-Path $DeployDirectory 'STAGE5-OWNER-TEST.md')
+Copy-Item -LiteralPath (Join-Path $sourceRoot 'scripts/verify-stage5-owner-package.ps1') -Destination $DeployDirectory
 $dumpbin = (Get-Command dumpbin.exe -ErrorAction Stop).Source
 $imports = & $dumpbin /imports $ClientPath
 if ($LASTEXITCODE) { throw 'Cannot inspect client imports' }
