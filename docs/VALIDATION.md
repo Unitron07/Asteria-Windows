@@ -40,7 +40,17 @@ compute decode plus CPU I420 presentation works. Broader x64/hardware and shared
 GPU-path qualification remain separate. Earlier failures/timings below remain
 historical, superseded for the current named ARM64 fallback by this owner result.
 
-## Current state: v0.2.0 released
+## Current state: v0.3.0 released
+
+[Asteria v0.3.0 — Native Vulkan Release](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.3.0) is the latest normal
+release for Windows x64 and native ARM64. Native Vulkan is preferred for
+Experimental PyroWave on supported hardware; initialization-time fallbacks,
+standard codecs and Automatic selection are retained. Stage 5 is complete.
+Final exact-package ARM64 smoke is PASS / OWNER-CONFIRMED; all required
+exact-source CI/package checks passed, with hosted GPU and validation SKIPs
+retained. See the [release record](#asteria-v030-release-record).
+
+## Historical state: v0.2.0 released
 
 Live PyroWave SDR 8-bit 4:2:0 has been validated against Vibepollo on native
 Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 ARM64. It remains
@@ -61,41 +71,69 @@ Broader hardware, GPU interop and performance qualification remain open.
 
 Moonlight PC v6.2.0 is the upstream baseline; weekly upstream/master proposals
 preserve history and require human review. See [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md).
-The current release is [Asteria v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0), an unsigned Windows
+The historical release is [Asteria v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0), an unsigned Windows
 x64/native ARM64 portable release. Its binaries and corresponding source are
 from `42f756e465288157608fe894e3a3dfe800b05344`; subsequent release-status
 updates are documentation-only. v0.1.0 evidence below remains historical.
 
-## Asteria v0.3.0 release candidate
+<a id="asteria-v030-release-candidate"></a>
 
-**Preparation only; not published or approved for tagging.** The initial source
-is main after Stage 5 docs PR #42 merged at
-`78e6c0aa43e3dcfe576fef86643065b80081c86b`. The release-preparation PR contains
-release notes/status documentation and a neutral package-manifest qualification
-label, without changing the qualified streaming implementation, runtime pins,
-shaders, Automatic selection or standard codecs. See
-[RELEASE_NOTES_v0.3.0.md](RELEASE_NOTES_v0.3.0.md).
+## Asteria v0.3.0 release record
 
-Reuse the v0.2.0 unsigned Release/portable pipeline. Keep app/version.txt at
-the inherited Moonlight `6.2.0`; Asteria's release tag/asset identity is `v0.3.0`.
-Portable/symbol/source assets are exact qualified CI bytes renamed for v0.3.0.
-Review build evidence for privacy before staging public evidence ZIPs, and hash
-the final eight archive bytes in SHA256SUMS.txt. No raw private owner/host logs
-are included without review. No Vulkan loader, SDK or shader compiler is bundled.
+[Asteria v0.3.0 — Native Vulkan Release](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.3.0) was published on
+2026-10-10 as a normal/latest GitHub release (`draft=false`, `prerelease=false`).
 
-Before publication, record one exact candidate SHA, both architecture build
-IDs, executable/runtime/shader/source identity, all artifact hashes and every
-required regression/package result. Hosted GPU/validation absence remains SKIP.
-The Stage 5 log supports implementation qualification, but the final rebuilt
-normal ARM64 package requires its own exact-identity owner smoke: launch,
-Vibepollo/native PyroWave/video, audio/input/debug overlay, no fatal Vulkan error,
-clean disconnect and a standard-codec stream. x64 hardware limitations must be
-reported honestly. A changed source SHA or asset invalidates that package sign-off.
+- Annotated `v0.3.0` tag and both package source revisions: `2f29a8963078dadbe4e5031791a6390098e4635d`.
+- Tag object: `571abdca0565db336e220d00beae6a1712118db5`.
+- Stage 5 docs PR #42 merged at `78e6c0aa43e3dcfe576fef86643065b80081c86b` before release preparation.
+- Release prep PR #43 merged as `40e1228a92b52c38cf1ebf5c18412874de050c80`. The qualified release source is its parent; the merge and tagged commit have identical file trees. The release tag preserves the exact tested executable/source identity.
+- Normal x64/native ARM64 unsigned builds: [run 38091218299](https://github.com/Unitron07/Asteria-Windows/actions/runs/38091218299), jobs `114327873269` / `114327873198`; pinned upstream comparisons also PASS.
+- Both settings suites: 17 PASS / 0 FAIL / 0 SKIP. Keyboard/input, normal startup/default codec, icon, PE/import, runtime/shader/source/package checks PASS.
+- Stage 2 [38091218122](https://github.com/Unitron07/Asteria-Windows/actions/runs/38091218122), Stage 3 [38091218099](https://github.com/Unitron07/Asteria-Windows/actions/runs/38091218099), Stage 4 [38091218121](https://github.com/Unitron07/Asteria-Windows/actions/runs/38091218121), Stage 5 [38091218123](https://github.com/Unitron07/Asteria-Windows/actions/runs/38091218123) and PyroWave [38091221236](https://github.com/Unitron07/Asteria-Windows/actions/runs/38091221236) PASS on the exact release source. Additional baseline push [38091221419](https://github.com/Unitron07/Asteria-Windows/actions/runs/38091221419) also PASS. Hosted GPU cases remain SKIP.
 
-STOP for explicit owner approval before the annotated v0.3.0 tag or normal
-GitHub release (`prerelease=false`). Update current-version release status only
-after publication; preserve v0.2.0 notes/evidence below. Performance qualification
-and v1.0 polish remain next; PyroWave stays Experimental.
+All nine uploaded assets were publicly downloaded after publication: size,
+GitHub digest and actual SHA-256 matched the approved staged bytes. The eight
+archives retain the established v0.2.0 portable/symbol/source/evidence scheme;
+`SHA256SUMS.txt` covers those eight archive bytes, without hashing itself.
+
+| Asset | SHA-256 |
+| --- | --- |
+| `Asteria-v0.3.0-evidence-arm64.zip` | `b4ba3e068443f329a49150727e9e7431961dfca83782a1b5e66b2af3212d445c` |
+| `Asteria-v0.3.0-evidence-x64.zip` | `0ea75cd3f8cd91d082e9e804a9483e9759b243b49c4e56b03cdb2f3342a35c97` |
+| `Asteria-v0.3.0-source-arm64.tar.gz` | `59ac584a9930b2dd45d7dea826859f07213d86ad2709e3a6b917dc8b25042f10` |
+| `Asteria-v0.3.0-source-x64.tar.gz` | `e1cc79eb244a62499050fa700016c41fcb273edb2b75744cc94262ea7b506a29` |
+| `Asteria-v0.3.0-windows-arm64-portable.zip` | `4754bf1cf7c6809aa8877fd379a6c04a978f23788d8175cbf4d0b26d75f82791` |
+| `Asteria-v0.3.0-windows-arm64-symbols.zip` | `9625ae5b1ed51d1f64cd31fa8aa192ca74bdd32c57f3e10def09a13885963e36` |
+| `Asteria-v0.3.0-windows-x64-portable.zip` | `a74ab15a7807669c55489d626ebf88e94606af791d91729dff3dd34bc185104b` |
+| `Asteria-v0.3.0-windows-x64-symbols.zip` | `913ef8632bbc42b4a2d063740ed0ff792e8f85c160292c1f96ff6a7aa30208cf` |
+| `SHA256SUMS.txt` | `7b3a904cc0022bb7fac30be70f064b44da743e05a81c440dff5448f4a44f7040` |
+
+The final ARM64 portable ZIP above was explicitly owner-confirmed on 2026-10-10:
+"Tested this exact package; all checks passed." Normal launch, connection to
+Vibepollo, native PyroWave video, audio/input, debug overlay, no fatal presenter
+errors, clean disconnect and standard-codec streaming passed. This is functional
+owner sign-off, not a new independently reviewed log or machine counter record;
+no new host/driver details are inferred. x64 hardware streaming was not performed.
+
+The historical Stage 5 first live log remains separately verified at
+`5c7ec593d9c5c27b097d194ea758b48b09a2bba4`; additional reconnect/window/overlay-only
+exercises remain owner-confirmed. Its `overlayRedraws=0` is unchanged. FULL live
+range was log-verified; Stage 4 separately qualified FULL and LIMITED. Vulkan
+validation remains **SKIP**, not PASS. No raw private owner/host logs were published.
+
+PyroWave `186f0393b77f7755953b5ecde994bb1cec2e4155`, bitstream `186f0393`, C API
+`0.6.0`, Granite `b6cffd5ce81f540f0855e6778428483e14763d9b` and approved patches
+remain unchanged. Runtime DLL SHA-256: x64
+`3b4bc9f8a38dfb6a0cb6dad5a125b5f101c58af46dbd31b1d73d5c275cfacd39`; ARM64
+`bc669e5aa30f7cdfa4599ef8746e12b0988b3e41d2dcd08cc5368d0c308adc8c`.
+Qualified video/overlay shader source, SPIR-V and header provenance is retained
+in each package/evidence archive. No bundled Vulkan loader, SDK or runtime shader
+compiler is required. App/version.txt remains inherited `6.2.0`.
+
+PyroWave remains **Experimental**. Controlled performance qualification and
+v1.0 polish are next, planning only. Post-publication status edits are docs-only;
+the immutable release source, binaries, tag and asset hashes above stay unchanged.
+Historical v0.2.0, Stage 2/3/4 and earlier qualification evidence is preserved.
 
 ## Asteria v0.2.0 release record
 

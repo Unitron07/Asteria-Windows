@@ -4,22 +4,22 @@
 
 # Asteria
 
-**[Asteria v0.2.0 is released](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0):** Moonlight PC v6.2.0 baseline, native Windows x64/ARM64,
-and explicitly selected **PyroWave (Experimental)** in normal builds, with pinned
-runtime/provenance and codec-aware bitrate controls. Automatic uses standard codecs.
-Live Vibepollo SDR 8-bit 4:2:0 is owner-validated on Surface Pro 11 / Snapdragon X
-Plus / Adreno X1-85; this is not production-stable or universal hardware qualification.
-See [validation](docs/VALIDATION.md#current-live-arm64-owner-result).
+**[Asteria v0.3.0 — Native Vulkan Release is available](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.3.0).**
+Native Vulkan is the preferred backend for explicitly selected **PyroWave
+(Experimental)** on supported Windows hardware. Decoded Y/U/V stays GPU-resident
+through BT.709 conversion and presentation, avoiding CPU video readback, external
+handles and D3D11 video upload in the native path. Safe initialization-time
+fallbacks remain; Automatic continues to select standard codecs.
 
-**v0.3.0 — Native Vulkan Release is being prepared.** Stage 5 is complete and
-native Vulkan is the preferred Experimental PyroWave backend on supported
-hardware in current main. See the [release-note draft](docs/RELEASE_NOTES_v0.3.0.md)
-and [candidate gates](docs/VALIDATION.md#asteria-v030-release-candidate).
-v0.2.0 remains the current published release until v0.3.0 is approved/published.
+Stage 5 is complete / owner-confirmed on Surface Pro 11 / Snapdragon X Plus /
+Adreno X1-85. The final exact ARM64 release package also passed owner-confirmed
+functional smoke. GPU/validation SKIPs remain SKIPs; broader GPU and performance
+qualification is separate. See the [release notes](docs/RELEASE_NOTES_v0.3.0.md)
+and [release record](docs/VALIDATION.md#asteria-v030-release-record).
 
 **Asteria** is a native Windows game-streaming client derived from [Moonlight PC](https://github.com/moonlight-stream/moonlight-qt). Its active direction is codec experimentation and low-latency presentation on native Windows x64/ARM64, followed by isolated remote sessions and future remote PCVR.
 
-> **Release status:** [v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0) is the current normal release for Windows x64 and native ARM64, distributed as unsigned portable ZIPs. PyroWave remains Experimental and explicitly selected. See the [release notes](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0) and [validation record](docs/VALIDATION.md#asteria-v020-release-record) for tested scope and limitations. [v0.1.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0) and its evidence remain available as history.
+> **Release status:** [v0.3.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.3.0) is the current normal release for Windows x64 and native ARM64, distributed as unsigned portable ZIPs. PyroWave remains Experimental and explicitly selected. See the [release notes](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.3.0) and [validation record](docs/VALIDATION.md#asteria-v030-release-record) for tested scope and limitations. v0.2.0, v0.1.0 and their evidence remain available as history.
 
 ## Available now
 
@@ -33,9 +33,9 @@ The owner uses Nonary/Vibepollo (the Apollo-derived host service) for this proje
 
 ## Current public release
 
-**[Asteria v0.2.0 is available now](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0)** for Windows x64 and native ARM64 as unsigned portable ZIPs. Both packages were built from commit `42f756e465288157608fe894e3a3dfe800b05344` in the same successful [Windows qualification run](https://github.com/Unitron07/Asteria-Windows/actions/runs/37262907765), with both-target [PyroWave qualification](https://github.com/Unitron07/Asteria-Windows/actions/runs/37263855400). The release includes SHA-256 checksums, symbols, corresponding source and build/architecture evidence. Extract into a writable folder and keep `portable.dat` beside `Asteria.exe`. No installer is offered.
+**[Asteria v0.3.0 is available now](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.3.0)** for Windows x64 and native ARM64 as unsigned portable ZIPs. Both packages were built from `2f29a8963078dadbe4e5031791a6390098e4635d` in [Windows baseline run 38091218299](https://github.com/Unitron07/Asteria-Windows/actions/runs/38091218299). The annotated tag points to this exact owner-qualified source, which is included in merged PR #43. All eight portable/symbol/source/evidence archives and `SHA256SUMS.txt` were publicly downloaded and hash-verified after publication. Extract into a writable folder and keep `portable.dat` beside `Asteria.exe`. No installer is offered.
 
-Normal packages include PyroWave (Experimental), still explicit-only; Automatic uses standard codecs. The inherited application version is 6.2.0 and the project release tag is v0.2.0. Broad GPU/hardware qualification remains open; see the [release record](docs/VALIDATION.md#asteria-v020-release-record). Release-status changes after the tag are documentation-only; binaries/source correspond to the tagged commit above.
+Normal packages include PyroWave (Experimental), still explicit-only; Automatic uses standard codecs. The inherited application version is 6.2.0 and the Asteria release tag is v0.3.0. Final ARM64 launch/native PyroWave video/audio/input/debug overlay/clean disconnect and standard-codec streaming are owner-confirmed; x64 coverage is CI/packaging only. See the [release record](docs/VALIDATION.md#asteria-v030-release-record). These post-publication status updates are documentation-only; release binaries/source remain tied to the tag above.
 
 ## Roadmap
 
@@ -65,7 +65,8 @@ The old M2–M4 Apollo convenience milestones are deprioritized. Capability pars
 clipboard, virtual-display requests and server commands may return as supporting
 integrations. Historical identifiers, technical notes and release-qualification
 gates remain in the [porting plan](docs/PORTING_PLAN.md).
-v0.2.0 is released; v0.3.0 prepares the completed native Vulkan PyroWave path.
+v0.3.0 is released with the completed native Vulkan PyroWave path.
+Controlled performance qualification and v1.0 polish are next.
 Isolated sessions and VR remain future work, outside this release.
 
 ### Planned Asteria VR
@@ -80,7 +81,7 @@ See the detailed [porting plan](docs/PORTING_PLAN.md), [architecture](docs/ARCHI
 
 ## Upstream maintenance
 
-Moonlight history is preserved. The explicit baseline is v6.2.0; weekly automation watches upstream `master`, proposes clean merges as PRs and reports conflicts for human integration. Upstream changes are never auto-merged. See [maintainer instructions](docs/UPSTREAM_SYNC.md). v0.2.0 is the current release.
+Moonlight history is preserved. The explicit baseline is v6.2.0; weekly automation watches upstream `master`, proposes clean merges as PRs and reports conflicts for human integration. Upstream changes are never auto-merged. See [maintainer instructions](docs/UPSTREAM_SYNC.md). v0.3.0 is the current release.
 
 ## Naming and provenance
 

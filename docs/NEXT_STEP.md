@@ -1,11 +1,13 @@
 # Next step: controlled native Vulkan performance qualification and v1.0 polish
 
-Release preparation first: **v0.3.0 — Native Vulkan Release** packages the
-completed Stage 2–5 work. The [release notes](RELEASE_NOTES_v0.3.0.md) and
-[candidate gates](VALIDATION.md#asteria-v030-release-candidate) describe the
-same-source CI/package verification, final ARM64 smoke and explicit publication
-approval required. v0.2.0 stays current until publication. This release work
-does not start the performance or v1.0 implementation phase below.
+**[v0.3.0 — Native Vulkan Release is published](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.3.0)**
+from `2f29a8963078dadbe4e5031791a6390098e4635d`, with exact-source x64/native ARM64 packages,
+verified public downloads and final ARM64 owner-confirmed functional smoke.
+See the [release record](VALIDATION.md#asteria-v030-release-record) and
+[release notes](RELEASE_NOTES_v0.3.0.md). Stage 5 is complete; PyroWave remains
+Experimental. Controlled performance qualification and v1.0 polish are the next
+development phase described below. This documentation update starts no tuning,
+v1.0 implementation, MultiSeat or VR work.
 
 [Stage 3 offline shared-device proof](../tests/pyrowave/vulkan/STAGE3.md) now
 distinguishes exact identity from approved numerical equivalence: every decoded
@@ -37,7 +39,7 @@ teardown. CPU YUV readback, D3D11 resources and external handles were absent fro
 the presentation path. Validation was `SKIP` because the layer was unavailable.
 See [STAGE4.md](../tests/pyrowave/vulkan/STAGE4.md) for the final evidence.
 
-## Current state: v0.2.0 released
+## Historical state: v0.2.0 released
 
 Live PyroWave SDR 8-bit 4:2:0 has been validated against Vibepollo on native
 Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 ARM64. It remains
@@ -58,7 +60,7 @@ Broader hardware, GPU interop and performance qualification remain open.
 
 Moonlight PC v6.2.0 is the upstream baseline; weekly upstream/master proposals
 preserve history and require human review. See [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md).
-The current release is [Asteria v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0), an unsigned Windows
+The historical release is [Asteria v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0), an unsigned Windows
 x64/native ARM64 portable release. Its binaries and corresponding source are
 from `42f756e465288157608fe894e3a3dfe800b05344`; subsequent release-status
 updates are documentation-only. v0.1.0 evidence below remains historical.
