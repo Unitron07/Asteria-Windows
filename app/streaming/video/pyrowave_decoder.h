@@ -7,6 +7,7 @@
 #include "pyrowave_vulkan_live_policy.h"
 #include "pyrowave_queue.h"
 #include "pyrowave_stats.h"
+#include "pyrowave_perf.h"
 #include <mutex>
 
 // Decode on common-c's VideoDec thread; all SDL resources belong to the SDL main
@@ -34,6 +35,15 @@ public:
     void abortNative(const QString& reason) { if(m_Native) fail(reason); }
 
 private:
+    std::unique_ptr<PyroWavePerf::Capture> m_Perf;
+    QString m_PerfDirectory;
+    QString m_PerfGpu, m_PerfBackend, m_PerfDecoderPath;
+    int m_TargetFps=0, m_BitrateKbps=0;
+    bool m_Vsync=false, m_OverlayChanged=false;
+    uint32_t m_PendingFrameId=0;
+    uint32_t m_GpuFrameIds[PyroWave::FrameSlots::Count] = {};
+    void configurePerf(bool testOnly);
+    void exportPerf() noexcept;
     bool fail(const QString& reason);
     bool initializeLegacy(PDECODER_PARAMETERS params);
     bool initializeCpu();
@@ -43,7 +53,7 @@ private:
     void logNativeSummary();
     void wakeRenderer(); // m_Mutex held
     void updateStats();
-    void renderOverlays();
+    bool renderOverlays();
     void reportGpuTiming(); // Decoder thread, or shutdown after decode is stopped.
     PyroWave::Runtime m_Runtime;
     std::vector<std::uint8_t> m_FrameBytes; // Dedicated common-c decoder thread scratch.
