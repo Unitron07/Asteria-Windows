@@ -1,4 +1,4 @@
-# Next step: Stage 5 live native Vulkan PyroWave integration
+# Next step: controlled native Vulkan performance qualification and v1.0 polish
 
 [Stage 3 offline shared-device proof](../tests/pyrowave/vulkan/STAGE3.md) now
 distinguishes exact identity from approved numerical equivalence: every decoded
@@ -42,7 +42,7 @@ PyroWave a 3000 Mbps ceiling, and PyroWave automatic bitrate is approximately
 `width * height * fps * 1.6` bits/s. Manual overrides survive resolution/FPS changes.
 The codec selector remains in Basic Settings.
 
-The tested Qualcomm driver rejects the Vulkan/D3D11 shared-fence import with
+The historical v0.2.0 Qualcomm path rejects Vulkan/D3D11 shared-fence import with
 `PYROWAVE_ERROR_UNSUPPORTED_EXTERNAL_HANDLE`. Fragment decode is preferred for
 the GPU interop probe; Asteria safely recreates the decoder for compute-path
 decode with CPU I420 readback/presentation. This working fallback does not imply
@@ -62,28 +62,42 @@ PyroWave CI. See the [release record](VALIDATION.md#asteria-v020-release-record)
 for commit, run IDs, checksums and hardware-validation limits. Future releases
 repeat their own qualification; this evidence is specific to v0.2.0.
 
-The next architectural target is **Stage 5 live native Vulkan PyroWave integration**:
+## Stage 5 COMPLETE / OWNER-CONFIRMED
 
-`live PyroWave stream -> existing packet/parser path -> same-device GPU decode -> qualified Stage 4 Vulkan presenter -> swapchain`.
+The qualified implementation `5c7ec593d9c5c27b097d194ea758b48b09a2bba4`
+merged through [PR #41](https://github.com/Unitron07/Asteria-Windows/pull/41)
+at `beb64659fd9217f95beaa2f92547b4933518ecdf`.
+The first Surface live run is log-verified; five reconnects in the same process,
+window transitions, functional overlay-only updates, standard-codec streaming
+and audio/input across reconnects are separately OWNER-CONFIRMED. The first log
+records `overlayRedraws=0`; no additional machine counters are asserted.
+Validation remains **SKIP**. See the
+[evidence and limits](../tests/pyrowave/vulkan/STAGE5.md#stage-5-owner-qualification-record)
+and [retained owner procedure](../tests/pyrowave/vulkan/STAGE5-OWNER-TEST.md).
+Stage 2/3/4 historical qualification remains unchanged. Native success did not
+exercise legacy GPU/CPU-I420 fallback or prove physical device-loss recovery.
 
-**Stage 5 IMPLEMENTED / LIVE OWNER QUALIFICATION PENDING.** See the
-[implementation/lifecycle contract](../tests/pyrowave/vulkan/STAGE5.md) and
-[real Surface procedure](../tests/pyrowave/vulkan/STAGE5-OWNER-TEST.md). Exact-head
-CI and owner evidence are required before merging the draft PR. No release is
-authorized. Stage 5 does not replace the historical Stage 4 qualification. Its high-level scope is to wire the qualified
-presenter into the live decoder/session lifecycle, retain standard-codec behavior,
-safe PyroWave CPU fallback and capability gating, integrate overlays separately,
-qualify live resize/reconnect/device-loss/fallback behavior, and measure real
-performance after correctness. Automatic codec selection remains unchanged unless
-separately authorized. MultiSeat and VR are outside this step.
-M1A remains measurement-first; standard codecs and Moonlight behavior are the
-baseline. This is architectural work rather than more CPU-fallback micro-optimization.
+## Next phase: controlled performance qualification and v1.0 polish
+
+Planning only; implementation and optimization require separate work:
+
+- Repeat matched native-versus-old-fallback benchmarks on Surface Pro 11 with
+  the same resolution, frame rate, bitrate and workload; record which fallback
+  actually runs and preserve standard codecs/Moonlight as regression baselines.
+- Separate CPU decode API/async submission time from native GPU iDWT/Dequant
+  execution and final scanout/end-to-end latency. The Stage 5 screenshot and
+  shutdown timings are samples, not a matched benchmark or latency proof.
+- Measure frame queue delay, present duration, CPU utilization, power, drops,
+  p95/p99 stability and long-run resource behavior with repeatable conditions.
+- Address only bottlenecks demonstrated by those measurements.
+- Complete UI/QoL polish and regression qualification before v1.0.
+- Keep PyroWave **Experimental** until a separate graduation decision. No v1.0
+  tag or release is authorized by Stage 5 completion.
+
 P1b live records/FEC/partial recovery and bandwidth probing remain later work.
-After the performance phase, isolated sessions / MultiSeat are the next major
-feature area, followed by Asteria VR. Session-lifecycle work may benefit VR but
-is not a hard dependency, and VR does not require PyroWave. Both need a separate
-Asteria-oriented Vibepollo fork/host extension;
-see [the roadmap](PORTING_PLAN.md#host-dependent-roadmap-boundaries).
+v2 MultiSeat and v3 VR are future milestones, outside this task. Both need a
+separate Asteria-oriented Vibepollo fork/host extension; VR does not require
+PyroWave. See [the roadmap](PORTING_PLAN.md#host-dependent-roadmap-boundaries).
 Old M2â€“M4 Apollo convenience work is deprioritized; its notes are retained as
 possible supporting integrations rather than standalone active milestones.
 

@@ -1,7 +1,23 @@
-# Stage 5 live owner procedure
+# Stage 5 completed owner qualification and reproduction procedure
 
-LIVE OWNER QUALIFICATION PENDING. DO NOT MERGE. Use the exact-head normal ARM64
-Asteria portable package on Surface Pro 11 / Snapdragon X Plus / Adreno X1-85.
+Status: **Stage 5 COMPLETE / OWNER-CONFIRMED**. Qualified implementation
+`5c7ec593d9c5c27b097d194ea758b48b09a2bba4` merged through
+[PR #41](https://github.com/Unitron07/Asteria-Windows/pull/41) at
+`beb64659fd9217f95beaa2f92547b4933518ecdf`.
+The first live run is log-verified. Five same-process reconnects/window changes,
+functional overlay-only updates, standard-codec streaming and audio/input across
+reconnects are separately OWNER-CONFIRMED. The first log reports
+`overlayRedraws=0`; no additional machine counters/logs are asserted. Full-range
+live output is log-verified; precise LIMITED-range live evidence is unavailable,
+while Stage 4 independently qualified FULL and LIMITED. Validation remains SKIP.
+See the [complete evidence record](STAGE5.md#stage-5-owner-qualification-record).
+PyroWave remains Experimental; this completion does not authorize a release.
+
+## Retained reproduction checklist
+
+Use the exact-head normal ARM64 Asteria portable package on Surface Pro 11 /
+Snapdragon X Plus / Adreno X1-85. This checklist records the original procedure;
+it does not assert that a separate machine log exists for every confirmed task.
 
 1. Extract the ZIP to a new directory. Verify the SHA printed in CI's evidence
    artifact. From that directory, run Windows PowerShell or PowerShell 7:
@@ -48,4 +64,5 @@ For each live stream (summary `testOnly=false`), return the parseable
   overlayUploads/overlayRedraws, CPU API durations, and native GPU timing reports.
 
 Synthetic/offline tests and successful compilation do not count as live owner
-qualification. Stop and return the evidence for review; do not merge or release.
+qualification. Future retests should return evidence for review; no release,
+Experimental graduation or automatic merge is authorized by this procedure.
