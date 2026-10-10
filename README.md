@@ -11,6 +11,12 @@ Live Vibepollo SDR 8-bit 4:2:0 is owner-validated on Surface Pro 11 / Snapdragon
 Plus / Adreno X1-85; this is not production-stable or universal hardware qualification.
 See [validation](docs/VALIDATION.md#current-live-arm64-owner-result).
 
+**v0.3.0 — Native Vulkan Release is being prepared.** Stage 5 is complete and
+native Vulkan is the preferred Experimental PyroWave backend on supported
+hardware in current main. See the [release-note draft](docs/RELEASE_NOTES_v0.3.0.md)
+and [candidate gates](docs/VALIDATION.md#asteria-v030-release-candidate).
+v0.2.0 remains the current published release until v0.3.0 is approved/published.
+
 **Asteria** is a native Windows game-streaming client derived from [Moonlight PC](https://github.com/moonlight-stream/moonlight-qt). Its active direction is codec experimentation and low-latency presentation on native Windows x64/ARM64, followed by isolated remote sessions and future remote PCVR.
 
 > **Release status:** [v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0) is the current normal release for Windows x64 and native ARM64, distributed as unsigned portable ZIPs. PyroWave remains Experimental and explicitly selected. See the [release notes](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0) and [validation record](docs/VALIDATION.md#asteria-v020-release-record) for tested scope and limitations. [v0.1.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.1.0) and its evidence remain available as history.
@@ -41,10 +47,11 @@ Normal packages include PyroWave (Experimental), still explicit-only; Automatic 
    named x64/ARM64 targets; live Vibepollo SDR 4:2:0 is owner-validated on the named
    ARM64 device. Broader GPU interop/performance qualification remains open.
    Standard codecs and Moonlight behavior remain the baseline.
-3. **Native Vulkan PyroWave presentation:** the next major technical milestone,
-   post-v0.2.0. Planned GPU-resident presentation aims to avoid CPU readback/re-upload
-   and Vulkan/D3D11 external fence sharing while retaining safe fallback paths.
-   It is not implemented.
+3. **Native Vulkan PyroWave presentation:** Stage 2–5 implementation is complete;
+   Stage 5 live functional qualification is owner-confirmed on Surface X1-85.
+   GPU-resident presentation avoids CPU video readback/re-upload and external
+   handles in the native path. Safe fallbacks remain. Controlled performance
+   qualification and v1.0 polish are next; PyroWave stays Experimental.
 4. **Isolated sessions / MultiSeat:** the next major feature area after performance;
    one host remains usable locally while a remote user gets an isolated session.
    Most work belongs in a separate Asteria-oriented Vibepollo fork/host extension;
@@ -58,7 +65,8 @@ The old M2–M4 Apollo convenience milestones are deprioritized. Capability pars
 clipboard, virtual-display requests and server commands may return as supporting
 integrations. Historical identifiers, technical notes and release-qualification
 gates remain in the [porting plan](docs/PORTING_PLAN.md).
-v0.2.0 is released; native Vulkan presentation, isolated sessions and VR remain future work.
+v0.2.0 is released; v0.3.0 prepares the completed native Vulkan PyroWave path.
+Isolated sessions and VR remain future work, outside this release.
 
 ### Planned Asteria VR
 
