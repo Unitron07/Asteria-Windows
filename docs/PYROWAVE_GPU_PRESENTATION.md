@@ -27,12 +27,41 @@ Adreno X1-85 native ARM64. The isolated presenter proved same-device PyroWave
 GPU decode, caller-owned Y/U/V, explicit BT.709 FULL/LIMITED conversion, CENTER
 chroma, visible swapchain output, stable recreation and clean teardown. No CPU
 YUV readback, D3D11 resources or external handles entered presentation. Validation
-was `SKIP` because the layer was unavailable. The draft [Stage 5 live integration](../tests/pyrowave/vulkan/STAGE5.md) now
-shares this presenter with production PyroWave. Stage 5 IMPLEMENTED / LIVE OWNER
-QUALIFICATION PENDING; exact-head CI and the real Surface procedure are required.
+was `SKIP` because the layer was unavailable. [Stage 5 live integration](../tests/pyrowave/vulkan/STAGE5.md)
+now shares this presenter with production PyroWave and is **COMPLETE /
+OWNER-CONFIRMED**. Qualified head `5c7ec593d9c5c27b097d194ea758b48b09a2bba4`
+merged through [PR #41](https://github.com/Unitron07/Asteria-Windows/pull/41)
+at `beb64659fd9217f95beaa2f92547b4933518ecdf`.
 Standard codecs, Automatic and legacy fallbacks retain their behavior.
 
-## Current live ARM64 owner result
+## Current native live ARM64 owner result
+
+Normal Asteria on Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85
+presented normal Vibepollo video through native fragment decode on the same
+Asteria-owned Vulkan device, caller-owned GPU-resident Y/U/V, the qualified
+Stage 4 BT.709 shader and swapchain. The first `testOnly=false` log records all
+borrowed-handle matches, zero CPU readbacks/external handles/D3D11 resources,
+93 safely retired presentation drops, three bounded slots and clean teardown.
+
+Five same-process reconnects with window transitions, functional overlay-only
+updates, a standard-codec smoke test and audio/input across reconnects are
+separately OWNER-CONFIRMED. The first log has `overlayRedraws=0`; additional
+machine counters/logs are not asserted. Full-range live output is log-verified;
+precise LIMITED-range live evidence is unavailable, while Stage 4 independently
+qualified FULL and LIMITED. Validation remains **SKIP**, with zero reported
+errors/warnings, rather than a validation pass. See the
+[full evidence record](../tests/pyrowave/vulkan/STAGE5.md#stage-5-owner-qualification-record).
+
+The 2560x1440 screenshot sample showed about 119.91 incoming/decoding/render FPS,
+0.38 ms decode CPU API time, 0.34 ms frame queue delay and 0.27 ms render CPU time.
+Shutdown GPU diagnostics reported iDWT fragment 1.886 ms/frame and Dequant
+0.782 ms/frame. Async CPU submission is distinct from GPU execution; these
+samples do not measure final scanout/end-to-end latency or establish a matched
+speedup against the historical fallback. Controlled performance qualification
+and v1.0 polish are [next](NEXT_STEP.md#next-phase-controlled-performance-qualification-and-v10-polish).
+PyroWave stays Experimental; no release or graduation is implied.
+
+## Historical live ARM64 compute/CPU-I420 fallback result
 
 Owner-reported test: Surface Pro 11, Snapdragon X Plus, Qualcomm Adreno X1-85;
 Vibepollo host, 2560x1440, up to 120 Hz target, PyroWave SDR 8-bit 4:2:0.
@@ -74,7 +103,7 @@ not improve measured performance and appears worse on this tested device, not
 universally. This correction restores compute CPU fallback; its performance
 qualification was pending at that stage; the latest named ARM64 fallback result is recorded above.
 
-## Chosen path and pinned API evidence
+## Historical legacy interoperability path and pinned API evidence
 
 Codec commit `186f0393b77f7755953b5ecde994bb1cec2e4155`, C API 0.6.0 is unchanged.
 `pyrowave_decoder_decode_gpu_buffer` writes into caller-provided UNORM image
@@ -102,7 +131,8 @@ After any failed presentation probe, the decoder is recreated for synchronous
 CPU I420 output using the default compute path for v0.2.0. Offline CPU validation
 also defaults to compute. Preferred, GPU and fallback modes remain logged; this
 output-path policy has no vendor table. Native timing and preparation diagnostics
-are retained. Future native Vulkan presentation may produce a different result.
+are retained. The qualified Stage 5 native path is recorded above; this legacy
+fallback remains capability-gated and was not exercised by the native success run.
 
 Cross-API output is enabled only after adapter LUID equality, ID3D11Device5 /
 Context4 availability, every real R8 output-image import, every timeline fence
@@ -114,14 +144,15 @@ loss/submission failure ends the stream through normal Session cleanup; it does
 not replay host launch or silently continue with suspect GPU resources.
 
 A dedicated native Vulkan PyroWave presenter is now the qualified Stage 4 boundary.
-The draft **Stage 5 live integration** implements: `live PyroWave stream -> existing
+The completed **Stage 5 live integration** implements: `live PyroWave stream -> existing
 packet/parser path -> same-device GPU decode -> qualified Stage 4 presenter ->
 swapchain`. Stage 5 retains standard codecs, legacy GPU/CPU fallbacks and capability
-gating. Native overlays, live resize/reconnect/device-loss and performance await
-real Surface owner qualification; see the dedicated lifecycle and test document. Automatic codec selection remains unchanged unless separately
-authorized. MultiSeat and VR are outside this scope.
+gating. Native overlays and live window/reconnect behavior are owner-confirmed;
+physical device-loss recovery and controlled performance qualification remain
+separate. See the dedicated lifecycle/evidence document. Automatic codec selection
+remains unchanged. MultiSeat and VR are outside this scope.
 
-## Lifetime and latency
+## Historical legacy interoperability lifetime and latency
 
 Three frame slots allow one displayed frame, one rendering frame, and one pending
 frame. The displayed slot stays protected for overlay-only redraw. Publication
@@ -189,7 +220,7 @@ The old approximately 12.45 ms included decoder queueing/preparation; the new
 narrow fallback interval excludes them. Compare pipeline FPS and measured stages,
 not just the changed definition of the decode line.
 
-## Qualification
+## Historical legacy interoperability qualification and retest procedure
 
 GPU-free tests exercise queue bounds/stale drops/retained redraw, window merging,
 host latency, percentages, queue/decode/render units and unmeasured values.

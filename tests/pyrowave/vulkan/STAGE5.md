@@ -1,10 +1,13 @@
 # Stage 5: live native PyroWave integration
 
-Status: **Stage 5 IMPLEMENTED / LIVE OWNER QUALIFICATION PENDING**.
-The draft implementation requires exact-head CI and the real Surface procedure
-in [STAGE5-OWNER-TEST.md](STAGE5-OWNER-TEST.md). Do not merge or release.
-Stage 4 remains the historical owner-qualified color/presenter evidence; Stage 5
-does not imply successful live hardware qualification.
+Status: **Stage 5 COMPLETE / OWNER-CONFIRMED**.
+Qualified implementation: `5c7ec593d9c5c27b097d194ea758b48b09a2bba4`.
+[PR #41](https://github.com/Unitron07/Asteria-Windows/pull/41) merged at
+`beb64659fd9217f95beaa2f92547b4933518ecdf`.
+The first live run is log-verified on that implementation; additional functional
+tests are owner-confirmed as recorded below. Stage 2/3/4 historical evidence
+remains preserved. PyroWave stays Experimental; no release/graduation is implied.
+The [owner procedure](STAGE5-OWNER-TEST.md) is retained for reproduction.
 
 ## Main audit and thread/lifecycle map
 
@@ -126,7 +129,7 @@ duration totals. Runtime explicitly refuses CPU output while borrowing a native
 device and counts actual synchronous CPU calls; native cpuYuvReadbackFrames must
 be zero. No end-to-end latency is claimed. Validation unavailable is SKIP.
 
-## Build, provenance and remaining qualification
+## Build, provenance and CI
 
 Normal application builds dynamically load only System32 vulkan-1.dll, with no
 mandatory vulkan-1.lib import, bundled loader, SDK or runtime shader compiler.
@@ -142,6 +145,77 @@ redraw, overflow, thread and actual overlay/dispatch mocks plus Stage 2/3/4
 regressions. Existing Windows baseline and PyroWave workflows remain required.
 The normal exact-head Windows baseline packages include Asteria, runtime,
 shader provenance/source/bytes, notices, source revision, manifest/PE inventory,
-owner verifier and checklist. GPU absence is SKIP. Full live Surface qualification,
-visual/audio/input/overlay/window parity, five reconnects and standard-codec smoke
-test are still required; desirable x64 hardware qualification is separate.
+owner verifier and checklist. All six exact-head workflows/fourteen jobs passed:
+[Windows x64/ARM64 Asteria and upstream baseline](https://github.com/Unitron07/Asteria-Windows/actions/runs/37718066589),
+[Stage 5](https://github.com/Unitron07/Asteria-Windows/actions/runs/37718066450),
+[Stage 4](https://github.com/Unitron07/Asteria-Windows/actions/runs/37718066518),
+[Stage 3](https://github.com/Unitron07/Asteria-Windows/actions/runs/37718066439),
+[Stage 2](https://github.com/Unitron07/Asteria-Windows/actions/runs/37718066425)
+and [PyroWave regressions](https://github.com/Unitron07/Asteria-Windows/actions/runs/37718066447).
+Stage 5 had 9 PASS / 3 GPU SKIP per architecture. Hosted GPU absence and Vulkan
+validation remain SKIP; real Surface execution is separate evidence below.
+
+## Stage 5 owner qualification record
+
+**FIRST LIVE RUN VERIFIED IN LOG ON EXACT HEAD.** The supplied reviewed record
+for `Asteria-1791668616.log` and the visible overlay screenshot is from normal
+ARM64 Asteria on Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85,
+connected to normal Vibepollo. The summary is `testOnly=false` at the qualified
+implementation SHA above. No additional host configuration or logs are invented.
+
+```text
+Vibepollo -> common-c PyroWave framing/parser -> same Asteria-owned Vulkan device
+ -> fragment GPU decode -> caller-owned GPU-resident Y/U/V
+ -> qualified Stage 4 BT.709 shader -> Vulkan swapchain
+```
+
+| First-run summary | Recorded values |
+| --- | --- |
+| Selected GPU / backend | Qualcomm Adreno X1-85 / NATIVE_VULKAN |
+| Preferred / actual decoder path | fragment / fragment |
+| borrowedInstanceMatch / borrowedPhysicalDeviceMatch / borrowedDeviceMatch | true / true / true |
+| presentationPath | GPU_DECODE_CALLER_YUV_SHADER_SWAPCHAIN |
+| cpuYuvReadbackFrames / externalMemoryHandles / externalSemaphoreHandles / d3d11Resources | 0 / 0 / 0 / 0 |
+| slots / slotReuse | 3 / 19628 |
+| receivedFrames / decodedFrames / renderedFrames | 19631 / 19631 / 19538 |
+| presentationDrops / nativeRetiredDrops | 93 / 93 |
+| decodeTimelineWaits / consumerTimelineSignals | 19878 / 19878 |
+| timelineErrors / fatalPresenterErrors / cleanupOkay | 0 / 0 / true |
+| overlayUploads / retainedFrameRedraws / overlayRedraws | 213 / 247 / 0 |
+| swapchainRecreations / networkDrops | 2 / 30 |
+| validation / validationErrors / validationWarnings | SKIP / 0 / 0 |
+
+The first log proves native GPU-resident presentation, correct dropped-slot
+retirement, bounded slot reuse and clean teardown. It alone does not prove five
+reconnects or overlay-only redraw: `overlayRedraws=0` in this run.
+
+**FIVE RECONNECTS/OVERLAY-ONLY/STANDARD-CODEC/AUDIO-INPUT OWNER-CONFIRMED.**
+The owner explicitly reports successful completion of:
+
+- Five connect/stream/disconnect/reconnect cycles in the SAME Asteria process,
+  with resize, minimize/restore, maximize/restore and fullscreen/windowed changes.
+- Functional overlay-only updates on paused or low-frame-rate content, with
+  debug/status overlays functioning.
+- A standard-codec streaming smoke test with normal behavior.
+- Audio/input functioning across reconnect cycles.
+
+These functional confirmations are separate from the first log's recorded
+counters. No five additional JSON summaries or exact counters are asserted;
+`overlayRedraws>0` has not been machine-verified in the available evidence.
+Full-range live mode is log-verified; precise LIMITED-range live evidence is
+unavailable, while Stage 4 independently qualified FULL and LIMITED.
+
+The screenshot sample was 2560x1440 at about 119.91 incoming/decoding/render FPS,
+0.38 ms decode CPU API time, 0.34 ms frame queue delay and 0.27 ms render CPU time.
+Shutdown codec GPU timing was iDWT fragment 1.886 ms/frame and Dequant
+0.782 ms/frame. Async CPU API/submission time is not GPU execution duration;
+these samples are not an end-to-end/scanout latency measurement or matched
+performance benchmark.
+
+Validation remains **SKIP**, not PASS. The native success run did not exercise
+initialization-time legacy GPU interoperability/CPU-I420 fallbacks, which remain
+available. Forced physical device-loss recovery, broader/x64 live hardware and
+controlled performance qualification remain separate. The next phase is
+[controlled native performance qualification and v1.0 polish](../../../docs/NEXT_STEP.md#next-phase-controlled-performance-qualification-and-v10-polish),
+with no code optimization, release, Experimental graduation, MultiSeat or VR work
+included in this qualification record.

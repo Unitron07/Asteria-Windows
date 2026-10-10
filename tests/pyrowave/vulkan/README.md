@@ -5,8 +5,8 @@
 after Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85 native ARM64
 owner qualification. See [STAGE4.md](STAGE4.md) for the final color, sampling,
 shader, lifecycle and provenance record. Stage 4 left production/live paths
-unchanged. This draft now implements Stage 5 live integration; live Surface
-qualification is pending. See [STAGE5.md](STAGE5.md).
+unchanged. Stage 5 subsequently integrated this core into production/live
+PyroWave and is COMPLETE / OWNER-CONFIRMED; see [STAGE5.md](STAGE5.md).
 
 # Isolated Stage 2 native Vulkan presenter probe
 
@@ -137,6 +137,17 @@ pwsh from an unrelated directory, with default, explicit and whitespace evidence
 paths. It uses an unavailable CPU-only fixture and never records an owner pass.
 # Live Stage 5 integration
 
-[Stage 5](STAGE5.md) is implemented in the draft integration and awaits exact-head
-CI plus [real Surface live owner qualification](STAGE5-OWNER-TEST.md).
-Stage 2/3/4 remain historical qualified/offline boundaries. Do not merge yet.
+[Stage 5](STAGE5.md) is **COMPLETE / OWNER-CONFIRMED**. Qualified implementation
+`5c7ec593d9c5c27b097d194ea758b48b09a2bba4` merged through
+[PR #41](https://github.com/Unitron07/Asteria-Windows/pull/41) at
+`beb64659fd9217f95beaa2f92547b4933518ecdf`.
+The first live Surface run is log-verified; five same-process reconnects/window
+changes, overlay-only updates, standard-codec streaming and audio/input are
+separately OWNER-CONFIRMED. The first log has `overlayRedraws=0`; no additional
+machine counters are asserted. Validation remains SKIP. Full-range live output
+is log-verified; Stage 4 independently qualified FULL and LIMITED. See the
+[evidence and limits](STAGE5.md#stage-5-owner-qualification-record) and
+[retained reproduction procedure](STAGE5-OWNER-TEST.md).
+Stage 2/3/4 remain historical qualified/offline boundaries. PyroWave remains
+Experimental; [controlled performance qualification and v1.0 polish](../../../docs/NEXT_STEP.md#next-phase-controlled-performance-qualification-and-v10-polish)
+are next, with no release/graduation, MultiSeat or VR work authorized here.
