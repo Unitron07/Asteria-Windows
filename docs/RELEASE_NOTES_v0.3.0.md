@@ -40,9 +40,9 @@ PyroWave remains pinned to commit `186f0393b77f7755953b5ecde994bb1cec2e4155`, bi
 
 Use the x64 package on Intel/AMD Windows PCs, or the native ARM64 package on Windows-on-ARM hardware. Both use the established unsigned Release build configuration and include the required Qt/SDL/codec dependencies and notices. No Vulkan SDK, bundled Vulkan loader or runtime shader compiler is required; native Vulkan uses the installed Windows GPU driver.
 
-Stage 5 live native Vulkan was owner-qualified on **Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85**, using normal ARM64 Asteria and normal Vibepollo. The first exact-head live log verified fragment decode, all borrowed-device handle matches, zero CPU video readbacks/external handles/D3D11 resources, 93 safely retired presentation drops, bounded slot reuse and clean teardown.
+Stage 5 live native Vulkan was owner-qualified on **Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85**, using normal ARM64 Asteria and normal Vibepollo. The first live log at qualified implementation `5c7ec593d9c5c27b097d194ea758b48b09a2bba4` verified fragment decode, all borrowed-device handle matches, zero CPU video readbacks/external handles/D3D11 resources, 93 safely retired presentation drops, bounded slot reuse and clean teardown.
 
-Five reconnect cycles in the same process, window transitions, functional overlay-only updates, standard-codec streaming and audio/input across reconnects are separately **owner-confirmed**. The first log recorded `overlayRedraws=0`; additional machine counters or logs are not asserted. Hosted GPU tests and Vulkan validation were unavailable and recorded as **SKIP**, not hardware or validation PASS. Broader GPU and x64 native-path hardware coverage remains separate.
+Five reconnect cycles in the same process, window transitions, functional overlay-only updates, standard-codec streaming and audio/input across reconnects are separately **owner-confirmed**. The first log recorded `overlayRedraws=0`; additional machine counters or logs are not asserted. Hosted GPU tests and Vulkan validation were unavailable and recorded as **SKIP**, not hardware or validation PASS. The owner also confirmed final normal ARM64 release-package smoke on exact source `2f29a8963078dadbe4e5031791a6390098e4635d` / portable ZIP SHA-256 `4754bf1cf7c6809aa8877fd379a6c04a978f23788d8175cbf4d0b26d75f82791`: launch, native PyroWave video, audio/input, debug overlay, no fatal errors, clean disconnect and standard-codec streaming passed. This is owner functional sign-off; no additional machine counters or log verification are claimed. Broader GPU and x64 native-path hardware coverage remains separate.
 
 ## Performance observations
 
@@ -89,7 +89,7 @@ Get-FileHash .\Asteria-v0.3.0-windows-arm64-portable.zip -Algorithm SHA256
 
 Compare the result with the checksum file. The accompanying evidence records the release source SHA, run IDs, executable source revision, runtime/shader provenance and PE inventory. The bundled `verify-stage5-owner-package.ps1` additionally verifies the extracted package against that exact source/architecture and original ZIP hash. Package manifests bind identity; hardware approval is recorded separately in the release evidence.
 
-Both architectures are built from one exact source commit. Matching symbols and source snapshots include recursive submodules and the existing dependency/build provenance. Historical v0.2.0 release assets and notes remain intact.
+Both architectures are built from release source [`2f29a8963078dadbe4e5031791a6390098e4635d`](https://github.com/Unitron07/Asteria-Windows/commit/2f29a8963078dadbe4e5031791a6390098e4635d), using [Windows baseline run 38091218299](https://github.com/Unitron07/Asteria-Windows/actions/runs/38091218299). Matching symbols and source snapshots include recursive submodules and the existing dependency/build provenance. Historical v0.2.0 release assets and notes remain intact.
 
 ## Credits / upstream acknowledgments
 
