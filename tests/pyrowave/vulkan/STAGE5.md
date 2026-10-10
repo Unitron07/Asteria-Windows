@@ -157,6 +157,11 @@ validation remain SKIP; real Surface execution is separate evidence below.
 
 ## Stage 5 owner qualification record
 
+The v0.3.0 release candidate reuses this qualified implementation but rebuilds
+normal packages at the release source SHA. The [release gate](../../../docs/VALIDATION.md#asteria-v030-release-candidate)
+requires exact-source/ZIP verification and final ARM64 package smoke/sign-off;
+this earlier implementation run is not approval of a differently built binary.
+
 **FIRST LIVE RUN VERIFIED IN LOG ON EXACT HEAD.** The supplied reviewed record
 for `Asteria-1791668616.log` and the visible overlay screenshot is from normal
 ARM64 Asteria on Surface Pro 11 / Snapdragon X Plus / Qualcomm Adreno X1-85,

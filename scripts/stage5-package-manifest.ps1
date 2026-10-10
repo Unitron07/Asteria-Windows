@@ -28,7 +28,8 @@ try {
     foreach($required in @('Asteria.exe','pyrowave/pyrowave-runtime.json','pyrowave/shaders/shader-provenance.json','pyrowave/shaders/overlay-provenance.json','STAGE5-OWNER-TEST.md','verify-stage5-owner-package.ps1')) {
         if($files.path -cnotcontains $required) { throw "Missing owner package requirement: $required" }
     }
-    $record=@{sourceRevision=$SourceRevision;architecture=$Architecture;qualification='LIVE_OWNER_QUALIFICATION_PENDING';files=$files;peInventory=$pe}
+    # Package identity is indexed here; hardware approval belongs to release-specific evidence.
+    $record=@{sourceRevision=$SourceRevision;architecture=$Architecture;qualification='HARDWARE_QUALIFICATION_RECORDED_SEPARATELY';files=$files;peInventory=$pe}
     $stream=$archive.CreateEntry('stage5-package-manifest.json').Open(); $writer=[IO.StreamWriter]::new($stream,[Text.UTF8Encoding]::new($false))
     try { $writer.Write(($record | ConvertTo-Json -Depth 8)) } finally { $writer.Dispose() }
 } finally { $archive.Dispose() }

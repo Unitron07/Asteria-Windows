@@ -206,15 +206,17 @@ probing remain future work.
 
 ## Native Vulkan PyroWave presentation — next performance phase
 
-**Status:** planned, explicitly post-v0.2.0; not implemented. The next major PyroWave
-performance work is architectural, rather than more CPU-fallback micro-optimization.
+**Status:** Stage 2–5 native Vulkan implementation is complete; Stage 5 live
+functional qualification is OWNER-CONFIRMED on Surface Pro 11 / Snapdragon X Plus /
+Adreno X1-85. The first exact-head live run is log-verified; additional functional
+tests are owner-confirmed. See [the record](../tests/pyrowave/vulkan/STAGE5.md#stage-5-owner-qualification-record).
+v0.3.0 prepares this work for release, with exact-package smoke/publication gates.
 
-Current architecture attempts GPU decode with D3D11/Vulkan interop where supported.
-On the tested Qualcomm driver, interop is unavailable and the working path is
-compute decoder -> CPU I420 fallback. This is device-specific evidence, not a
-universal performance claim or a claim that Qualcomm cannot decode PyroWave.
+The native path prefers same-device GPU decode and presentation on supported
+hardware, retaining initialization-time legacy GPU interop and compute/CPU-I420
+fallback. Native success does not prove those fallbacks were exercised.
 
-Conceptual target:
+Implemented native path:
 
 ```text
 PyroWave Vulkan decode
@@ -223,16 +225,20 @@ PyroWave Vulkan decode
     -> Vulkan swapchain
 ```
 
-- [ ] Avoid Vulkan -> CPU -> D3D11 readback/re-upload.
-- [ ] Remove dependence on Vulkan/D3D11 external fence sharing for this path.
-- [ ] Reduce presentation overhead and improve ARM64/Qualcomm viability.
-- [ ] Retain safe fallback paths and standard-codec behavior.
+- [x] Avoid Vulkan -> CPU -> D3D11 readback/re-upload in the native path.
+- [x] Avoid Vulkan/D3D11 external fence sharing in the native path.
+- [x] Integrate bounded slots, GPU drop retirement, native overlays and window/session lifecycle.
+- [x] Retain initialization-time fallback and standard-codec behavior; live functional checks are owner-confirmed.
 - [ ] Compare decode/present time, latency, drops and GPU use against current
       fallback and standard codecs on named x64/ARM64 hardware under matched conditions.
 
-**Exit gate:** demonstrate GPU-resident presentation and a measured benefit on
-named hardware, with fallback, lifecycle and standard-codec regressions checked.
-No universal speedup is promised.
+**Next:** controlled matched native-versus-old-fallback benchmarks and v1.0
+UI/QoL/regression polish, as [planned](NEXT_STEP.md#next-phase-controlled-performance-qualification-and-v10-polish).
+Separate CPU submission, GPU iDWT/Dequant and final scanout latency. The initial
+Surface sample is not a calibrated latency result or matched speedup. Validation
+remains SKIP; broader hardware, long-run performance and physical device-loss
+qualification remain separate. PyroWave stays Experimental until a separate
+graduation decision. No universal speedup is promised.
 
 ## Isolated sessions / MultiSeat — next feature phase (historical M7)
 
@@ -285,8 +291,9 @@ Do not attach calendar estimates before measurements and client/host contract
 spikes establish effort. M1A starts with existing Moonlight statistics; new
 instrumentation or pacing changes require a measured reason. P0-R and P0.5 are
 complete on the named targets; live P1a is owner-validated on ARM64, with broader
-qualification open. Decide the native Vulkan device/lifecycle/fallback design
-from evidence, then evaluate isolated-session backends and their host contract.
+qualification open. Stage 5 native device/lifecycle integration is owner-confirmed;
+controlled performance qualification and v1.0 polish come before evaluating
+isolated-session backends and their host contract.
 VR runtime/headset qualification follows isolated-session work. Profiles, P1b
 transport hardening and the old Apollo integrations do not define the active order.
 
@@ -295,7 +302,8 @@ transport hardening and the old Apollo integrations do not define the active ord
 Asteria-Windows is the client repository. Isolated sessions and remote PCVR require
 substantial host-side work in a separately maintained Asteria-oriented Vibepollo
 fork/host extension, outside this repository. Neither feature is implemented here.
-The active order is native Vulkan presentation, isolated sessions, then VR.
+Native Vulkan presentation is complete. The active order is controlled performance
+qualification/v1.0 polish, future v2 isolated sessions/MultiSeat, then v3 VR.
 
 ### Isolated sessions / MultiSeat (historical M7)
 

@@ -1,5 +1,12 @@
 # Next step: controlled native Vulkan performance qualification and v1.0 polish
 
+Release preparation first: **v0.3.0 — Native Vulkan Release** packages the
+completed Stage 2–5 work. The [release notes](RELEASE_NOTES_v0.3.0.md) and
+[candidate gates](VALIDATION.md#asteria-v030-release-candidate) describe the
+same-source CI/package verification, final ARM64 smoke and explicit publication
+approval required. v0.2.0 stays current until publication. This release work
+does not start the performance or v1.0 implementation phase below.
+
 [Stage 3 offline shared-device proof](../tests/pyrowave/vulkan/STAGE3.md) now
 distinguishes exact identity from approved numerical equivalence: every decoded
 Y/U/V byte must be within Â±1 of CPU decode; a single Â±2 fails. Exact hashes and
