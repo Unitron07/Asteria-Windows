@@ -13,6 +13,12 @@ $evidence = Join-Path $DependencyRoot "evidence/perf-teardown-$([guid]::NewGuid(
 New-Item -ItemType Directory -Force -Path $buildRoot,$evidence | Out-Null
 $qualifiedHead = '0e39de03454e9bc8e2a4d1ff0d09e6a7e667b117'
 $oldDecoder = Join-Path $buildRoot 'qualified-decoder.cpp'
+git -C $sourceRoot cat-file -e "${qualifiedHead}^{commit}" 2>$null
+if ($LASTEXITCODE) {
+    # Later PR heads may be shallow clones whose two parents exclude this head.
+    git -C $sourceRoot fetch --no-tags origin $qualifiedHead
+    if ($LASTEXITCODE) { throw 'Cannot fetch the immutable qualified regression source' }
+}
 git -C $sourceRoot show "${qualifiedHead}:app/streaming/video/pyrowave_decoder.cpp" | Set-Content -LiteralPath $oldDecoder -Encoding utf8
 if ($LASTEXITCODE) { throw 'Qualified regression source is missing' }
 . (Join-Path $PSScriptRoot 'baseline-preflight.ps1')
