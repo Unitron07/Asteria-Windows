@@ -20,4 +20,4 @@ SOURCES += $$VIDEO/pyrowave_vulkan_dispatch.cpp $$VIDEO/pyrowave_vulkan_probe.cp
 SOURCES += $$VIDEO/pyrowave_vulkan_shared.cpp $$VIDEO/pyrowave_vulkan_presenter.cpp
 SOURCES += $$VIDEO/pyrowave_vulkan_overlays.cpp $$VIDEO/pyrowave_vulkan_live.cpp
 include(../../app/streaming/video/pyrowave_experimental.pri)
-LIBS += -L$$SDL_ROOT/lib/$$SDL_ARCH -lSDL2
+LIBS += -L$$SDL_ROOT/lib/$$SDL_ARCH -lSDL2 -luser32
