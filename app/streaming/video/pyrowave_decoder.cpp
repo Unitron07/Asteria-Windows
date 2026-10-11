@@ -308,10 +308,6 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
             m_Perf->record(PyroWavePerf::Preparation,timing.preparationUs);
             m_Perf->record((m_Native || m_Gpu) ? PyroWavePerf::GpuDecodeSubmission : PyroWavePerf::CpuDecodeReadback,timing.decodeUs);
             if(m_Perf->active(PyroWavePerf::nowUs())) m_Perf->increment(PyroWavePerf::Decoded);
-            if(!m_Native) {
-                m_Perf->interval(PyroWavePerf::PublicationInterval,PyroWavePerf::nowUs(),m_Perf->lastPublication);
-                m_Perf->event(PyroWavePerf::Publish,du->frameNumber,slot);
-            }
         }
         ++m_Stats.decodedFrames;
         m_Stats.totalDecodeTimeUs += timing.decodeUs;
@@ -336,6 +332,10 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
             m_PendingFrameId=du->frameNumber;
             m_Pending = std::move(pixels);
             m_PendingReadyUs=LiGetMicroseconds();
+        }
+        if(m_Perf && !m_Native) {
+            m_Perf->interval(PyroWavePerf::PublicationInterval,PyroWavePerf::nowUs(),m_Perf->lastPublication);
+            m_Perf->event(PyroWavePerf::Publish,du->frameNumber,slot);
         }
         wakeRenderer();
     }

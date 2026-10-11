@@ -131,6 +131,9 @@ struct Capture {
         if(!active(nowUs())) { haveLastFrame=false; return; }
         if(haveLastFrame) {
             const uint32_t delta=frame-lastFrame; // serial-number arithmetic, including wrap
+            if(!delta || delta>=0x80000000u) {
+                increment(Received); event(Receive,frame); return; // preserve forward high-water mark
+            }
             if(delta>1 && delta<0x80000000u) increment(NetworkDrops,delta-1);
         }
         haveLastFrame=true; lastFrame=frame; increment(Received); event(Receive,frame);

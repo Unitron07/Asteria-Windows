@@ -34,6 +34,7 @@ int main() {
     CHECK(c->counts[Submitted]==1); CHECK(c->counts[RetainedRedraws]==2); CHECK(c->counts[OverlayRedraws]==1);
     c->received(0xfffffffeu); c->received(1); CHECK(c->counts[NetworkDrops]==2);
     c->received(1); CHECK(c->counts[NetworkDrops]==2);
+    c->received(0); c->received(2); CHECK(c->counts[NetworkDrops]==2);
     for(size_t i=0;i<Capture::EventCapacity*2;++i) c->event(Drop,uint32_t(i),1);
     CHECK(c->eventCount>Capture::EventCapacity); CHECK(c->events.front().stage==Submit);
     c->eventCount=Max; c->event(Drop,1); CHECK(c->eventCount==Max); CHECK(c->counterOverflow);

@@ -33,7 +33,7 @@ struct NativePresentation::Impl {
     std::unique_ptr<Stage4::Presenter> presenter;
     std::unique_ptr<PyroWaveVulkan::Overlays> overlays;
     PyroWaveVulkan::LiveSlots slots;
-    std::array<uint64_t,3> readyUs{},decodeCounts{};
+    std::array<uint64_t,3> readyUs{},captureReadyUs{},decodeCounts{};
     int selected=-1;
     explicit Impl(NativePresentation& s,Runtime& r):self(s),runtime(r) {}
     void mainThread() const { if(thread!=GetCurrentThreadId()) throw std::runtime_error("native presentation outside SDL owner thread"); }
@@ -95,7 +95,7 @@ bool NativePresentation::initialize(SDL_Window* window,int width,int height,bool
                 const unsigned i=unsigned(p.selected);
                 if(p.perf) {
                     const bool newFrame=p.slots.pending>=0;
-                    if(newFrame) p.perf->ordered(PyroWavePerf::PickupAge,p.pickupUs,p.readyUs[i]);
+                    if(newFrame) p.perf->ordered(PyroWavePerf::PickupAge,p.pickupUs,p.captureReadyUs[i]);
                     p.perf->submitted(newFrame,p.overlayWork,p.frameIds[i],p.selected);
                 }
                 ++p.self.diagnostics.decodeWaits; ++p.self.diagnostics.consumerSignals;
@@ -147,11 +147,14 @@ bool NativePresentation::decode(const std::vector<uint8_t>& bytes,size_t& packet
     if(p.decodeCounts[slot]++) ++diagnostics.slotReuse;
     p.presenter->decoded(unsigned(slot),*p.runtime.liveRange(),Stage4::Filter::Linear);
     p.readyUs[slot]=micros(); p.frameIds[slot]=frameNumber;
+    p.slots.publish(slot,[&p](int i) { p.retire(i); });
     if(p.perf) {
-        p.perf->interval(PyroWavePerf::PublicationInterval,p.readyUs[slot],p.perf->lastPublication);
+        // Keep the historical readyUs/overlay definition intact. Capture marks
+        // successful publication after any pending replacement retirement.
+        p.captureReadyUs[slot]=micros();
+        p.perf->interval(PyroWavePerf::PublicationInterval,p.captureReadyUs[slot],p.perf->lastPublication);
         p.perf->event(PyroWavePerf::Publish,frameNumber,slot);
     }
-    p.slots.publish(slot,[&p](int i) { p.retire(i); });
     ++diagnostics.decoded; diagnostics.decodeSubmitUs+=timing.decodeUs;
     return true;
 }

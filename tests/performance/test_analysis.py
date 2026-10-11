@@ -67,6 +67,14 @@ class AnalysisTests(unittest.TestCase):
         other = copy.deepcopy(self.run)
         other['video']['targetFps'] = 120
         self.assertIn('NON-COMPARABLE profile/context mismatch', perf.markdown([self.run, other]))
+        other=copy.deepcopy(self.run); other['capture']['warmupSeconds']=20
+        self.assertIn('NON-COMPARABLE profile/context mismatch', perf.markdown([self.run,other]))
+        other=copy.deepcopy(self.run); other['capture']['durationSeconds']=30
+        self.assertIn('Partial capture',perf.markdown([other]))
+
+    def test_codec_pin_required(self):
+        self.run['codec']={}
+        with self.assertRaises(ValueError): perf.validate(self.run)
 
     def test_missing_metrics(self):
         self.run['metrics'] = {}

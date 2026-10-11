@@ -18,7 +18,13 @@
     "runId": {"type": "string"},
     "decoderLifetimeIndex": {"type": "integer", "minimum": 0},
     "decoderReportsOmitted": {"type": "integer", "minimum": 0},
-    "codec": {"type": "object"},
+    "codec": {
+      "type": "object", "required": ["name", "commit", "bitstreamId", "apiVersion"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1}, "commit": {"type": "string", "minLength": 1},
+        "bitstreamId": {"type": "string", "minLength": 1}, "apiVersion": {"type": "string", "minLength": 1}
+      }
+    },
     "video": {
       "type": "object", "required": ["width", "height", "targetFps", "requestedBitrateKbps", "vsync"],
       "properties": {

@@ -67,6 +67,8 @@ successful submission/publication, not proof of GPU completion.
 
 Local environment configuration avoids normal Settings UI and command parsers.
 Launch the development package directly from the configured PowerShell process:
+close existing Asteria processes first. Environment changes apply to newly launched
+processes; restart the app for every profiling-enabled/disabled condition.
 
 ```powershell
 New-Item -ItemType Directory -Force C:\Benchmarks\Asteria | Out-Null
@@ -115,6 +117,11 @@ also exported. `steady_clock` timestamps are never subtracted from common-c or
 host timestamps. Fallback pickup uses common-c timestamps on both endpoints;
 native pickup uses steady_clock on both endpoints. No absolute clock epochs are
 exported; event times are relative to capture start (including warmup).
+Native capture publication timestamps are recorded after successful slot
+publication and any pending replacement retirement, under the existing state
+mutex. Historical native overlay ready timestamps remain unchanged. The diagnostic
+event array uses reservation order across threads; sort by relativeUs when
+inspecting chronology, and do not infer ordering from equal timestamps.
 
 | JSON name | Measurement start -> end / thread | Comparability |
 | --- | --- | --- |
@@ -239,7 +246,7 @@ Reports include every supplied run, median run means, sample-weighted means,
 run-mean min/max and every per-run percentile/count. They never average p99s into
 a pooled p99. First input group is the descriptive reference. Unit, clock, scope,
 percentile method and profile compatibility are checked. Resolution/FPS/bitrate,
-V-sync, architecture, GPU/driver, codec pin and benchmarkContext must match for
+V-sync, architecture, GPU/driver, codec pin, warmup/requested duration and benchmarkContext must match for
 qualified comparisons. Missing driver/context makes deltas descriptive only.
 Different backend parser setup is flagged. Same runId files are rejected as
 independent repeated runs. No host control, input sending or automatic connection.

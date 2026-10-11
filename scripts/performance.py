@@ -25,6 +25,10 @@ def validate(run):
     for field in ('width', 'height', 'targetFps', 'requestedBitrateKbps'):
         if not number(run['video'].get(field)) or run['video'][field] <= 0:
             raise ValueError(f'invalid video.{field}')
+    if any(type(run['video'][field]) is not int for field in ('width', 'height')):
+        raise ValueError('video dimensions must be integers')
+    if not all(isinstance(run['codec'].get(field),str) and run['codec'][field] for field in ('name','commit','bitstreamId','apiVersion')):
+        raise ValueError('missing codec identity/pin')
     if type(run['video'].get('vsync')) is not bool:
         raise ValueError('missing video.vsync')
     for field in ('durationSeconds', 'requestedDurationSeconds', 'warmupSeconds'):
@@ -86,7 +90,9 @@ def load(path):
     return validate(json.loads(path.read_text(encoding='utf-8-sig'), parse_constant=reject_constant))
 
 def profile(run):
-    return json.dumps({k: run.get(k) for k in ('architecture', 'gpu', 'driver', 'codec', 'video', 'benchmarkContext')}, sort_keys=True)
+    fields={k: run.get(k) for k in ('architecture', 'gpu', 'driver', 'codec', 'video', 'benchmarkContext')}
+    fields['capturePolicy']={k:run['capture'][k] for k in ('warmupSeconds','requestedDurationSeconds')}
+    return json.dumps(fields,sort_keys=True)
 
 def compatible(a, b):
     return all(a.get(k) == b.get(k) for k in ('unit', 'scope', 'clock', 'percentileMethod'))
@@ -140,6 +146,8 @@ def markdown(runs):
             lines.append(f"| {name} ({m['unit']}) | {m['availableRuns']} | {m['sampleCount']} | {m['weightedMean']:.3f} | {m['medianRunMean']:.3f} | {m['minimumRunMean']:.3f}–{m['maximumRunMean']:.3f} |")
             tails.append(f"Per-run {name} tails (sample count, p50/p95/p99): " + '; '.join(f"{p['sampleCount']}: {p['p50']}/{p['p95']}/{p['p99']}" for p in m['perRunPercentiles']))
         lines += ['', *[tail+'\n' for tail in tails]]
+        if any(r['capture']['durationSeconds']<r['capture']['requestedDurationSeconds'] for r in members):
+            lines += ['', 'Partial capture: at least one stream ended before its requested window; benchmark qualification incomplete.']
         lines += ['', 'Limitations: ' + '; '.join(sorted(set().union(*(r['limitations'] for r in members)))), '']
     if len(summaries) > 1:
         base, base_runs, base_stats = summaries[0]
