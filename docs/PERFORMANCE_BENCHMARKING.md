@@ -269,6 +269,35 @@ JSON roundtrip, aggregation, weighted means, missing values and incompatibility.
 Existing normal builds/standard-codec regressions, parser/runtime and Stage 2–5
 workflows remain required and unchanged in strength. GPU absence is SKIP, not PASS.
 
+The production decoder teardown/export regression (`tests/performance/teardown_export.pro`,
+run by `scripts/test-performance-teardown.ps1` in both PyroWave CI architectures)
+deletes actual `PyroWaveVideoDecoder` instances and uninitialized native/legacy
+resource wrappers, then inspects the report retained by `exportPerf()`. Only the
+Session/overlay/transport boundary is stubbed; no GPU initialization or connection
+is attempted. It verifies all three backend identities after resource reset,
+unchanged measured values/counters, cleanup recording, atomic JSON roundtrip and
+analysis of the resulting production reports. A negative control compiles the
+qualified `0e39de03454e9bc8e2a4d1ff0d09e6a7e667b117` decoder source and must reproduce
+exactly its two native metadata errors before the current source may pass.
+
+That qualified head exported native `newFrameSubmissionInterval.scope` as SDL
+RenderPresent and `frameAgeAtPickup.clock` as common-c because `m_Native` was
+already reset in the destructor. Subsequent exports use the backend identity
+saved after successful initialization; they do not infer semantics from live
+resource pointers. Timing values, counter definitions and teardown order are
+unchanged. Preserve old captures as evidence and obtain a fresh capture on the
+fixed exact head before comparing native scope/clock metadata.
+
+| Saved backend | newFrameSubmissionInterval.scope | frameAgeAtPickup.clock |
+| --- | --- | --- |
+| NATIVE_VULKAN | CPU:successive_new_video_vkQueueSubmit_success_callbacks | steady_clock |
+| LEGACY_D3D11_INTEROP | CPU:successive_new_video_SDL_RenderPresent_returns | common-c monotonic |
+| CPU_I420_FALLBACK | CPU:successive_new_video_SDL_RenderPresent_returns | common-c monotonic |
+
+For all three, submission intervals retain the steady clock. Schema version 1
+and the analysis commands are unchanged. The fixtures verify exporter ordering,
+not live GPU execution, display timing or Surface performance.
+
 `perf-overhead` alternates seven disabled/enabled pairs after warmup, using an
 identical CPU-only arithmetic surrogate plus representative hooks. It emits raw
 ns/frame pairs. This measures capture-hook overhead, not full live streaming,

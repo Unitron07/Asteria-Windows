@@ -35,6 +35,7 @@ public:
     void abortNative(const QString& reason) { if(m_Native) fail(reason); }
 
 private:
+    friend struct PyroWavePerformanceExportTest;
     std::unique_ptr<PyroWavePerf::Capture> m_Perf;
     QString m_PerfDirectory;
     QString m_PerfGpu, m_PerfBackend, m_PerfDecoderPath;

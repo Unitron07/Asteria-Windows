@@ -16,6 +16,8 @@ on:
       - 'scripts/build-pyrowave-live.ps1'
       - 'scripts/apply-common-c-p1a.ps1'
       - 'tests/pyrowave/**'
+      - 'tests/performance/**'
+      - 'scripts/test-performance-teardown.ps1'
       - 'scripts/build-pyrowave-deps.ps1'
       - 'scripts/pyrowave/**'
       - '.github/workflows/pyrowave-offline.yml'
@@ -136,6 +138,10 @@ jobs:
       - name: Compile experiment through existing Qt/qmake toolchain
         shell: pwsh
         run: ./scripts/test-pyrowave-qmake.ps1 -Architecture '${{ matrix.arch }}' -QtRoot '${{ runner.workspace }}/Qt/6.11.2' -DependencyRoot $env:PYROWAVE_DEPS
+      - name: Phase 1A production teardown/export regression and qualified-head negative control
+        timeout-minutes: 12
+        shell: pwsh
+        run: ./scripts/test-performance-teardown.ps1 -Architecture '${{ matrix.arch }}' -QtRoot '${{ runner.workspace }}/Qt/6.11.2' -DependencyRoot $env:PYROWAVE_DEPS
       - name: Attempt roundtrip (hosted runner GPU may be unavailable)
         shell: pwsh
         run: |

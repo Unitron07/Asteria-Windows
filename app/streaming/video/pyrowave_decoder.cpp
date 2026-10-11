@@ -398,11 +398,14 @@ void PyroWaveVideoDecoder::exportPerf() noexcept {
     try {
         auto report=PyroWavePerf::serialize(*m_Perf);
         auto metrics=report["metrics"].toObject();
+        // Resources are already destroyed here. Use the identity saved after
+        // successful initialization, which also supplies report["backend"].
+        const bool native=m_PerfBackend=="NATIVE_VULKAN";
         auto submission=metrics["newFrameSubmissionInterval"].toObject();
-        submission["scope"]=m_Native ? "CPU:successive_new_video_vkQueueSubmit_success_callbacks" : "CPU:successive_new_video_SDL_RenderPresent_returns";
+        submission["scope"]=native ? "CPU:successive_new_video_vkQueueSubmit_success_callbacks" : "CPU:successive_new_video_SDL_RenderPresent_returns";
         metrics["newFrameSubmissionInterval"]=submission;
         auto pickup=metrics["frameAgeAtPickup"].toObject();
-        pickup["clock"]=m_Native ? "steady_clock" : "common-c monotonic";
+        pickup["clock"]=native ? "steady_clock" : "common-c monotonic";
         metrics["frameAgeAtPickup"]=pickup;
         report["metrics"]=metrics;
         report["sourceRevision"]=ASTERIA_PYROWAVE_SOURCE_REVISION;
