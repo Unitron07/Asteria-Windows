@@ -9,6 +9,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDir>
+#include "pyrowave_perf_export.h"
+#include <QSysInfo>
 #include <algorithm>
 #include <new>
 #include <cstring>
@@ -50,6 +52,8 @@ bool verifyProvenance(const QString& directory, QString& reason) {
 }
 
 PyroWaveVideoDecoder::~PyroWaveVideoDecoder() {
+    const auto cleanupStarted=m_Perf ? PyroWavePerf::nowUs() : 0;
+    if(m_Perf) m_Perf->end=cleanupStarted;
     // Session holds its decoder lock while destroying us, then stops common-c.
     if (!m_TestOnly) Session::get()->getOverlayManager().setOverlayRenderer(nullptr);
     if(m_RetryTimer) SDL_RemoveTimer(m_RetryTimer);
@@ -63,6 +67,10 @@ PyroWaveVideoDecoder::~PyroWaveVideoDecoder() {
     if (m_Texture) SDL_DestroyTexture(m_Texture);
     if (m_Renderer) SDL_DestroyRenderer(m_Renderer);
     m_Runtime.close();
+    if(m_Perf) {
+        m_Perf->metrics[PyroWavePerf::Cleanup].record(PyroWavePerf::nowUs()-cleanupStarted);
+        exportPerf();
+    }
 }
 
 QString PyroWaveVideoDecoder::getError() {
@@ -83,6 +91,10 @@ bool PyroWaveVideoDecoder::fail(const QString& reason) {
 }
 
 bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
+    configurePerf(params->testOnly);
+    const auto initStarted=m_Perf ? PyroWavePerf::nowUs() : 0;
+    m_TargetFps=params->frameRate; m_Vsync=params->enableVsync;
+    if(m_Perf) m_BitrateKbps=Session::get()->performanceBitrateKbps();
     // Even test-only preflight on Session's hidden main-thread window must
     // prove presentation on the selected backend before any host launch.
     if (params->videoFormat != VIDEO_FORMAT_PYROWAVE || !params->window ||
@@ -99,7 +111,7 @@ bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
     if(!m_Runtime.load(std::filesystem::path(directory.toStdWString()))) return fail(QString::fromStdString(m_Runtime.error()));
     try {
         m_BackendSelection.initialize([&] {
-    m_Native=std::make_unique<PyroWave::NativePresentation>(m_Runtime);
+    m_Native=std::make_unique<PyroWave::NativePresentation>(m_Runtime,m_Perf.get());
     if(m_Native->initialize(params->window,m_Width,m_Height,params->enableVsync)) {
         return true;
     }
@@ -117,6 +129,13 @@ bool PyroWaveVideoDecoder::initialize(PDECODER_PARAMETERS params) {
             const auto type=static_cast<Overlay::OverlayType>(i);
             if(overlays.isOverlayEnabled(type)) overlays.setOverlayTextUpdated(type);
         }
+    }
+    if(m_Perf) {
+        m_PerfGpu=QString::fromStdString(m_Native ? m_Native->diagnostics.gpu : m_Runtime.deviceDescription());
+        m_PerfBackend=m_Native ? "NATIVE_VULKAN" : m_Gpu ? "LEGACY_D3D11_INTEROP" : "CPU_I420_FALLBACK";
+        m_PerfDecoderPath=m_Runtime.decoderPath();
+        m_Perf->metrics[PyroWavePerf::Initialization].record(PyroWavePerf::nowUs()-initStarted);
+        m_Perf->start=PyroWavePerf::nowUs();
     }
     return true;
 }
@@ -205,6 +224,16 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
         if (m_Failed) { wakeRenderer(); return DR_OK; }
         m_BackendSelection.beginLive();
         const uint64_t now = LiGetMicroseconds();
+        if(m_Perf) {
+            m_Perf->received(du->frameNumber);
+            m_Perf->interval(PyroWavePerf::Interarrival,du->receiveTimeUs,m_Perf->lastArrival);
+            m_Perf->ordered(PyroWavePerf::Reassembly,du->enqueueTimeUs,du->receiveTimeUs);
+            m_Perf->ordered(PyroWavePerf::DecoderQueue,now,du->enqueueTimeUs);
+            if(m_Perf->active(PyroWavePerf::nowUs())) {
+                if(du->fullLength>0) m_Perf->increment(PyroWavePerf::VideoBytes,uint64_t(du->fullLength));
+                if(du->frameHostProcessingLatency) m_Perf->record(PyroWavePerf::HostProcessing,uint64_t(du->frameHostProcessingLatency)*100);
+            }
+        }
         if (!m_Stats.measurementStartUs) m_Stats.measurementStartUs = now;
         if (m_LastFrameNumber && du->frameNumber > m_LastFrameNumber + 1) {
             const auto lost = du->frameNumber - m_LastFrameNumber - 1;
@@ -232,10 +261,13 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
                 std::lock_guard<std::mutex> guard(m_Mutex);
                 bool dropped;
                 slot=m_Slots.reserve(dropped);
-                if (dropped) ++m_Stats.pacerDroppedFrames;
+                if (dropped) {
+                    ++m_Stats.pacerDroppedFrames;
+                    if(m_Perf && m_Perf->active(PyroWavePerf::nowUs())) m_Perf->increment(PyroWavePerf::PresentationDrops);
+                }
             }
             if (m_Gpu && slot<0) { fail("GPU frame slot invariant failed"); return DR_OK; }
-            const bool decoded = m_Native ? m_Native->decode(bytes,packets,timing) : m_Gpu ? m_Gpu->decode(slot,bytes,packets,timing) : m_Runtime.decodeLive(bytes,pixels,packets,&timing);
+            const bool decoded = m_Native ? m_Native->decode(bytes,packets,timing,du->frameNumber) : m_Gpu ? m_Gpu->decode(slot,bytes,packets,timing) : m_Runtime.decodeLive(bytes,pixels,packets,&timing);
             if (m_FirstSequence && m_Runtime.liveRange()) {
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave sequence: BT.709 %s-range, SDR 4:2:0",
                     *m_Runtime.liveRange() == PyroWave::YuvRange::Full ? "full" : "limited");
@@ -249,6 +281,9 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
     } catch (const std::exception& e) { fail(QString::fromUtf8(e.what())); return DR_OK; }
     if (!rejection.empty()) {
         // Includes reassembly rejection before any runtime packet submission.
+        if(m_Perf && m_Perf->active(PyroWavePerf::nowUs())) {
+            m_Perf->increment(PyroWavePerf::Rejected); m_Perf->event(PyroWavePerf::Reject,du->frameNumber);
+        }
         m_Runtime.discardFrame();
         if (slot>=0) {
             std::lock_guard<std::mutex> guard(m_Mutex);
@@ -268,6 +303,12 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
             m_FirstFrame = false;
             m_PerformanceStartUs = LiGetMicroseconds();
         }
+        if(m_Perf) {
+            m_Perf->record(PyroWavePerf::Assembly,assemblyUs);
+            m_Perf->record(PyroWavePerf::Preparation,timing.preparationUs);
+            m_Perf->record((m_Native || m_Gpu) ? PyroWavePerf::GpuDecodeSubmission : PyroWavePerf::CpuDecodeReadback,timing.decodeUs);
+            if(m_Perf->active(PyroWavePerf::nowUs())) m_Perf->increment(PyroWavePerf::Decoded);
+        }
         ++m_Stats.decodedFrames;
         m_Stats.totalDecodeTimeUs += timing.decodeUs;
         m_Pipeline.preparationUs += timing.preparationUs;
@@ -275,12 +316,26 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
         if(m_Native) {
             // Native decode already published its bounded GPU slot.
         } else if (m_Gpu) {
+            m_GpuFrameIds[slot]=du->frameNumber;
             m_GpuReadyUs[slot]=LiGetMicroseconds();
-            if (m_Slots.publish(slot)) ++m_Stats.pacerDroppedFrames;
+            if (m_Slots.publish(slot)) {
+                ++m_Stats.pacerDroppedFrames;
+                if(m_Perf && m_Perf->active(PyroWavePerf::nowUs())) m_Perf->increment(PyroWavePerf::PresentationDrops);
+            }
         } else {
-            if (!m_Pending.planes[0].empty()) ++m_Stats.pacerDroppedFrames;
+            if (!m_Pending.planes[0].empty()) {
+                ++m_Stats.pacerDroppedFrames;
+                if(m_Perf && m_Perf->active(PyroWavePerf::nowUs())) {
+                    m_Perf->increment(PyroWavePerf::PresentationDrops); m_Perf->event(PyroWavePerf::Drop,m_PendingFrameId);
+                }
+            }
+            m_PendingFrameId=du->frameNumber;
             m_Pending = std::move(pixels);
             m_PendingReadyUs=LiGetMicroseconds();
+        }
+        if(m_Perf && !m_Native) {
+            m_Perf->interval(PyroWavePerf::PublicationInterval,PyroWavePerf::nowUs(),m_Perf->lastPublication);
+            m_Perf->event(PyroWavePerf::Publish,du->frameNumber,slot);
         }
         wakeRenderer();
     }
@@ -296,18 +351,85 @@ int PyroWaveVideoDecoder::submitDecodeUnit(PDECODE_UNIT du) {
 
 void PyroWaveVideoDecoder::reportGpuTiming() {
     unsigned timestamps = 0;
+    struct ReportContext { unsigned* timestamps; PyroWavePerf::Capture* capture; } context{&timestamps,m_Perf.get()};
     const auto callback = [](void* userdata,const char* message) {
         if (!message || !*message) return;
         // Upstream also reports memory budgets. Preserve that terminology too.
         const bool memory = std::strncmp(message,"Memory Heap ",12)==0;
-        if (!memory) ++*static_cast<unsigned*>(userdata);
+        auto& context=*static_cast<ReportContext*>(userdata);
+        if (!memory) ++*context.timestamps;
+        if(context.capture) context.capture->codecReport(message);
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave %s: %s",
             memory ? "device performance" : "GPU timing",message);
     };
-    if (!m_Runtime.reportPerformanceStats(callback,&timestamps))
+    if (!m_Runtime.reportPerformanceStats(callback,&context))
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU timing unavailable: native reporting API/device unavailable");
     else if (!timestamps)
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU timing unavailable: no resolved native timestamp intervals");
+}
+
+void PyroWaveVideoDecoder::configurePerf(bool testOnly) {
+    if(testOnly) return;
+    const auto directory=qEnvironmentVariable("ASTERIA_PERF_CAPTURE");
+    if(directory.isEmpty()) return;
+    // Existing, explicitly chosen directory; never create or upload anything.
+    if(!QDir::isAbsolutePath(directory) || !QDir(directory).exists()) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"Performance capture disabled: output must be an existing absolute directory"); return;
+    }
+    const auto seconds=[](const char* name,int fallback,int maximum) {
+        const auto text=qEnvironmentVariable(name); if(text.isEmpty()) return fallback;
+        bool okay=false; const auto value=text.toInt(&okay);
+        return okay && value>=0 && value<=maximum ? value : -1;
+    };
+    const int warmup=seconds("ASTERIA_PERF_WARMUP_SECONDS",10,3600);
+    const int duration=seconds("ASTERIA_PERF_DURATION_SECONDS",60,86400);
+    if(warmup<0 || duration<=0) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"Performance capture disabled: invalid warmup/duration"); return;
+    }
+    try {
+        m_Perf=std::make_unique<PyroWavePerf::Capture>();
+        m_Perf->warmup=uint64_t(warmup)*1000000; m_Perf->duration=uint64_t(duration)*1000000;
+        m_PerfDirectory=directory;
+    } catch(...) { m_Perf.reset(); SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"Performance capture allocation unavailable"); }
+}
+
+void PyroWaveVideoDecoder::exportPerf() noexcept {
+    if(!m_Perf || !m_Perf->start) return;
+    try {
+        auto report=PyroWavePerf::serialize(*m_Perf);
+        auto metrics=report["metrics"].toObject();
+        auto submission=metrics["newFrameSubmissionInterval"].toObject();
+        submission["scope"]=m_Native ? "CPU:successive_new_video_vkQueueSubmit_success_callbacks" : "CPU:successive_new_video_SDL_RenderPresent_returns";
+        metrics["newFrameSubmissionInterval"]=submission;
+        auto pickup=metrics["frameAgeAtPickup"].toObject();
+        pickup["clock"]=m_Native ? "steady_clock" : "common-c monotonic";
+        metrics["frameAgeAtPickup"]=pickup;
+        report["metrics"]=metrics;
+        report["sourceRevision"]=ASTERIA_PYROWAVE_SOURCE_REVISION;
+        report["architecture"]=QSysInfo::buildCpuArchitecture();
+        report["gpu"]=m_PerfGpu; report["driver"]=QJsonValue(QJsonValue::Null);
+        report["backend"]=m_PerfBackend; report["decoderPath"]=m_PerfDecoderPath;
+        report["codec"]=QJsonObject{{"name","PyroWave"},{"commit",PyroWave::CodecCommit},
+            {"bitstreamId",PyroWave::BitstreamId},{"apiVersion","0.6.0"}};
+        report["video"]=QJsonObject{{"width",m_Width},{"height",m_Height},{"targetFps",m_TargetFps},
+            {"requestedBitrateKbps",m_BitrateKbps},{"vsync",m_Vsync}};
+        report["systemResources"]=QJsonObject{{"processCpuPercent",QJsonValue(QJsonValue::Null)},
+            {"processWorkingSetBytes",QJsonValue(QJsonValue::Null)},{"processGpuUtilizationPercent",QJsonValue(QJsonValue::Null)},
+            {"gpuMemoryBytes",QJsonValue(QJsonValue::Null)},{"batteryDischargeWatts",QJsonValue(QJsonValue::Null)},
+            {"thermalState",QJsonValue(QJsonValue::Null)},{"gpuClockMHz",QJsonValue(QJsonValue::Null)}};
+        const auto seconds=report["capture"].toObject()["durationSeconds"].toDouble();
+        const bool observedAvailable=seconds>0 && !report["capture"].toObject()["counterOverflow"].toBool();
+        report["observed"]=QJsonObject{
+            {"incomingFps",observedAvailable ? QJsonValue(double(m_Perf->counts[PyroWavePerf::Received].load())/seconds) : QJsonValue(QJsonValue::Null)},
+            {"submissionFps",observedAvailable ? QJsonValue(double(m_Perf->counts[PyroWavePerf::Submitted].load())/seconds) : QJsonValue(QJsonValue::Null)},
+            {"videoPayloadMbps",observedAvailable ? QJsonValue(double(m_Perf->counts[PyroWavePerf::VideoBytes].load())*8/seconds/1000000) : QJsonValue(QJsonValue::Null)},
+            {"jitterDrops",QJsonValue(QJsonValue::Null)}};
+        QJsonArray codecReports;
+        for(size_t i=0;i<m_Perf->codecReportCount;++i) codecReports.append(QString::fromUtf8(m_Perf->codecReports[i].data()));
+        report["nativeCodecReports"]=QJsonObject{{"scope","cumulative device reports; includes warmup; native text/units"},
+            {"reports",codecReports},{"truncated",m_Perf->codecReportsTruncated}};
+        Session::get()->retainPerformanceReport(m_PerfDirectory,report);
+    } catch(...) { SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"Performance capture export unavailable; stream cleanup continues"); }
 }
 
 void PyroWaveVideoDecoder::updateStats() {
@@ -335,12 +457,14 @@ void PyroWaveVideoDecoder::updateStats() {
         m_Stats={}; m_Stats.measurementStartUs=now; m_Pipeline={};
     }
     if (!LiGetEstimatedRttInfo(&stats.lastRtt,&stats.lastRttVariance)) stats.lastRtt=stats.lastRttVariance=0;
+    if(m_Perf && stats.lastRtt) m_Perf->record(PyroWavePerf::Rtt,uint64_t(stats.lastRtt)*1000);
     const auto text=PyroWave::formatStats(stats,pipeline,m_Width,m_Height,now,bool(m_Native || m_Gpu));
     auto& overlays = Session::get()->getOverlayManager();
     if (overlays.isOverlayEnabled(Overlay::OverlayDebug)) overlays.updateOverlayText(Overlay::OverlayDebug,text.c_str());
 }
 
-void PyroWaveVideoDecoder::renderOverlays() {
+bool PyroWaveVideoDecoder::renderOverlays() {
+    bool changed=false;
     auto& manager = Session::get()->getOverlayManager();
     int width=0,height=0;
     SDL_GetRendererOutputSize(m_Renderer,&width,&height);
@@ -348,6 +472,7 @@ void PyroWaveVideoDecoder::renderOverlays() {
         const auto type = static_cast<Overlay::OverlayType>(i);
         if (!manager.isOverlayEnabled(type)) continue;
         if (auto surface = manager.getUpdatedOverlaySurface(type)) {
+            changed=true;
             if (m_OverlayTextures[i]) SDL_DestroyTexture(m_OverlayTextures[i]);
             m_OverlayTextures[i] = SDL_CreateTextureFromSurface(m_Renderer,surface);
             SDL_FreeSurface(surface);
@@ -359,9 +484,12 @@ void PyroWaveVideoDecoder::renderOverlays() {
             SDL_RenderCopy(m_Renderer,m_OverlayTextures[i],nullptr,&rect);
         }
     }
+    return changed;
 }
 
 void PyroWaveVideoDecoder::renderFrameOnMainThread() {
+    PyroWavePerf::Timer renderTimer(m_Perf.get(),PyroWavePerf::RenderLoop);
+    if(m_Perf) m_Perf->interval(PyroWavePerf::ScheduleInterval,PyroWavePerf::nowUs(),m_Perf->lastSchedule);
     if(m_RetryTimer) { SDL_RemoveTimer(m_RetryTimer); m_RetryTimer=0; }
     if(m_Native) {
         { std::lock_guard<std::mutex> guard(m_Mutex); m_EventQueued=false; if(m_Failed) return; }
@@ -388,7 +516,7 @@ void PyroWaveVideoDecoder::renderFrameOnMainThread() {
     }
     PyroWave::Pixels pixels;
     int slot=-1,displayed=-1;
-    uint64_t readyUs=0;
+    uint64_t readyUs=0; uint32_t frameId=0; bool overlayChanged=false;
     {
         std::lock_guard<std::mutex> guard(m_Mutex);
         m_EventQueued = false;
@@ -398,10 +526,14 @@ void PyroWaveVideoDecoder::renderFrameOnMainThread() {
             if (slot>=0) readyUs=m_GpuReadyUs[slot];
         }
         else readyUs=m_PendingReadyUs;
+        frameId=slot>=0 ? m_GpuFrameIds[slot] : m_PendingFrameId;
+        overlayChanged=m_OverlayChanged; m_OverlayChanged=false;
         pixels = std::move(m_Pending);
         m_Pending = {};
     }
     const auto dequeued = LiGetMicroseconds();
+    const bool newFrame=slot>=0 || !pixels.planes[0].empty();
+    if(m_Perf && newFrame) m_Perf->ordered(PyroWavePerf::PickupAge,dequeued,readyUs);
     updateStats();
     const auto start = LiGetMicroseconds();
     if (!pixels.planes[0].empty()) {
@@ -428,6 +560,9 @@ void PyroWaveVideoDecoder::renderFrameOnMainThread() {
             std::lock_guard<std::mutex> guard(m_Mutex);
             if (slot>=0) m_Slots.cancel(slot);
             ++m_Stats.pacerDroppedFrames;
+            if(m_Perf && m_Perf->active(PyroWavePerf::nowUs())) {
+                m_Perf->increment(PyroWavePerf::PresentationDrops); m_Perf->event(PyroWavePerf::Drop,frameId,slot);
+            }
         }
         return;
     }
@@ -437,8 +572,9 @@ void PyroWaveVideoDecoder::renderFrameOnMainThread() {
         SDL_RenderCopy(m_Renderer,m_Gpu ? m_Gpu->texture(displayed) : m_Texture,nullptr,&destination) != 0) {
         fail(QString("SDL presentation: ") + SDL_GetError()); return;
     }
-    renderOverlays();
+    const bool overlayWork=renderOverlays() || overlayChanged;
     SDL_RenderPresent(m_Renderer);
+    if(m_Perf) m_Perf->submitted(newFrame,overlayWork,frameId,slot);
     if (m_Gpu && !m_Gpu->endRender(displayed)) { fail(QString::fromStdString(m_Gpu->error())); return; }
     if (!pixels.planes[0].empty() || slot>=0) {
         std::lock_guard<std::mutex> guard(m_Mutex);
@@ -451,6 +587,7 @@ void PyroWaveVideoDecoder::renderFrameOnMainThread() {
 
 void PyroWaveVideoDecoder::notifyOverlayUpdated(Overlay::OverlayType) {
     std::lock_guard<std::mutex> guard(m_Mutex);
+    m_OverlayChanged=true;
     wakeRenderer();
 }
 

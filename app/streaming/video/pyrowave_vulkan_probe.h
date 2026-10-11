@@ -1,6 +1,7 @@
 #pragma once
 #include "pyrowave_vulkan_dispatch.h"
 #include "pyrowave_vulkan_policy.h"
+#include "pyrowave_perf.h"
 #include <SDL.h>
 #include <array>
 #include <atomic>
@@ -10,6 +11,7 @@
 namespace PyroWaveVulkan {
 using Log = std::function<void(const std::string&)>;
 struct ProbeOptions {
+    PyroWavePerf::Capture* perf=nullptr;
     bool vsync = true, validation = true, api10 = false;
     std::string failAt, deviceName;
     // Offline Stage 3 hooks: no swapchain or synthetic drawing resources.

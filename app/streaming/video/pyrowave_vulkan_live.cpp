@@ -11,6 +11,10 @@ uint64_t micros() { return uint64_t(std::chrono::duration_cast<std::chrono::micr
 struct NativePresentation::Impl {
     NativePresentation& self;
     Runtime& runtime;
+    PyroWavePerf::Capture* perf=nullptr;
+    std::array<uint32_t,3> frameIds{};
+    uint64_t pickupUs=0;
+    bool overlayWork=false;
     DWORD thread=GetCurrentThreadId();
     SDL_Window* window=nullptr;
     std::mutex mutex; // State/data, separate from the nonrecursive VkQueue lock.
@@ -29,7 +33,7 @@ struct NativePresentation::Impl {
     std::unique_ptr<Stage4::Presenter> presenter;
     std::unique_ptr<PyroWaveVulkan::Overlays> overlays;
     PyroWaveVulkan::LiveSlots slots;
-    std::array<uint64_t,3> readyUs{},decodeCounts{};
+    std::array<uint64_t,3> readyUs{},captureReadyUs{},decodeCounts{};
     int selected=-1;
     explicit Impl(NativePresentation& s,Runtime& r):self(s),runtime(r) {}
     void mainThread() const { if(thread!=GetCurrentThreadId()) throw std::runtime_error("native presentation outside SDL owner thread"); }
@@ -39,9 +43,12 @@ struct NativePresentation::Impl {
             ++self.diagnostics.decodeWaits; ++self.diagnostics.consumerSignals;
         }
         ++self.diagnostics.presentationDrops;
+        if(perf && perf->active(PyroWavePerf::nowUs())) {
+            perf->increment(PyroWavePerf::PresentationDrops); perf->event(PyroWavePerf::Drop,frameIds[slot],slot);
+        }
     }
 };
-NativePresentation::NativePresentation(Runtime& runtime):impl(new Impl(*this,runtime)) {}
+NativePresentation::NativePresentation(Runtime& runtime,PyroWavePerf::Capture* capture):impl(new Impl(*this,runtime)) { impl->perf=capture; }
 NativePresentation::~NativePresentation() { shutdown(); }
 uint64_t NativePresentation::presentationDrops() const { std::lock_guard<std::mutex> guard(impl->mutex); return diagnostics.presentationDrops; }
 const std::string& NativePresentation::error() const { return impl->error; }
@@ -60,6 +67,7 @@ bool NativePresentation::initialize(SDL_Window* window,int width,int height,bool
         // Runtime is verified/loaded by the decoder. Never create its default device.
         p.vk.load(); p.log("vulkan_loader="+p.vk.loaderPath);
         PyroWaveVulkan::ProbeOptions options; options.minimumApi=VK_API_VERSION_1_2;
+        options.perf=p.perf;
         options.existingWin32Window=true; options.vsync=vsync;
         options.lockQueue=[&p] { p.queue.lock(false); };
         options.unlockQueue=[&p] { p.queue.unlock(false); };
@@ -73,7 +81,10 @@ bool NativePresentation::initialize(SDL_Window* window,int width,int height,bool
                 if(p.selected>=0) p.presenter->select(unsigned(p.selected),*p.runtime.liveRange(),Stage4::Filter::Linear);
                 p.presenter->before(cmd);
             }
-            if(p.overlays) p.overlays->before(cmd);
+            if(p.overlays) {
+                PyroWavePerf::Timer timer(p.perf,PyroWavePerf::OverlayUpload);
+                p.overlays->before(cmd);
+            }
         };
         options.video=[&p](VkCommandBuffer cmd,VkRenderPass pass,VkExtent2D extent) { if(p.presenter) p.presenter->record(cmd,pass,extent); if(p.overlays) p.overlays->record(cmd,pass,extent); };
         options.videoSubmit=[&p](VkSubmitInfo& submit) { if(p.presenter) p.presenter->submission(submit); };
@@ -82,6 +93,11 @@ bool NativePresentation::initialize(SDL_Window* window,int width,int height,bool
             p.presenter->submitted();
             if(p.selected>=0) {
                 const unsigned i=unsigned(p.selected);
+                if(p.perf) {
+                    const bool newFrame=p.slots.pending>=0;
+                    if(newFrame) p.perf->ordered(PyroWavePerf::PickupAge,p.pickupUs,p.captureReadyUs[i]);
+                    p.perf->submitted(newFrame,p.overlayWork,p.frameIds[i],p.selected);
+                }
                 ++p.self.diagnostics.decodeWaits; ++p.self.diagnostics.consumerSignals;
                 if(p.overlays) p.overlays->submitted(p.presenter->slotTimeline(i),p.presenter->consumerValue(i));
             }
@@ -116,7 +132,7 @@ bool NativePresentation::initialize(SDL_Window* window,int width,int height,bool
         return true;
     } catch(const std::exception& e) { p.error=e.what(); shutdown(); return false; }
 }
-bool NativePresentation::decode(const std::vector<uint8_t>& bytes,size_t& packets,DecodeTiming& timing) {
+bool NativePresentation::decode(const std::vector<uint8_t>& bytes,size_t& packets,DecodeTiming& timing,uint32_t frameNumber) {
     auto& p=*impl;
     // This mutex serializes timeline/publication state, never nests a codec queue
     // callback lock. Main/decoder may submit through that separate queue mutex.
@@ -130,8 +146,15 @@ bool NativePresentation::decode(const std::vector<uint8_t>& bytes,size_t& packet
     }
     if(p.decodeCounts[slot]++) ++diagnostics.slotReuse;
     p.presenter->decoded(unsigned(slot),*p.runtime.liveRange(),Stage4::Filter::Linear);
-    p.readyUs[slot]=micros();
+    p.readyUs[slot]=micros(); p.frameIds[slot]=frameNumber;
     p.slots.publish(slot,[&p](int i) { p.retire(i); });
+    if(p.perf) {
+        // Keep the historical readyUs/overlay definition intact. Capture marks
+        // successful publication after any pending replacement retirement.
+        p.captureReadyUs[slot]=micros();
+        p.perf->interval(PyroWavePerf::PublicationInterval,p.captureReadyUs[slot],p.perf->lastPublication);
+        p.perf->event(PyroWavePerf::Publish,frameNumber,slot);
+    }
     ++diagnostics.decoded; diagnostics.decodeSubmitUs+=timing.decodeUs;
     return true;
 }
@@ -147,7 +170,8 @@ NativePresentation::RenderResult NativePresentation::render() {
     p.selected=p.slots.current(); if(p.selected<0) return result;
     const bool newFrame=p.slots.pending>=0;
     const bool overlayWork=p.overlayChanged || p.overlays->pending();
-    const auto started=micros();
+    p.overlayWork=overlayWork;
+    const auto started=micros(); p.pickupUs=started;
     if(p.owner->draw()) {
         if(newFrame) { result.newFrame=true; result.readyUs=micros()-p.readyUs[p.selected]; ++diagnostics.rendered; }
         else {
@@ -187,9 +211,10 @@ void NativePresentation::shutdown() noexcept {
     // Consumer work is drained before codec/wrapper destruction. The wrapper
     // borrows every owner handle and all callback/create-info storage until close.
     p.runtime.resetDecoder();
-    if(diagnostics.decoded) p.runtime.reportPerformanceStats([](void*,const char* text) {
+    if(diagnostics.decoded) p.runtime.reportPerformanceStats([](void* userdata,const char* text) {
+        if(userdata) static_cast<PyroWavePerf::Capture*>(userdata)->codecReport(text);
         if(text && *text) SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,"PyroWave GPU timing: %s",text);
-    },nullptr);
+    },p.perf);
     diagnostics.cpuReadbacks=p.runtime.cpuYuvReadbackFrames();
     p.runtime.close();
     if(p.overlays) { diagnostics.overlayUploads=p.overlays->uploads; p.overlays.reset(); }

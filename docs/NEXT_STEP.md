@@ -1,4 +1,14 @@
-# Next step: controlled native Vulkan performance qualification and v1.0 polish
+# Next step: Phase 1A performance instrumentation and benchmarking infrastructure
+
+**Active milestone: Phase 1A**, implementation under validation. Add opt-in local
+capture, an audited metric dictionary, bounded CPU/frame-pacing distributions,
+versioned JSON, tested analysis tools and measured instrumentation overhead.
+See [PERFORMANCE_BENCHMARKING.md](PERFORMANCE_BENCHMARKING.md). Completion requires
+passing exact-source x64/native ARM64 builds and parser/runtime/Stage 2–5 checks;
+no new hardware qualification or Phase 1B completion is claimed. Surface owner
+instrumentation qualification precedes matched Phase 1B benchmarks. No tuning,
+Phase 2, release, automatic merge or forced backend selection is authorized.
+Published v0.3.0 remains the immutable benchmark reference.
 
 **[v0.3.0 — Native Vulkan Release is published](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.3.0)**
 from `2f29a8963078dadbe4e5031791a6390098e4635d`, with exact-source x64/native ARM64 packages,
