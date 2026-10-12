@@ -92,8 +92,8 @@ and [ffplay loop/fullscreen options](https://ffmpeg.org/ffplay.html).
 ## Design, order and predetermined exclusions
 
 Use 10-second warmup and 60-second capture, five independent streams per condition.
-Runner's five-pair order: **C D D C C D D C C D**. Across profiles alternate which
-condition begins in subsequent experiments; for manual A/B use A B B A A B B A A B,
+Runner's five-pair order: **C D D C C D D C C D**. Use `--start OFF` to reverse it
+in subsequent experiments; for manual A/B use A B B A A B B A A B,
 then B A A B B A A B B A in a subsequent block. Keep all runs including poor ones.
 First pass: one C/D pair at 1080p60, inspect manifests/backend/export, then one
 at 1440p120. Correct configuration errors before the complete five-pair sessions.

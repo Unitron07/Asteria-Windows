@@ -46,6 +46,7 @@ class BenchmarkTests(unittest.TestCase):
         sequence=runner.order(5)
         self.assertEqual(sequence,['ON','OFF','OFF','ON','ON','OFF','OFF','ON','ON','OFF'])
         self.assertEqual(sequence.count('ON'),5)
+        self.assertEqual(runner.order(5,'OFF'),['OFF','ON','ON','OFF','OFF','ON','ON','OFF','OFF','ON'])
         for value in (0,True,101):
             with self.assertRaises(ValueError): runner.order(value)
 
@@ -149,14 +150,28 @@ class BenchmarkTests(unittest.TestCase):
                     r['metrics']['frameAgeAtPickup']['clock']='steady_clock'
                     runner.save_new(Path(env['ASTERIA_PERF_CAPTURE'])/'synthetic.json',r)
                 return Child()
-            args=type('Args',(),dict(config=config,exe=exe,session=session,pairs=2,cooldown=0,resume=False))()
+            args=type('Args',(),dict(config=config,exe=exe,session=session,pairs=2,start='ON',cooldown=0,resume=False))()
             with patch.object(runner,'verify_package',return_value='a'*64),patch.object(runner,'no_running_client'),patch.object(runner,'timer'),patch.object(runner.subprocess,'Popen',side_effect=launch),patch('builtins.input',return_value=''):
+                with patch.object(runner,'timer',side_effect=ValueError('fixture stream interruption')):
+                    with self.assertRaisesRegex(ValueError,'interruption'): runner.execute(args)
+                failed=next(session.glob('run-*/manifest.json'))
+                self.assertEqual(b.read_json(failed)['status'],'failed')
+                original=failed.read_bytes()
+                args.resume=True
                 runner.execute(args)
-                self.assertEqual(modes,['ON','OFF','OFF','ON'])
+                self.assertEqual(modes,['ON','ON','OFF','OFF','ON'])
+                self.assertEqual(failed.read_bytes(),original)
                 for p in session.glob('run-*/manifest.json'):
-                    m=b.load_manifest(p); self.assertEqual(m['status'],'complete')
+                    m=b.load_manifest(p)
+                    if m['status']=='failed': continue
+                    self.assertEqual(m['status'],'complete')
                     self.assertEqual(len(m['_runs']),1 if m['profiling']=='ON' else 0)
                 args.resume=True; runner.execute(args)
-                self.assertEqual(len(modes),4)
+                self.assertEqual(len(modes),5)
+                # A completed manifest copied from another experiment cannot satisfy resume.
+                path=next(p for p in session.glob('run-*/manifest.json') if b.read_json(p)['status']=='complete')
+                m=b.read_json(path); m['context']['networkRoute']='tampered'
+                path.write_text(json.dumps(m),encoding='utf-8')
+                with self.assertRaisesRegex(ValueError,'saved experiment'): runner.execute(args)
 
 if __name__=='__main__': unittest.main()

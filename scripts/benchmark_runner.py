@@ -38,10 +38,12 @@ def child_env(mode, directory, warmup, duration, parent=None):
     elif mode!='OFF': raise ValueError('runner supports ON/OFF only')
     return env
 
-def order(pairs):
+def order(pairs, start='ON'):
     if type(pairs) is not int or not 1<=pairs<=100: raise ValueError('pairs must be 1..100')
+    if start not in ('ON','OFF'): raise ValueError('start must be ON or OFF')
     # ON OFF OFF ON ON OFF ...; alternate the first condition of each pair.
-    return [mode for i in range(pairs) for mode in (('ON','OFF') if i%2==0 else ('OFF','ON'))]
+    sequence=[mode for i in range(pairs) for mode in (('ON','OFF') if i%2==0 else ('OFF','ON'))]
+    return sequence if start=='ON' else [('OFF' if m=='ON' else 'ON') for m in sequence]
 
 def verify_package(exe, source, architecture):
     exe=Path(exe).resolve()
@@ -128,6 +130,12 @@ def resume_plan(session, desired):
         m=benchmark.read_json(p)
         if m['status']=='complete':
             benchmark.load_manifest(p)
+            ordinal=m.get('ordinal')
+            if type(ordinal) is not int or not 1<=ordinal<=len(desired['order']):
+                raise ValueError('completed attempt ordinal outside saved plan')
+            template=desired['template']
+            if any(m[k]!=template[k] for k in ('sourceRevision','architecture','gpu','driver','codec','bitstreamId','hostVersion','profile','context')) or m['executableSha256']!=desired['executableSha256'] or m['profiling']!=desired['order'][ordinal-1]:
+                raise ValueError('completed attempt does not belong to saved experiment')
             if m['ordinal'] in completed: raise ValueError('duplicate completed plan ordinal')
             completed.add(m['ordinal'])
     return completed
@@ -147,7 +155,7 @@ def execute(args):
     if session.exists() and not args.resume: raise ValueError('session exists; use --resume with identical plan')
     session.mkdir(parents=True,exist_ok=args.resume)
     desired={'schemaVersion':1,'executable':str(exe),'executableSha256':binary_hash,
-             'template':template,'order':order(args.pairs),'cooldownSeconds':args.cooldown}
+             'template':template,'order':order(args.pairs,args.start),'cooldownSeconds':args.cooldown}
     # Exclusive lock; stale lock requires owner to verify the previous runner/client exited.
     lock=session/'runner.lock'
     with lock.open('x') as f: f.write(str(os.getpid()))
@@ -225,6 +233,7 @@ def main():
     parser.add_argument('--config',type=Path,required=True)
     parser.add_argument('--session',type=Path,required=True)
     parser.add_argument('--pairs',type=int,default=5)
+    parser.add_argument('--start',choices=('ON','OFF'),default='ON')
     parser.add_argument('--cooldown',type=int,default=60)
     parser.add_argument('--resume',action='store_true')
     args=parser.parse_args()
