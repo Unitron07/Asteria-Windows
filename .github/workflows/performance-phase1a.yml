@@ -1,0 +1,55 @@
+name: Phase 1A performance infrastructure
+on:
+  push:
+    branches: ['codex/perf-phase1a-*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-2025
+            platform: x64
+          - arch: arm64
+            runner: windows-11-arm
+            platform: ARM64
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Compile and test fixed-storage capture
+        shell: pwsh
+        run: |
+          cmake -S tests/performance -B build/perf -G 'Visual Studio 18 2026' -A '${{ matrix.platform }}'
+          if($LASTEXITCODE) { throw 'Performance configure failed' }
+          cmake --build build/perf --config Release
+          if($LASTEXITCODE) { throw 'Performance build failed' }
+          ctest --test-dir build/perf -C Release --output-on-failure
+          if($LASTEXITCODE) { throw 'Performance tests failed' }
+          ./build/perf/Release/perf-overhead.exe | Set-Content build/perf/overhead.json -Encoding utf8
+          if($LASTEXITCODE) { throw 'Overhead experiment failed' }
+      - name: Validate and aggregate deterministic JSON fixtures
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests/performance -p 'test_*.py' -v
+          if($LASTEXITCODE) { throw 'Analysis tests failed' }
+          python scripts/performance.py validate tests/performance/synthetic.json
+          if($LASTEXITCODE) { throw 'Synthetic capture invalid' }
+          git diff --check
+          if($LASTEXITCODE) { throw 'Whitespace check failed' }
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: performance-${{ matrix.arch }}-${{ github.run_id }}
+          path: |
+            build/perf/Testing/
+            build/perf/overhead.json
+          if-no-files-found: error

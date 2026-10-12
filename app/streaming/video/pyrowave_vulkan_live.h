@@ -1,5 +1,6 @@
 #pragma once
 #include "pyrowave_runtime.h"
+#include "pyrowave_perf.h"
 #include <SDL.h>
 #include <memory>
 
@@ -16,10 +17,10 @@ public:
         std::string gpu,preferredPath,actualPath;
     } diagnostics;
     struct RenderResult { bool newFrame=false,retry=false; uint64_t readyUs=0; };
-    explicit NativePresentation(Runtime& runtime);
+    explicit NativePresentation(Runtime& runtime,PyroWavePerf::Capture* capture=nullptr);
     ~NativePresentation();
     bool initialize(SDL_Window* window,int width,int height,bool vsync);
-    bool decode(const std::vector<uint8_t>& bytes,size_t& packets,DecodeTiming& timing);
+    bool decode(const std::vector<uint8_t>& bytes,size_t& packets,DecodeTiming& timing,uint32_t frameNumber=0);
     RenderResult render();
     void updateOverlay(unsigned index,SDL_Surface* surface,bool enabled);
     void windowChanged();

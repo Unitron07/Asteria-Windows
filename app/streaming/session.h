@@ -2,6 +2,11 @@
 
 #include <QSemaphore>
 #include <QQuickWindow>
+#ifdef PYROWAVE_EXPERIMENTAL
+#include <QJsonObject>
+#include <array>
+#include <atomic>
+#endif
 
 #include <Limelight.h>
 #include <opus_multistream.h>
@@ -126,6 +131,16 @@ public:
         return m_OverlayManager;
     }
 
+    int performanceBitrateKbps() const { return m_StreamConfig.bitrate; }
+#ifdef PYROWAVE_EXPERIMENTAL
+    void retainPerformanceReport(const QString& directory,const QJsonObject& report) {
+        // Main-thread decoder teardown; consumed only by deferred cleanup after
+        // Session has destroyed its final decoder. Bound resize/recreation data.
+        if(m_PerfReportCount<m_PerfReports.size()) m_PerfReports[m_PerfReportCount++]={directory,report};
+        else ++m_PerfReportsOmitted;
+    }
+#endif
+
     void flushWindowEvents();
 
     void setShouldExit(bool quitHostApp = false);
@@ -149,6 +164,13 @@ signals:
     void launchWarningsChanged();
 
 private:
+#ifdef PYROWAVE_EXPERIMENTAL
+    bool m_PerfRequested=false;
+    QString m_PerfRunId;
+    std::atomic<uint64_t> m_PerfSetupUs{0},m_PerfConnectionUs{0};
+    std::array<QPair<QString,QJsonObject>,16> m_PerfReports{};
+    size_t m_PerfReportCount=0,m_PerfReportsOmitted=0;
+#endif
     void exec();
 
     bool startConnectionAsync();

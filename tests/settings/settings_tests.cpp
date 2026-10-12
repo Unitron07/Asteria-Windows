@@ -14,6 +14,7 @@
 #include <QQmlExpression>
 #include <QTextStream>
 #include <memory>
+#include "streaming/video/pyrowave_perf_export.h"
 
 // Only desktop discovery/polling/navigation are stubbed. Preferences, settings
 // persistence, the QML page and its controls are the production implementations.
@@ -81,6 +82,33 @@ class SettingsTests : public QObject {
         return QJsonDocument::fromJson(child.readAllStandardOutput()).object();
     }
 private slots:
+    void performanceCaptureSerialization() {
+        auto capture=std::make_unique<PyroWavePerf::Capture>();
+        capture->start=1; capture->end=20000001;
+        capture->metrics[PyroWavePerf::Assembly].record(1000);
+        auto report=PyroWavePerf::serialize(*capture);
+        QCOMPARE(report["schemaVersion"].toInt(),1);
+        auto metrics=report["metrics"].toObject();
+        auto measured=metrics["frameAssembly"].toObject();
+        QCOMPARE(measured["unit"].toString(),QString("us"));
+        QCOMPARE(measured["sampleCount"].toInteger(),qint64(1));
+        QCOMPARE(measured["mean"].toDouble(),1000.0);
+        QVERIFY(metrics["vulkanPresentCall"].toObject()["p99"].isNull());
+        QJsonParseError error;
+        auto roundtrip=QJsonDocument::fromJson(QJsonDocument(report).toJson(),&error);
+        QCOMPARE(error.error,QJsonParseError::NoError); QCOMPARE(roundtrip.object(),report);
+        QTemporaryDir output; QVERIFY(output.isValid());
+        QVERIFY(PyroWavePerf::writeReport(output.path(),report));
+        QVERIFY(PyroWavePerf::writeReport(output.path(),report));
+        QCOMPARE(QDir(output.path()).entryList({"*.json"},QDir::Files).size(),2);
+        QVERIFY(!PyroWavePerf::writeReport(output.path()+"/absent",report));
+        capture->metrics[PyroWavePerf::Assembly].overflow=true;
+        QVERIFY(PyroWavePerf::serialize(*capture)["metrics"].toObject()["frameAssembly"].toObject()["mean"].isNull());
+        capture->counts[PyroWavePerf::Received]=PyroWavePerf::Max;
+        auto overflowed=PyroWavePerf::serialize(*capture);
+        QVERIFY(overflowed["counts"].toObject()["receivedFrames"].isNull());
+        QVERIFY(overflowed["capture"].toObject()["counterOverflow"].toBool());
+    }
     void initTestCase() {
         QVERIFY(directory.isValid());
         QVERIFY(!QFontDatabase::applicationFontFamilies(0).isEmpty());

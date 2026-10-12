@@ -273,6 +273,7 @@ void Probe::destroySwapchain() noexcept {
     swapchain = VK_NULL_HANDLE;
 }
 bool Probe::recreate() {
+    const auto perfStarted=options.perf ? PyroWavePerf::nowUs() : 0;
     mainThread();
     int width = 0, height = 0;
     drawableSize(width,height);
@@ -374,6 +375,7 @@ bool Probe::recreate() {
     }
     progress.rebuild = false;
     ++recreations;
+    if(options.perf) options.perf->record(PyroWavePerf::Recreation,PyroWavePerf::nowUs()-perfStarted);
     log("swapchain_generation=" + std::to_string(recreations) + " extent=" + std::to_string(extent.width) + "x" + std::to_string(extent.height) +
         " images=" + std::to_string(images.size()) + " present_mode=" + std::to_string(mode) + " format=" + std::to_string(format.format));
     return true;
@@ -470,7 +472,7 @@ bool Probe::draw() {
     if (options.videoSubmit) options.videoSubmit(submit);
     const auto submitStarted = std::chrono::steady_clock::now();
 #endif
-    check(queueOperation([&] { return vk.QueueSubmit(queue,1,&submit,frame.complete); }), "vkQueueSubmit");
+    check(queueOperation([&] { PyroWavePerf::Timer timer(options.perf,PyroWavePerf::QueueSubmit); return vk.QueueSubmit(queue,1,&submit,frame.complete); }), "vkQueueSubmit");
 #ifdef PYROWAVE_VULKAN_STAGE4
     queueSubmitMs += std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-submitStarted).count();
     if (options.videoSubmitted) options.videoSubmitted();
@@ -481,7 +483,7 @@ bool Probe::draw() {
 #ifdef PYROWAVE_VULKAN_STAGE4
     const auto presentStarted = std::chrono::steady_clock::now();
 #endif
-    const VkResult result = queueOperation([&] { return vk.QueuePresentKHR(queue,&present); });
+    const VkResult result = queueOperation([&] { PyroWavePerf::Timer timer(options.perf,PyroWavePerf::PresentCall); return vk.QueuePresentKHR(queue,&present); });
 #ifdef PYROWAVE_VULKAN_STAGE4
     presentCallMs += std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-presentStarted).count();
 #endif

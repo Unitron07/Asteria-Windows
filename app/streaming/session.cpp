@@ -7,6 +7,7 @@
 #include <PyroWave.h>
 #ifdef PYROWAVE_EXPERIMENTAL
 #include "video/pyrowave_decoder.h"
+#include "video/pyrowave_perf_export.h"
 #endif
 #include "SDL_compat.h"
 #include "utils.h"
@@ -635,6 +636,11 @@ Session::~Session()
 
 bool Session::initialize(QQuickWindow* qtWindow)
 {
+#ifdef PYROWAVE_EXPERIMENTAL
+    m_PerfRequested=m_Preferences->videoCodecConfig==StreamingPreferences::VCC_FORCE_PYROWAVE && !qEnvironmentVariableIsEmpty("ASTERIA_PERF_CAPTURE");
+    if(m_PerfRequested) m_PerfRunId=QUuid::createUuid().toString(QUuid::WithoutBraces);
+    PyroWavePerf::LifetimeTimer perfSetup(m_PerfRequested ? &m_PerfSetupUs : nullptr);
+#endif
     m_QtWindow = qtWindow;
 
 #ifdef Q_OS_DARWIN
@@ -1355,7 +1361,35 @@ private:
         SDL_assert(m_Session->m_VideoDecoder == nullptr);
 
         // Finish cleanup of the connection state
+#ifdef PYROWAVE_EXPERIMENTAL
+        const auto perfCleanupStarted=m_Session->m_PerfRequested ? PyroWavePerf::nowUs() : 0;
+#endif
         LiStopConnection();
+#ifdef PYROWAVE_EXPERIMENTAL
+        const auto perfCleanupUs=m_Session->m_PerfRequested ? PyroWavePerf::nowUs()-perfCleanupStarted : 0;
+        try {
+            for(size_t i=0;i<m_Session->m_PerfReportCount;++i) {
+                auto& saved=m_Session->m_PerfReports[i];
+                auto metrics=saved.second["metrics"].toObject();
+                const auto lifetime=[&](const char* name,const char* scope,uint64_t value) {
+                    metrics[name]=QJsonObject{{"unit","us"},{"scope",scope},{"clock","steady_clock"},
+                        {"sampleCount",1},{"status","available"},{"percentileMethod","nearest-rank-exact"},
+                        {"mean",qint64(value)},{"minimum",qint64(value)},{"maximum",qint64(value)},
+                        {"p50",qint64(value)},{"p95",qint64(value)},{"p99",qint64(value)}};
+                };
+                lifetime("streamSetup","per-stream:Session_initialize_including_decoder_preflight",m_Session->m_PerfSetupUs.load());
+                lifetime("connectionStart","per-stream:Session_startConnectionAsync_including_host_launch_and_LiStartConnection",m_Session->m_PerfConnectionUs.load());
+                lifetime("connectionCleanup","per-stream:LiStopConnection_excluding_decoder_and_optional_host_quit",perfCleanupUs);
+                saved.second["metrics"]=metrics;
+                saved.second["decoderReportsOmitted"]=qint64(m_Session->m_PerfReportsOmitted);
+                saved.second["runId"]=m_Session->m_PerfRunId;
+                saved.second["decoderLifetimeIndex"]=int(i);
+                if(!PyroWavePerf::writeReport(saved.first,saved.second))
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"Performance capture export failed; cleanup continues");
+                saved={};
+            }
+        } catch(...) { SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"Performance capture export unavailable; cleanup continues"); }
+#endif
 
         // Perform a best-effort app quit
         if (shouldQuit) {
@@ -1652,6 +1686,9 @@ public:
 // Called in a non-main thread
 bool Session::startConnectionAsync()
 {
+#ifdef PYROWAVE_EXPERIMENTAL
+    PyroWavePerf::LifetimeTimer perfConnection(m_PerfRequested ? &m_PerfConnectionUs : nullptr);
+#endif
     // The UI should have ensured the old game was already quit
     // if we decide to stream a different game.
     Q_ASSERT(m_Computer->currentGameId == 0 ||
