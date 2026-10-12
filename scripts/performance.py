@@ -174,17 +174,23 @@ def markdown(runs):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('validate', 'report', 'summary'))
+    parser.add_argument('command', choices=('validate', 'report', 'summary', 'benchmark-validate', 'benchmark-report'))
     parser.add_argument('files', nargs='+', type=Path)
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
     try:
-        runs = [load(p) for p in args.files]
-        if args.command == 'validate':
+        if args.command.startswith('benchmark-'):
+            from benchmark import load_manifest, report
+            manifests = [load_manifest(p) for p in args.files]
+            text = report(manifests) if args.command == 'benchmark-report' else f'VALID: {len(manifests)} benchmark manifests (qualification assessed separately)\n'
+        elif args.command == 'validate':
+            runs = [load(p) for p in args.files]
             text = f'VALID: {len(runs)} schemaVersion=1 captures\n'
         elif args.command == 'report':
+            runs = [load(p) for p in args.files]
             text = markdown(runs)
         else:
+            runs = [load(p) for p in args.files]
             if len({profile(r) for r in runs}) != 1 or len({(r['sourceRevision'], r['backend'], r['buildKind']) for r in runs}) != 1:
                 raise ValueError('summary requires one source/backend/build kind/profile group; use report for comparisons')
             text = json.dumps(summarize(runs), indent=2, allow_nan=False)+'\n'

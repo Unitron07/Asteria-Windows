@@ -1,13 +1,16 @@
-# Next step: Phase 1A performance instrumentation and benchmarking infrastructure
+# Next step: Phase 1B controlled benchmarking and bottleneck analysis
 
-**Active milestone: Phase 1A**, implementation under validation. Add opt-in local
-capture, an audited metric dictionary, bounded CPU/frame-pacing distributions,
-versioned JSON, tested analysis tools and measured instrumentation overhead.
-See [PERFORMANCE_BENCHMARKING.md](PERFORMANCE_BENCHMARKING.md). Completion requires
-passing exact-source x64/native ARM64 builds and parser/runtime/Stage 2–5 checks;
-no new hardware qualification or Phase 1B completion is claimed. Surface owner
-instrumentation qualification precedes matched Phase 1B benchmarks. No tuning,
-Phase 2, release, automatic merge or forced backend selection is authorized.
+**Active milestone: Phase 1B, Step A preparation; INCOMPLETE pending repeated
+owner measurements and analysis.** See [PERFORMANCE_PHASE1B.md](PERFORMANCE_PHASE1B.md)
+for the matrix, semi-automated runner, evidence boundaries and owner instructions.
+Phase 1A is COMPLETE / OWNER-QUALIFIED at exact implementation
+`00b805e19866155483e6bd27dcd775355087a0ed`; [PR #45](https://github.com/Unitron07/Asteria-Windows/pull/45)
+merged at `a3e6d4604e1a02e5b86689f032a88cc08c155e03`, this preparation's main base.
+Native metadata was verified by the owner on Surface ARM64; functional checks
+are separately OWNER-CONFIRMED. Vulkan validation remains SKIP. Raw evidence
+and limitations are retained in the linked Phase 1B record and PR #45.
+No Phase 1B performance result, optimization, release or automatic merge is claimed.
+Phase 2/3 implementations, MultiSeat and VR remain outside this task.
 Published v0.3.0 remains the immutable benchmark reference.
 
 **[v0.3.0 — Native Vulkan Release is published](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.3.0)**

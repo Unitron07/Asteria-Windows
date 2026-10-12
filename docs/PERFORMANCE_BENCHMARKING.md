@@ -1,10 +1,12 @@
 # Phase 1A: streaming performance capture
 
-Status: implementation under validation; Phase 1A is not complete until the
-exact implementation passes normal x64/native ARM64 and all regressions.
-Phase 1B and hardware performance qualification have not started. No optimization,
-renderer architecture change, codec pin/patch, shader change, forced backend,
-release, merge or 120 FPS qualification threshold is included.
+Status: **COMPLETE / OWNER-QUALIFIED** at `00b805e19866155483e6bd27dcd775355087a0ed`.
+PR #45 merged at `a3e6d4604e1a02e5b86689f032a88cc08c155e03`.
+Native metadata is owner-verified on Surface ARM64; functional checks are
+separately OWNER-CONFIRMED, Vulkan validation remains SKIP. See the evidence and
+limits in [PERFORMANCE_PHASE1B.md](PERFORMANCE_PHASE1B.md).
+**Phase 1B is active, Step A preparation; controlled results remain unavailable.**
+No optimization, shader/pin change, forced backend, release or 120 FPS threshold.
 
 Audited main base: `0f897c0f591d736371c5a3352b48f3e445810842`.
 Immutable reference v0.3.0: `2f29a8963078dadbe4e5031791a6390098e4635d`.
