@@ -96,6 +96,8 @@ class BenchmarkTests(unittest.TestCase):
         text=b.report([self.m])
         self.assertIn('10 / 100; 0.1',text)
         self.assertIn('local decoder queue discard',text)
+        self.assertIn('decoder-lifetime counts',text)
+        self.assertIn('profiling was disabled',text)
         self.assertNotIn('pooledPercentiles": 0',text)
 
     def test_mismatched_sources_profiles_and_duplicate_identity(self):

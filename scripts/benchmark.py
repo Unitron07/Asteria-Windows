@@ -195,6 +195,19 @@ def report(manifests):
         lines.append(f"| {m['runId']} | {m['condition']} / {m['profiling']} | {'; '.join(problem) or 'context complete'} | {d} / {n}; {fraction if fraction is not None else 'unavailable'} |")
         key=(m['evidenceGroup'],m['condition'],m['sourceRevision'],m['actualBackend'],m['actualDecoderPath'],m['profiling'],match_key(m))
         groups.setdefault(key,[]).append(m)
+    lines += ['','## Individual observation windows','']
+    for m in manifests:
+        counts=(m.get('commonObservation') or {}).get('counts',{})
+        lines += [f"### {m['runId']}",f'Common decoder-lifetime counts (includes warmup/manual delay): `{json.dumps(counts,sort_keys=True)}`.']
+        for r in m.get('_runs',[]):
+            seconds=r['capture']['durationSeconds']
+            safe=seconds>0 and not r['capture'].get('counterOverflow')
+            fps={k:r['counts'][k]/seconds if safe and r['counts'].get(k) is not None else None
+                 for k in ('receivedFrames','decodedFrames','newVideoSubmissions')}
+            lines += [f"Capture `{r.get('runId')}`: {seconds}s measured after {r['capture']['warmupSeconds']}s warmup.",
+                      f"Capture-window counts (separate from lifetime): `{json.dumps(r['counts'],sort_keys=True)}`.",
+                      f"Capture-window FPS by counter: `{json.dumps(fps,sort_keys=True)}`; observed fields: `{json.dumps(r.get('observed'),sort_keys=True)}`."]
+        if m['profiling']=='OFF': lines.append('Capture-window histograms/FPS/percentiles unavailable: profiling was disabled.')
     lines += ['','## Repeated conditions','']
     summaries=[]
     for key,members in groups.items():
