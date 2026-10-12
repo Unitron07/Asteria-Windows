@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
     paths:
+      # Benchmark tooling still qualifies against both architectures and all stages.
+      - 'scripts/benchmark*.py'
+      - 'scripts/performance.py'
+      - 'tests/performance/**'
       - 'app/streaming/video/pyrowave*'
       - 'app/streaming/video/shaders/pyrowave/**'
       - 'app/streaming/session.*'
