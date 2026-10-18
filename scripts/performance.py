@@ -174,15 +174,19 @@ def markdown(runs):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('validate', 'report', 'summary', 'benchmark-validate', 'benchmark-report'))
+    parser.add_argument('command', choices=('validate', 'report', 'summary', 'benchmark-validate', 'benchmark-report', 'benchmark-ready'))
     parser.add_argument('files', nargs='+', type=Path)
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
     try:
         if args.command.startswith('benchmark-'):
-            from benchmark import load_manifest, report
+            from benchmark import load_manifest, report, validate_bitrate_pair
             manifests = [load_manifest(p) for p in args.files]
-            text = report(manifests) if args.command == 'benchmark-report' else f'VALID: {len(manifests)} benchmark manifests (qualification assessed separately)\n'
+            if args.command == 'benchmark-ready':
+                validate_bitrate_pair(manifests)
+                text = 'READY: matched 250/500 Mbps owner setup; verify saved settings and actual evidence on hardware.\n'
+            else:
+                text = report(manifests) if args.command == 'benchmark-report' else f'VALID: {len(manifests)} benchmark manifests (qualification assessed separately)\n'
         elif args.command == 'validate':
             runs = [load(p) for p in args.files]
             text = f'VALID: {len(runs)} schemaVersion=1 captures\n'

@@ -1,8 +1,11 @@
 # Phase 1B: controlled benchmarking and bottleneck analysis
 
-Status: **Step A preparation; Phase 1B INCOMPLETE**. No new Surface measurements
-exist in this change. Step B begins only after the owner provides repeated real
-captures/logs. A valid conclusion can be that no optimization is justified.
+Status: **next controlled experiment prepared; Phase 1B INCOMPLETE**. The owner
+completed ten exploratory 1440p120 streams (five ON, five OFF). The next step is
+the [matched 250/500 Mbps counterbalanced pilot](PERFORMANCE_PHASE1B_BITRATE_PILOT.md),
+which records the supplied independent findings, context checklist, exact commands
+and evidence gate. Follow that procedure before any full repeated benchmark.
+A valid conclusion can be that no optimization is justified.
 This PR changes local tooling, tests and documentation, not the streaming runtime.
 
 ## Verified identities and evidence boundaries
@@ -91,6 +94,10 @@ and [ffplay loop/fullscreen options](https://ffmpeg.org/ffplay.html).
 
 ## Design, order and predetermined exclusions
 
+The following ON/OFF design is retained for historical reference. The next
+experiment uses the four-stream all-ON bitrate pilot linked above. New launches
+require complete owner setup; old manifests remain readable with explicit unknowns.
+
 Use 10-second warmup and 60-second capture, five independent streams per condition.
 Runner's five-pair order: **C D D C C D D C C D**. Use `--start OFF` to reverse it
 in subsequent experiments; for manual A/B use A B B A A B B A A B,
@@ -126,7 +133,7 @@ host workload and verify display/power/network conditions manually.
 New-Item -ItemType Directory C:\Benchmarks\Phase1B
 Copy-Item .\docs\benchmark-manifest.template.json C:\Benchmarks\Phase1B\surface-1440p120.json
 notepad C:\Benchmarks\Phase1B\surface-1440p120.json
-# Fill known null fields; leave unavailable values null. Confirm exact GPU spelling
+# Complete required setup using the new pilot checklist. Confirm exact GPU spelling
 # from the qualified log. Keep sourceRevision equal to the selected package.
 python .\scripts\performance.py benchmark-validate C:\Benchmarks\Phase1B\surface-1440p120.json
 
@@ -326,13 +333,13 @@ overhead is unestablished. Histogram tails are approximate and traces bounded.
 Network/host/client/display domains stay separate. No physical latency reduction,
 hardware power efficiency improvement or profiling benefit is claimed.
 
-## Results and bottleneck ranking: waiting for owner
+## Results and bottleneck ranking: exploratory block complete; controlled pilot pending
 
 | Profile / conditions | Completed controlled repeats | Qualification / finding |
 | --- | --- | --- |
 | 1080p60 A/B/C/D | unavailable | awaiting owner measurements |
-| 1440p120 A/B/C/D | unavailable | awaiting owner measurements |
-| Same-binary C/D | unavailable | causal overhead not established |
+| 1440p120 same-binary C/D | ten exploratory streams, five ON/five OFF | supplied analysis: ON lower median drop rate, wins 3/5 pairs; two ON p99 tails ~41/~37 ms; missing workload/network/power context |
+| 1440p120 250/500 Mbps, all ON | pending four-stream ABBA pilot | matched controls/evidence required; no causal conclusion |
 
 After owner upload: validate each original, verify source/path/profile/window,
 inspect full repeat variation and exclusions, retain common-method resource and

@@ -36,10 +36,23 @@
     "brightness": null,
     "clientOs": null,
     "warmupSeconds": 10,
-    "measurementSeconds": 60
+    "measurementSeconds": 60,
+    "hostWorkloadSha256": null,
+    "workloadStartProtocol": null,
+    "hostDisplaySettings": null,
+    "hostEncoderSettings": null,
+    "displayMode": null,
+    "hdr": null,
+    "vrr": null,
+    "networkAdapter": null,
+    "clientPowerMode": null,
+    "backgroundLoad": null,
+    "cooldownPolicy": null,
+    "thermalCondition": null
   },
   "commonObservation": null,
   "captures": [],
   "logs": [],
-  "notes": "TEMPLATE ONLY. Confirm actual GPU string and all settings; null means unavailable, never guessed. 500000 Kbps is the proposed 1440p120 experiment target, not an observed bitrate."
+  "notes": "TEMPLATE ONLY. Fill owner setup before launch; null means unavailable, never guessed. Target bitrate is not observed payload. See PERFORMANCE_PHASE1B_BITRATE_PILOT.md.",
+  "experimentStage": "repeated"
 }

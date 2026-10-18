@@ -16,6 +16,53 @@ EVIDENCE = ('stage5-qualification', 'official-v0.2.0', 'official-v0.3.0',
             'phase1a-initial', 'phase1a-metadata-fixed', 'phase1b-controlled')
 COUNTERS = ('receivedFrames', 'decodedFrames', 'renderedFrames', 'presentationDrops',
             'nativeRetiredDrops', 'networkDrops', 'retainedFrameRedraws', 'overlayRedraws')
+# Required before NEW launches; old manifests remain readable without retrofilling.
+SETUP = ('hostWorkloadSha256', 'workloadStartProtocol', 'hostDisplaySettings',
+         'hostEncoderSettings', 'displayMode', 'hdr', 'vrr', 'networkAdapter',
+         'clientPowerMode', 'backgroundLoad', 'cooldownPolicy', 'thermalCondition')
+
+def validate_ready(m):
+    """Owner-declared setup gate, not proof of actual hardware configuration."""
+    validate_manifest(m)
+    if m['evidenceGroup'] != 'phase1b-controlled':
+        raise ValueError('new launches require controlled evidence group')
+    if m.get('experimentStage') not in ('pilot', 'repeated'):
+        raise ValueError('experimentStage must be pilot or repeated')
+    for key in IDENTITY:
+        if key not in ('timestamp', 'executableSha256') and m[key] is None:
+            raise ValueError(f'complete owner setup before launch: {key}')
+        if isinstance(m[key], str) and m[key].strip().lower() in ('unknown', 'todo', 'unavailable'):
+            raise ValueError(f'record concrete setup: {key}')
+    c = m['context']
+    for key in MATCH + SETUP:
+        if c.get(key) is None:
+            raise ValueError(f'complete owner setup before launch: context.{key}')
+        if isinstance(c[key], str) and c[key].strip().lower() in ('unknown', 'todo', 'unavailable'):
+            raise ValueError(f'record concrete setup: context.{key}')
+    for key in SETUP:
+        if not isinstance(c[key], str) or not c[key].strip() or c[key].strip().lower() in ('unknown', 'todo', 'unavailable'):
+            raise ValueError(f'record concrete setup: context.{key}')
+    if not re.fullmatch('[0-9a-f]{64}', c['hostWorkloadSha256']):
+        raise ValueError('hostWorkloadSha256 must be exact SHA-256')
+    return m
+
+def validate_bitrate_pair(manifests):
+    if len(manifests) != 2:
+        raise ValueError('benchmark-ready requires the 250 and 500 Mbps configs')
+    a, b = [validate_ready(m) for m in manifests]
+    for m in (a, b):
+        if m['status'] != 'planned' or m['captures'] or m['logs']:
+            raise ValueError('bitrate configs must be empty planned runs')
+        if (m['profile'], m['architecture'], m['codec'], m['actualBackend'], m['actualDecoderPath'], m['profiling']) != ('1440p120', 'arm64', 'PyroWave', 'NATIVE_VULKAN', 'fragment', 'ON'):
+            raise ValueError('bitrate pilot requires 1440p120 ARM64 PyroWave native fragment profiling ON')
+    if {a['context']['bitrateKbps'], b['context']['bitrateKbps']} != {250000, 500000}:
+        raise ValueError('bitrate pair requires 250000 and 500000 Kbps targets')
+    identity = ('sourceRevision', 'applicationVersion', 'architecture', 'gpu', 'driver', 'codec',
+                'actualBackend', 'actualDecoderPath', 'bitstreamId', 'hostVersion',
+                'executableSha256', 'experimentStage', 'condition', 'evidenceGroup')
+    if any(a[k] != b[k] for k in identity) or {k:v for k,v in a['context'].items() if k != 'bitrateKbps'} != {k:v for k,v in b['context'].items() if k != 'bitrateKbps'}:
+        raise ValueError('matched configs may differ only in target bitrate (and run labels/notes)')
+    return manifests
 
 def read_json(path):
     path = Path(path)
@@ -204,6 +251,11 @@ def load_manifest(path):
 
 def issues(m):
     result=list(m.get('_evidenceErrors', []))
+    if m.get('experimentStage'):
+        try:
+            validate_ready(m)
+        except ValueError as error:
+            result.append(str(error))
     missing=[k for k in IDENTITY if m[k] is None]+['context.'+k for k in MATCH if m['context'][k] is None]
     if missing: result.append('unknown: '+', '.join(missing))
     if m['status'] != 'complete': result.append('status='+m['status'])
@@ -226,7 +278,7 @@ def distribution(values):
             'mad':mad,'outlierIndices':[i for i,v in enumerate(values) if mad and abs(v-median)>3*1.4826*mad]}
 
 def match_key(m):
-    return json.dumps([m['profile'],*[m[k] for k in ('architecture','gpu','driver','codec','bitstreamId','hostVersion')],m['context']],sort_keys=True)
+    return json.dumps([m.get('experimentStage'),m['profile'],*[m[k] for k in ('architecture','gpu','driver','codec','bitstreamId','hostVersion')],m['context']],sort_keys=True)
 
 def report(manifests):
     ids=[m['runId'] for m in manifests]

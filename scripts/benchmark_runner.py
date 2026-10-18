@@ -201,7 +201,7 @@ def resume_plan(session, desired):
             if type(ordinal) is not int or not 1<=ordinal<=len(desired['order']):
                 raise ValueError('completed attempt ordinal outside saved plan')
             template=desired['template']
-            if any(m[k]!=template[k] for k in ('sourceRevision','architecture','gpu','driver','codec','bitstreamId','hostVersion','profile','context')) or m['executableSha256']!=desired['executableSha256'] or m['profiling']!=desired['order'][ordinal-1]:
+            if any(m.get(k)!=template.get(k) for k in ('sourceRevision','applicationVersion','architecture','gpu','driver','codec','bitstreamId','hostVersion','actualBackend','actualDecoderPath','experimentStage','profile','context')) or m['executableSha256']!=desired['executableSha256'] or m['profiling']!=desired['order'][ordinal-1]:
                 raise ValueError('completed attempt does not belong to saved experiment')
             if m['ordinal'] in completed: raise ValueError('duplicate completed plan ordinal')
             completed.add(m['ordinal'])
@@ -210,7 +210,9 @@ def resume_plan(session, desired):
 def execute(args):
     if os.name!='nt': raise ValueError('live runner requires Windows; fixture tests are portable')
     if not 0<=args.cooldown<=3600: raise ValueError('cooldown must be 0..3600 seconds')
-    template=benchmark.validate_manifest(benchmark.read_json(args.config))
+    single_run=getattr(args,'single_run',False)
+    if single_run and args.pairs!=1: raise ValueError('--single-run requires --pairs 1')
+    template=benchmark.validate_ready(benchmark.read_json(args.config))
     if template['evidenceGroup']!='phase1b-controlled' or template['status']!='planned' or template['captures'] or template['logs']:
         raise ValueError('config must be an empty planned controlled run')
     c=template['context']
@@ -218,11 +220,13 @@ def execute(args):
         raise ValueError('warmup/duration outside production environment bounds')
     exe=args.exe.resolve()
     binary_hash=verify_package(exe,template['sourceRevision'],template['architecture'])
+    if template['executableSha256'] is not None and template['executableSha256']!=binary_hash:
+        raise ValueError('configured executable SHA-256 differs from selected package')
     session=args.session.resolve()
     if session.exists() and not args.resume: raise ValueError('session exists; use --resume with identical plan')
     session.mkdir(parents=True,exist_ok=args.resume)
     desired={'schemaVersion':1,'executable':str(exe),'executableSha256':binary_hash,
-             'template':template,'order':order(args.pairs,args.start),'cooldownSeconds':args.cooldown}
+             'template':template,'order':[args.start] if single_run else order(args.pairs,args.start),'cooldownSeconds':args.cooldown}
     # Exclusive lock; stale lock requires owner to verify the previous runner/client exited.
     lock=session/'runner.lock'
     with lock.open('x') as f: f.write(str(os.getpid()))
@@ -240,13 +244,12 @@ def execute(args):
             captures=target/'captures'; captures.mkdir()
             m=copy.deepcopy(template)
             m.update(runId=str(uuid.uuid4()),timestamp=now(),ordinal=ordinal,profiling=mode,
-                     condition='C' if mode=='ON' else 'D',status='incomplete',executableSha256=binary_hash,
-                     actualBackend=None,actualDecoderPath=None)
+                     condition='C' if mode=='ON' else 'D',status='incomplete',executableSha256=binary_hash)
             save_new(target/'started.json',m)
             before={p.name:digest(p) for p in exe.parent.glob('Asteria-*.log')}
             process=None
             try:
-                input(f'Run {ordinal}/{len(desired["order"])} {mode}: confirm settings/workload ready and other clients closed; Enter launches. ')
+                input(f'Run {ordinal}/{len(desired["order"])} {mode}, {c["width"]}x{c["height"]}@{c["targetFps"]}, target {c["bitrateKbps"]} Kbps: confirm saved settings/workload/context and other clients closed; Enter launches. ')
                 with (target/'console.log').open('xb') as console:
                     process=subprocess.Popen([str(exe)],cwd=exe.parent,
                         env=child_env(mode,captures,c['warmupSeconds'],c['measurementSeconds']),stdout=console,stderr=subprocess.STDOUT)
@@ -295,6 +298,7 @@ def main():
     parser.add_argument('--revalidate',type=Path,help='offline validation of an original failed ON attempt; never launches Asteria')
     parser.add_argument('--recovery-output',type=Path,help='new standalone directory outside the original session')
     parser.add_argument('--pairs',type=int,default=5)
+    parser.add_argument('--single-run',action='store_true',help='one launch using --start; requires --pairs 1 (bitrate pilot uses ON)')
     parser.add_argument('--start',choices=('ON','OFF'),default='ON')
     parser.add_argument('--cooldown',type=int,default=60)
     parser.add_argument('--resume',action='store_true')

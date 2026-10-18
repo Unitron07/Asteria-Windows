@@ -2,6 +2,7 @@ import copy
 import json
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -11,6 +12,18 @@ sys.path.insert(0,str(ROOT/'scripts'))
 import benchmark as b
 import benchmark_runner as runner
 import performance
+
+def ready_config(m):
+    """Synthetic setup only; no hardware measurements."""
+    m=copy.deepcopy(m)
+    m.update(applicationVersion='synthetic',driver='synthetic-driver',hostVersion='synthetic-host',
+             actualBackend='NATIVE_VULKAN',actualDecoderPath='fragment',experimentStage='pilot')
+    for key in b.MATCH:
+        if m['context'][key] is None: m['context'][key]='synthetic-setting'
+    m['context'].update(vsync=False,displayRefreshHz=120,linkSpeedMbps=1000,mtu=1500,brightness=50)
+    m['context'].update({k:'synthetic-setting' for k in b.SETUP})
+    m['context']['hostWorkloadSha256']='a'*64
+    return m
 
 class BenchmarkTests(unittest.TestCase):
     def setUp(self):
@@ -113,6 +126,67 @@ class BenchmarkTests(unittest.TestCase):
         self.assertEqual(stats['maximum'],100); self.assertEqual(stats['outlierIndices'],[4])
         self.assertIsNone(b.distribution([1])['sampleStdev'])
 
+    def test_ready_requires_context_but_old_unknown_evidence_remains_readable(self):
+        b.validate_manifest(self.m)
+        with self.assertRaisesRegex(ValueError,'owner setup'): b.validate_ready(self.m)
+        ready=ready_config(self.m)
+        b.validate_ready(ready)
+        for key in b.MATCH+b.SETUP:
+            m=copy.deepcopy(ready); m['context'][key]=None
+            with self.subTest(key=key),self.assertRaises(ValueError):
+                b.validate_ready(m)
+        for key in ('driver','hostVersion','actualDecoderPath'):
+            m=copy.deepcopy(ready);m[key]=None
+            with self.subTest(key=key),self.assertRaises(ValueError): b.validate_ready(m)
+        for value in ('TODO','unknown','unavailable',''):
+            m=copy.deepcopy(ready);m['context']['hostWorkload']=value
+            with self.subTest(value=value),self.assertRaises(ValueError): b.validate_ready(m)
+        ready['context']['hostWorkloadSha256']='not-a-hash'
+        with self.assertRaisesRegex(ValueError,'SHA-256'): b.validate_ready(ready)
+
+    def test_bitrate_pair_rejects_all_context_and_identity_drift(self):
+        a=ready_config(self.m);a['context']['bitrateKbps']=250000
+        b500=copy.deepcopy(a);b500['context']['bitrateKbps']=500000
+        b.validate_bitrate_pair([a,b500])
+        for key in b.MATCH+b.SETUP:
+            if key=='bitrateKbps': continue
+            bad=copy.deepcopy(b500)
+            value=bad['context'][key]
+            bad['context'][key]=(not value if type(value) is bool else value+1 if type(value) in (int,float) else 'b'*64 if key=='hostWorkloadSha256' else value+'-changed')
+            with self.subTest(key=key),self.assertRaises(ValueError): b.validate_bitrate_pair([a,bad])
+        for key,value in (('actualDecoderPath','compute'),('sourceRevision','b'*40),('experimentStage','repeated'),('profiling','OFF'),('driver','other')):
+            bad=copy.deepcopy(b500);bad[key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError): b.validate_bitrate_pair([a,bad])
+        self.assertNotEqual(b.match_key(a),b.match_key(dict(a,experimentStage='repeated')))
+        with self.assertRaises(ValueError): b.validate_bitrate_pair([a])
+
+    def test_bitrate_templates_and_ready_cli(self):
+        with tempfile.TemporaryDirectory() as d:
+            paths=[]
+            for rate in (250,500):
+                m=b.read_json(ROOT/f'docs/benchmark-1440p120-{rate}mbps.template.json')
+                b.validate_manifest(m)
+                with self.assertRaises(ValueError): b.validate_ready(m)
+                path=Path(d)/f'{rate}.json';runner.save_new(path,ready_config(m));paths.append(str(path))
+            command=[sys.executable,str(ROOT/'scripts/performance.py'),'benchmark-ready',*paths]
+            result=subprocess.run(command,capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertIn('READY:',result.stdout)
+            m=b.read_json(paths[1]);m['context']['networkRoute']='changed'
+            Path(paths[1]).write_text(json.dumps(m),encoding='utf-8')
+            result=subprocess.run(command,capture_output=True,text=True)
+            self.assertNotEqual(result.returncode,0)
+            self.assertIn('matched configs',result.stderr)
+
+    @unittest.skipUnless(sys.platform=='win32','Windows launch gate')
+    def test_missing_setup_blocks_before_package_session_or_process(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);config=root/'config.json';runner.save_new(config,self.m)
+            args=type('Args',(),dict(config=config,cooldown=60))()
+            with patch.object(runner,'verify_package') as package,patch.object(runner.subprocess,'Popen') as launch:
+                with self.assertRaisesRegex(ValueError,'owner setup'): runner.execute(args)
+                package.assert_not_called();launch.assert_not_called()
+
     def test_real_shutdown_summary_validation(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d); self.m['logs']=['Asteria-1.log']
@@ -131,6 +205,7 @@ class BenchmarkTests(unittest.TestCase):
     @unittest.skipUnless(sys.platform=='win32','live orchestration fixture uses Windows runner platform gate')
     def test_end_to_end_semi_automated_order_exports_and_resume(self):
         # Exercise production orchestration with a fake process, not a stream/GPU.
+        self.m=ready_config(self.m)
         with tempfile.TemporaryDirectory() as d:
             root=Path(d); package=root/'package'; package.mkdir(); exe=package/'Asteria.exe'
             config=root/'config.json'; runner.save_new(config,self.m)
@@ -151,7 +226,7 @@ class BenchmarkTests(unittest.TestCase):
                 if mode=='ON':
                     r=performance.load(Path(__file__).with_name('synthetic.json'))
                     r.update(runId=str(len(modes)),sourceRevision=self.m['sourceRevision'],architecture='arm64',gpu=self.m['gpu'],backend='NATIVE_VULKAN',decoderPath='fragment')
-                    r['video'].update(width=2560,height=1440,targetFps=120,requestedBitrateKbps=500000)
+                    r['video'].update(width=2560,height=1440,targetFps=120,requestedBitrateKbps=500000,vsync=self.m['context']['vsync'])
                     r['metrics']['newFrameSubmissionInterval'].update(scope='CPU:successive_new_video_vkQueueSubmit_success_callbacks',clock='steady_clock')
                     r['metrics']['frameAgeAtPickup']['clock']='steady_clock'
                     runner.save_new(Path(env['ASTERIA_PERF_CAPTURE'])/'synthetic.json',r)
@@ -175,6 +250,25 @@ class BenchmarkTests(unittest.TestCase):
                     self.assertEqual(len(m['_runs']),1 if m['profiling']=='ON' else 0)
                 args.resume=True; runner.execute(args)
                 self.assertEqual(len(modes),5)
+                # Same orchestration, one ON launch for a bitrate condition; resume
+                # must not turn it into another launch or a profiling-OFF pair.
+                args.session=root/'single';args.pairs=1;args.single_run=True;args.resume=False
+                runner.execute(args)
+                self.assertEqual(modes,['ON','ON','OFF','OFF','ON','ON'])
+                args.resume=True;runner.execute(args)
+                self.assertEqual(len(modes),6)
+                args.pairs=2
+                with self.assertRaisesRegex(ValueError,'--pairs 1'):runner.execute(args)
+                args.session=session;args.pairs=2;args.single_run=False
+                # A requested fragment path must survive launch and be checked
+                # against real log evidence rather than silently replaced.
+                changed=copy.deepcopy(self.m);changed['actualDecoderPath']='compute'
+                badconfig=root/'wrong-path.json';runner.save_new(badconfig,changed)
+                args.config=badconfig;args.session=root/'wrong-path';args.resume=False
+                with self.assertRaisesRegex(ValueError,'actualDecoderPath'):runner.execute(args)
+                failed_path=next(args.session.glob('run-*/manifest.json'))
+                self.assertEqual(b.read_json(failed_path)['status'],'failed')
+                args.config=config;args.session=session;args.resume=True
                 # A completed manifest copied from another experiment cannot satisfy resume.
                 path=next(p for p in session.glob('run-*/manifest.json') if b.read_json(p)['status']=='complete')
                 m=b.read_json(path); m['context']['networkRoute']='tampered'
