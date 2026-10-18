@@ -164,6 +164,60 @@ crash, verify no prior runner/client is running before manually deleting ONLY th
 session's stale lock. A resumable failed run is not silently treated as completed.
 Copying raw logs may include private addresses; redact a copy before public sharing.
 
+### Native log selection and offline pilot recovery
+
+The runner records its redirected **console.log** as first-class manifest evidence,
+as well as changed portable `Asteria-*.log` files. The runner and analyzer share one
+selector: ignore explicit `testOnly=true` preflight summaries, then require exactly
+one real `testOnly=false` native shutdown summary. Identical parsed JSON copied
+across different log files counts once, regardless of prefix/key order. Two real
+records within one file still count twice even if identical; distinct real summaries
+in different files also fail. Missing/malformed testOnly or malformed JSON fails.
+Source SHA, GPU, bitstream, native backend, actual decoder path, cleanup=true,
+explicit zero timeline/fatal errors and integer counters remain validated. The
+original lines, capture values and counter definitions are never rewritten.
+
+An owner Surface pilot exposed two defects in the original tooling head
+`b11ed44735a270a907f21a1456a68e785b38bb66`: console.log was omitted and preflight
+was counted as another lifetime. The owner reports one preflight and one real
+summary in `run-01-ON-5511ce24/console.log`, with one capture named
+`asteria-perf-8179fbe6-e203-4bb6-af11-c3f5966f2115.json`. Those raw files were
+not available on the development computer; **this is a reported reproduction,
+not an independently revalidated hardware run**. Recovery is possible only if
+the actual evidence passes validation; no new stream is needed for that check.
+
+Close Asteria normally first. Using the refreshed toolkit on the Surface, replace
+the example session path with the actual pilot location:
+
+```powershell
+python .\scripts\benchmark_runner.py --revalidate C:\Benchmarks\Phase1B\pilot\run-01-ON-5511ce24 --recovery-output C:\Benchmarks\Phase1B\pilot-revalidated
+python .\scripts\performance.py benchmark-validate C:\Benchmarks\Phase1B\pilot-revalidated\manifest.json
+```
+
+This offline command launches no application and changes no original file. It is
+restricted to an original failed ON manifest with the exact old log-selection
+error. It requires original exitCode=0, ordered owner timing records, the same
+declared capture inventory, exactly one full-duration non-overflowed valid capture,
+correct native scope/clock metadata and one healthy real summary matching capture
+and manifest identities/settings. Missing evidence or another failure refuses
+automatic recovery; do not edit values or fabricate timing/exit evidence to pass.
+
+Only after validation, it exclusively creates a **new standalone directory**
+outside the original session, copies the original log/capture bytes, retains the
+failed manifest verbatim as `original-manifest.json`, and writes `manifest.json`,
+`revalidation.json` and `summary.md`. It hashes every copied source file, revalidates
+the copy, and detects changes during validation/copy. Existing output is refused;
+an interrupted copy remains separate and must not be treated as completed.
+`revalidation` records the original failure and hashes. No original finishedAt,
+measurement values, settings, runId or ordinal is invented or replaced.
+
+The original manifest remains **failed**, and its session plan is not advanced.
+The recovered copy is the **same pilot**, not another independent repeat. Analyze
+either the original failed attempt or its validated copy, never both as repeats.
+Normal `--resume` of the original session retries its failed ON ordinal; it does
+not silently adopt a recovered pilot. New valid ON attempts proceed to OFF under
+the corrected runner. Retain pilot evidence separately from planned full repeats.
+
 ### Unattended interface audit
 
 `app/cli/commandlineparser.cpp` documents `stream <host> <app>` and `quit <host>`.

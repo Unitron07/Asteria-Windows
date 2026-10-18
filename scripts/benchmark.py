@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import re
 import statistics
+from collections import Counter
 from datetime import datetime
 import performance
 
@@ -94,6 +95,64 @@ def safe_path(root, name):
         raise ValueError('evidence escapes manifest directory')
     return path
 
+def native_summary(m, root):
+    """Select one real lifetime, sharing identical copies across log files only.
+
+    A repeated record within ONE log remains ambiguous and must not be deduped:
+    it could represent two real lifetimes. Compare parsed JSON, not log prefixes.
+    """
+    counts = Counter()
+    records = {}
+    seen_paths = set()
+    for name in m['logs']:
+        path = safe_path(root, name)
+        if path in seen_paths:
+            continue
+        seen_paths.add(path)
+        local = Counter()
+        for lineno, line in enumerate(path.read_text(encoding='utf-8-sig', errors='replace').splitlines(), 1):
+            marker = 'PYROWAVE_NATIVE_STREAM_SUMMARY '
+            if marker not in line:
+                continue
+            try:
+                def reject(value):
+                    raise ValueError(f'invalid numeric constant: {value}')
+                record = json.loads(line.split(marker, 1)[1], parse_constant=reject)
+                if type(record) is not dict or type(record.get('testOnly')) is not bool:
+                    raise ValueError('testOnly must be an explicit JSON boolean')
+                if record['testOnly']:
+                    continue  # Native preflight never counts as a stream lifetime.
+                key = json.dumps(record, sort_keys=True, allow_nan=False)
+            except (ValueError, TypeError) as error:
+                raise ValueError(f'{name}:{lineno}: invalid native summary: {error}') from error
+            local[key] += 1
+            records[key] = record
+        counts |= local  # Maximum multiplicity per payload across copies, not sum.
+    real_count = sum(counts.values())
+    if real_count != 1:
+        raise ValueError(f'requires exactly one real native shutdown summary; found {real_count} real lifetimes (preflight excluded)')
+    r = records[next(iter(counts))]
+    for field, identity in (('sourceRevision', 'sourceRevision'), ('selectedGpu', 'gpu'), ('bitstreamId', 'bitstreamId')):
+        if not isinstance(r.get(field), str) or not r[field] or r[field] != m[identity]:
+            raise ValueError(f'shutdown summary {identity} mismatch')
+    if r.get('backend') != 'NATIVE_VULKAN':
+        raise ValueError('shutdown summary backend must be NATIVE_VULKAN')
+    if not isinstance(r.get('actualDecoderPath'), str) or not r['actualDecoderPath'].strip():
+        raise ValueError('shutdown summary missing actual decoder path')
+    for field in ('backend', 'actualDecoderPath'):
+        identity = 'actualBackend' if field == 'backend' else field
+        if m.get(identity) is not None and m[identity] != r[field]:
+            raise ValueError(f'common log provenance mismatch: {field}')
+    if r.get('cleanupOkay') is not True:
+        raise ValueError('native cleanup failure or missing cleanupOkay=true')
+    for field in ('timelineErrors', 'fatalPresenterErrors'):
+        if type(r.get(field)) is not int or r[field] != 0:
+            raise ValueError(f'native {field} must be explicit zero')
+    for field in set(COUNTERS).intersection(r) | {'decodedFrames', 'presentationDrops'}:
+        if type(r.get(field)) is not int or not 0 <= r[field] <= 2**63-1:
+            raise ValueError(f'invalid native counter: {field}')
+    return r
+
 def check_capture(m, run):
     c = m['context']
     for key in ('sourceRevision', 'architecture', 'gpu', 'backend'):
@@ -138,18 +197,7 @@ def load_manifest(path):
         if not safe_path(root,p).is_file():
             raise ValueError('missing log evidence')
     if m.get('commonObservation') is not None:
-        records=[]
-        for p in m['logs']:
-            for line in safe_path(root,p).read_text(encoding='utf-8-sig',errors='replace').splitlines():
-                marker='PYROWAVE_NATIVE_STREAM_SUMMARY '
-                if marker in line: records.append(json.loads(line.split(marker,1)[1]))
-        if len(records)!=1:
-            raise ValueError('common observation requires one original native log summary')
-        r=records[0]
-        if r.get('testOnly') is not False or any(r.get(k)!=m[v] for k,v in (
-                ('sourceRevision','sourceRevision'),('backend','actualBackend'),('actualDecoderPath','actualDecoderPath'),
-                ('selectedGpu','gpu'),('bitstreamId','bitstreamId'))):
-            raise ValueError('common log provenance mismatch')
+        r=native_summary(m,root)
         counts=m['commonObservation']['counts']
         if any(r.get(k)!=v for k,v in counts.items()): raise ValueError('common counters differ from original log')
     return m

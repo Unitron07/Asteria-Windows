@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import time
 import uuid
 import benchmark
@@ -78,7 +79,8 @@ def no_running_client():
         raise ValueError('close existing Asteria/Moonlight processes normally before launching/resuming')
 
 def collect_logs(root, before, target):
-    logs=[]
+    # The redirected console is already in the attempt directory; never recopy it.
+    logs=['console.log'] if (target/'console.log').is_file() else []
     for path in sorted(root.glob('Asteria-*.log')):
         if before.get(path.name)==digest(path): continue
         dest=target/path.name
@@ -92,26 +94,91 @@ def collect_logs(root, before, target):
     return logs
 
 def summarize_log(m, root):
-    records=[]
-    for name in m['logs']:
-        for line in (root/name).read_text(encoding='utf-8-sig',errors='replace').splitlines():
-            marker='PYROWAVE_NATIVE_STREAM_SUMMARY '
-            if marker in line: records.append(json.loads(line.split(marker,1)[1]))
-    if len(records)!=1:
-        raise ValueError('requires one real native shutdown summary; multiple lifetimes/reconnects are incomplete')
-    r=records[0]
-    if r.get('testOnly') is not False or r.get('sourceRevision')!=m['sourceRevision']:
-        raise ValueError('shutdown summary source/test identity mismatch')
-    if r.get('bitstreamId')!=m['bitstreamId'] or r.get('selectedGpu')!=m['gpu']:
-        raise ValueError('shutdown summary GPU/bitstream mismatch')
+    r=benchmark.native_summary(m,root)
     m['actualBackend']=r['backend']; m['actualDecoderPath']=r['actualDecoderPath']
     m['commonObservation']={'method':'PYROWAVE_NATIVE_STREAM_SUMMARY','scope':'decoder-lifetime',
         'counts':{k:r[k] for k in benchmark.COUNTERS if k in r},
         'transportLoss':None,'decoderQueueDiscards':None,'rttMs':None,'jitterMs':None,
         'payloadMbps':None,'audioLossEpisodes':None,
         'limitations':'Lifetime includes warmup and manual disconnect delay. networkDrops are inferred gaps, not attributable transport loss.'}
-    if not r.get('cleanupOkay') or r.get('timelineErrors') or r.get('fatalPresenterErrors'):
-        raise ValueError('native cleanup/timeline/presenter failure')
+
+def validate_attempt(m, root):
+    """The same evidence gates apply to a live finish and offline recovery."""
+    benchmark.validate_manifest(m)
+    if m['profiling']=='OFF' and m['captures']:
+        raise ValueError('OFF unexpectedly produced telemetry')
+    if m['profiling']=='ON' and len(m['captures'])!=1:
+        raise ValueError('ON requires exactly one lifetime capture')
+    summarize_log(m,root)
+    for name in m['captures']:
+        run=benchmark.performance.load(benchmark.safe_path(root,name))
+        benchmark.check_capture(m,run)
+        if run['capture']['durationSeconds']<m['context']['measurementSeconds']:
+            raise ValueError('partial measurement window')
+        if run['capture'].get('counterOverflow'):
+            raise ValueError('capture counter overflow')
+    if type(m.get('exitCode')) is not int or m['exitCode']!=0:
+        raise ValueError('application exit must be recorded as zero')
+
+def revalidate_attempt(source, destination):
+    """Explicit offline recovery to a NEW standalone directory; no process launch."""
+    source=Path(source).resolve(); destination=Path(destination).resolve()
+    if destination.exists(): raise ValueError('recovery output already exists')
+    if destination.is_relative_to(source) or source.is_relative_to(destination):
+        raise ValueError('recovery output and original attempt must be separate')
+    # Keep the recovered copy out of resume's glob: it is the SAME run, not a repeat.
+    if (source.parent/'plan.json').exists() and destination.is_relative_to(source.parent):
+        raise ValueError('recovery output must be outside the original session')
+    original_manifest_hash=digest(source/'manifest.json')
+    m=benchmark.validate_manifest(benchmark.read_json(source/'manifest.json'))
+    old_error='requires one real native shutdown summary; multiple lifetimes/reconnects are incomplete'
+    if m['status']!='failed' or m.get('failure')!=old_error or m['profiling']!='ON':
+        raise ValueError('automatic recovery is restricted to the original profiling-ON log-selection failure')
+    m=copy.deepcopy(m)
+    m['logs']=list(dict.fromkeys(m['logs']+(['console.log'] if (source/'console.log').is_file() else [])+
+                                [p.name for p in sorted(source.glob('Asteria-*.log'))]))
+    found=[str(p.relative_to(source)) for p in sorted((source/'captures').glob('*.json'))]
+    if {benchmark.safe_path(source,p) for p in m['captures']}!={benchmark.safe_path(source,p) for p in found}:
+        raise ValueError('original manifest capture inventory differs from files on disk')
+    m['captures']=found
+    for field in ('ownerConfirmedLiveAt','disconnectPromptAt'):
+        if not isinstance(m.get(field),str): raise ValueError(f'missing original timing evidence: {field}')
+        value=datetime.fromisoformat(m[field].replace('Z','+00:00'))
+        if value.tzinfo is None: raise ValueError('original timing evidence requires timezone')
+    if datetime.fromisoformat(m['disconnectPromptAt'].replace('Z','+00:00')) <= datetime.fromisoformat(m['ownerConfirmedLiveAt'].replace('Z','+00:00')):
+        raise ValueError('original timing evidence is out of order')
+    inputs=set(m['logs']+m['captures']+['manifest.json'])
+    if (source/'started.json').is_file(): inputs.add('started.json')
+    hashes={name:digest(benchmark.safe_path(source,name)) for name in sorted(inputs)}
+    if hashes['manifest.json']!=original_manifest_hash: raise ValueError('original manifest changed during recovery')
+    validate_attempt(m,source)  # No output or status promotion before evidence passes.
+    if any(digest(benchmark.safe_path(source,p))!=h for p,h in hashes.items()):
+        raise ValueError('original evidence changed during validation')
+    if set(m['logs']+m['captures']) & {'manifest.json','original-manifest.json','revalidation.json'}:
+        raise ValueError('reserved recovery evidence filename')
+    destination.mkdir(parents=True,exist_ok=False)
+    for name in sorted(inputs):
+        path=benchmark.safe_path(source,name)
+        dest=destination/('original-manifest.json' if name=='manifest.json' else name)
+        dest.parent.mkdir(parents=True,exist_ok=True)
+        with dest.open('xb') as output, path.open('rb') as original:
+            shutil.copyfileobj(original,output)
+        if digest(dest)!=hashes[name]: raise ValueError('evidence changed during recovery copy')
+    validate_attempt(m,destination)  # Re-read the exact copied evidence before completion.
+    if any(digest(benchmark.safe_path(source,p))!=h for p,h in hashes.items()):
+        raise ValueError('original evidence changed during recovery')
+    audit={'validatedAt':now(),'originalStatus':'failed','originalFailure':m.pop('failure'),
+           'originalManifestSha256':hashes['manifest.json'],'originalFileSha256':hashes,
+           'method':'offline console/preflight selection correction; original evidence unchanged',
+           'limitations':'Same runId/ordinal and measurement window. Not an independent repeat; original session is not advanced.'}
+    m['revalidation']=audit
+    m['status']='complete'
+    save_new(destination/'revalidation.json',audit)
+    save_new(destination/'manifest.json',m)
+    validated=benchmark.load_manifest(destination/'manifest.json')
+    with (destination/'summary.md').open('x',encoding='utf-8') as output:
+        output.write(benchmark.report([validated]))
+    return destination/'manifest.json'
 
 def timer(process, seconds):
     deadline=time.monotonic()+seconds
@@ -195,14 +262,7 @@ def execute(args):
                     m['exitCode']=process.returncode
                 m['logs']=collect_logs(exe.parent,before,target)
                 m['captures']=[str(p.relative_to(target)) for p in sorted(captures.glob('*.json'))]
-                if mode=='OFF' and m['captures']: raise ValueError('OFF unexpectedly produced telemetry')
-                if mode=='ON' and len(m['captures'])!=1: raise ValueError('ON requires exactly one lifetime capture')
-                summarize_log(m,target)
-                for name in m['captures']:
-                    benchmark.check_capture(m,benchmark.performance.load(target/name))
-                if any(benchmark.performance.load(target/p)['capture']['durationSeconds']<c['measurementSeconds'] for p in m['captures']):
-                    raise ValueError('partial measurement window')
-                if process.returncode!=0: raise ValueError('nonzero application exit')
+                validate_attempt(m,target)
                 m['status']='complete'
             except (Exception,KeyboardInterrupt) as error:
                 m['status']='interrupted' if isinstance(error,KeyboardInterrupt) else 'failed'
@@ -229,15 +289,26 @@ def execute(args):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--exe',type=Path,required=True)
-    parser.add_argument('--config',type=Path,required=True)
-    parser.add_argument('--session',type=Path,required=True)
+    parser.add_argument('--exe',type=Path)
+    parser.add_argument('--config',type=Path)
+    parser.add_argument('--session',type=Path)
+    parser.add_argument('--revalidate',type=Path,help='offline validation of an original failed ON attempt; never launches Asteria')
+    parser.add_argument('--recovery-output',type=Path,help='new standalone directory outside the original session')
     parser.add_argument('--pairs',type=int,default=5)
     parser.add_argument('--start',choices=('ON','OFF'),default='ON')
     parser.add_argument('--cooldown',type=int,default=60)
     parser.add_argument('--resume',action='store_true')
     args=parser.parse_args()
-    try: execute(args)
+    if args.revalidate:
+        if not args.recovery_output or any((args.exe,args.config,args.session,args.resume)):
+            parser.error('--revalidate requires --recovery-output and cannot launch/resume a session')
+    elif not all((args.exe,args.config,args.session)) or args.recovery_output:
+        parser.error('live mode requires --exe, --config and --session; recovery uses --revalidate and --recovery-output')
+    try:
+        if args.revalidate:
+            print(f'REVALIDATED COPY: {revalidate_attempt(args.revalidate,args.recovery_output)}; originals unchanged; original session not advanced')
+        else:
+            execute(args)
     except (Exception,KeyboardInterrupt) as error:
         parser.exit(1,f'STOP: {error or "interrupted"}. Preserve results and disconnect/close any live client normally.\n')
 

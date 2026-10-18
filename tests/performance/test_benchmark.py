@@ -143,7 +143,11 @@ class BenchmarkTests(unittest.TestCase):
                 record={'testOnly':False,'sourceRevision':self.m['sourceRevision'],'bitstreamId':self.m['bitstreamId'],
                         'selectedGpu':self.m['gpu'],'backend':'NATIVE_VULKAN','actualDecoderPath':'fragment',
                         'cleanupOkay':True,'timelineErrors':0,'fatalPresenterErrors':0,'decodedFrames':100,'presentationDrops':10}
-                (package/f'Asteria-{len(modes)}.log').write_text('INFO PYROWAVE_NATIVE_STREAM_SUMMARY '+json.dumps(record))
+                # Real Surface format: preflight and live summary ONLY in redirected
+                # console output, with no Asteria-*.log in the package directory.
+                text=Path(__file__).with_name('native-summary-console.txt').read_text(encoding='utf-8')
+                kw['stdout'].write(text.encode('utf-8'))
+                kw['stdout'].flush()
                 if mode=='ON':
                     r=performance.load(Path(__file__).with_name('synthetic.json'))
                     r.update(runId=str(len(modes)),sourceRevision=self.m['sourceRevision'],architecture='arm64',gpu=self.m['gpu'],backend='NATIVE_VULKAN',decoderPath='fragment')
@@ -167,6 +171,7 @@ class BenchmarkTests(unittest.TestCase):
                     m=b.load_manifest(p)
                     if m['status']=='failed': continue
                     self.assertEqual(m['status'],'complete')
+                    self.assertEqual(m['logs'],['console.log'])
                     self.assertEqual(len(m['_runs']),1 if m['profiling']=='ON' else 0)
                 args.resume=True; runner.execute(args)
                 self.assertEqual(len(modes),5)
