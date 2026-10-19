@@ -24,6 +24,31 @@ SETUP = ('hostWorkloadSha256', 'workloadStartProtocol', 'hostDisplaySettings',
 
 ESSENTIAL_CONTEXT = ('width', 'height', 'targetFps', 'bitrateKbps', 'vsync',
                      'warmupSeconds', 'measurementSeconds')
+BITRATE_EXACT = 'exact-v1'
+BITRATE_EXPLORATORY = 'exploratory-2-percent-v1'
+
+def bitrate_limits(m):
+    policy=m.get('bitrateMatchPolicy',BITRATE_EXACT)
+    target=m['context']['bitrateKbps']
+    if policy not in (BITRATE_EXACT,BITRATE_EXPLORATORY):
+        raise ValueError('unknown bitrate matching policy')
+    if policy==BITRATE_EXPLORATORY:
+        if qualification(m)!='exploratory' or m['profiling']!='ON' or target not in (250000,500000):
+            raise ValueError('2% bitrate policy requires exploratory ON 250000/500000 Kbps pilot')
+        return target*98//100,target*102//100,2
+    return target,target,0
+
+def bitrate_observation(m, run):
+    low,high,percent=bitrate_limits(m)
+    actual=run['video']['requestedBitrateKbps']
+    if not performance.number(actual) or actual<=0:
+        raise ValueError('invalid capture configured/requested bitrate')
+    target=m['context']['bitrateKbps']
+    match=('unavailable' if target is None else 'exact' if actual==target else
+           'within-tolerance' if low<=actual<=high else 'outside-tolerance')
+    return {'intendedKbps':target,'captureRequestedBitrateKbps':actual,
+            'captureField':'video.requestedBitrateKbps','tolerancePercent':percent,
+            'minimumKbps':low,'maximumKbps':high,'match':match}
 
 def qualification(m, override=None):
     level = override if override is not None else m.get('qualification', 'exploratory')
@@ -217,6 +242,7 @@ def validate_manifest(m):
         for key, value in obs.get('counts', {}).items():
             if key not in COUNTERS or type(value) is not int or value < 0:
                 raise ValueError('invalid common counter')
+    bitrate_limits(m)
     return m
 
 def safe_path(root, name):
@@ -296,9 +322,12 @@ def check_capture(m, run):
         raise ValueError('bitstream mismatch')
     if m['actualDecoderPath'] is not None and run.get('decoderPath') != m['actualDecoderPath']:
         raise ValueError('actual decoder path mismatch')
-    for a, b in (('width','width'), ('height','height'), ('targetFps','targetFps'), ('bitrateKbps','requestedBitrateKbps'), ('vsync','vsync')):
+    for a, b in (('width','width'), ('height','height'), ('targetFps','targetFps'), ('vsync','vsync')):
         if c[a] is not None and run['video'][b] != c[a]:
             raise ValueError(f'capture profile mismatch: {a}')
+    bitrate=bitrate_observation(m,run)
+    if bitrate['match']=='outside-tolerance':
+        raise ValueError(f"capture profile mismatch: bitrateKbps; intended {bitrate['intendedKbps']}, capture configured/requested {bitrate['captureRequestedBitrateKbps']}, allowed {bitrate['minimumKbps']}..{bitrate['maximumKbps']} Kbps")
     for a,b in (('warmupSeconds','warmupSeconds'), ('measurementSeconds','requestedDurationSeconds')):
         if c[a] is not None and run['capture'][b] != c[a]:
             raise ValueError(f'capture window policy mismatch: {a}')
@@ -309,6 +338,7 @@ def check_capture(m, run):
             metric=run['metrics'].get(key)
             if not metric or metric['clock'] != clock or (scope and metric['scope'] != scope):
                 raise ValueError('native metadata predates correction or is missing')
+    return bitrate
 
 def load_manifest(path):
     m = validate_manifest(read_json(path))
@@ -319,7 +349,9 @@ def load_manifest(path):
     for p in m['captures']:
         try:
             run = performance.load(safe_path(root,p))
-            check_capture(m,run)
+            observation=check_capture(m,run)
+            if 'bitrateObservation' in m and m['bitrateObservation']!=observation:
+                raise ValueError('recorded bitrate observation differs from original capture')
             m['_runs'].append(run)
         except (ValueError, OSError) as error:
             if m['status']=='complete': raise
@@ -341,6 +373,8 @@ def load_manifest(path):
             raise ValueError('application exit must be recorded as zero')
         if m['profiling'] == 'ON' and len(m['_runs']) != 1:
             raise ValueError('ON requires exactly one lifetime capture')
+        if m.get('bitrateMatchPolicy')==BITRATE_EXPLORATORY and 'bitrateObservation' not in m:
+            raise ValueError('tolerant completed run missing intended/actual bitrate evidence')
         for run in m['_runs']:
             if run['capture']['durationSeconds'] < m['context']['measurementSeconds']:
                 raise ValueError('partial measurement window')
@@ -379,7 +413,7 @@ def distribution(values):
             'mad':mad,'outlierIndices':[i for i,v in enumerate(values) if mad and abs(v-median)>3*1.4826*mad]}
 
 def match_key(m):
-    return json.dumps([qualification(m),m.get('experimentStage'),m['profile'],*[m[k] for k in ('architecture','gpu','driver','codec','bitstreamId','hostVersion')],m['context']],sort_keys=True)
+    return json.dumps([qualification(m),m.get('bitrateMatchPolicy',BITRATE_EXACT),m.get('experimentStage'),m['profile'],*[m[k] for k in ('architecture','gpu','driver','codec','bitstreamId','hostVersion')],m['context']],sort_keys=True)
 
 def report(manifests):
     ids=[m['runId'] for m in manifests]
@@ -400,7 +434,11 @@ def report(manifests):
     for m in manifests:
         counts=(m.get('commonObservation') or {}).get('counts',{})
         lines += [f"### {m['runId']}",f'Common decoder-lifetime counts (includes warmup/manual delay): `{json.dumps(counts,sort_keys=True)}`.']
+        if m.get('bitrateObservation') and not m.get('_runs'):
+            lines.append('Recorded attempt bitrate observation (failed/unqualified evidence): `'+json.dumps(m['bitrateObservation'],sort_keys=True)+'`.')
         for r in m.get('_runs',[]):
+            bitrate=bitrate_observation(m,r)
+            lines.append(f"Intended target {bitrate['intendedKbps']} Kbps; actual capture configured/requested {bitrate['captureRequestedBitrateKbps']} Kbps from `{bitrate['captureField']}`; allowed {bitrate['minimumKbps']}..{bitrate['maximumKbps']} Kbps ({bitrate['tolerancePercent']}%); {bitrate['match']}. This is not negotiated bitrate or measured payload; actual values are never relabeled as exact targets.")
             seconds=r['capture']['durationSeconds']
             safe=seconds>0 and not r['capture'].get('counterOverflow')
             fps={k:r['counts'][k]/seconds if safe and r['counts'].get(k) is not None else None

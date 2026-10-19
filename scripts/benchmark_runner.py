@@ -165,6 +165,8 @@ def validate_attempt(m, root):
     if 'automaticEvidence' in m: apply_discovery(m,m['automaticEvidence'])
     for name in m['captures']:
         run=benchmark.performance.load(benchmark.safe_path(root,name))
+        if 'bitrateMatchPolicy' in m:
+            m['bitrateObservation']=benchmark.bitrate_observation(m,run)
         benchmark.check_capture(m,run)
         if run['capture']['durationSeconds']<m['context']['measurementSeconds']:
             raise ValueError('partial measurement window')
@@ -304,6 +306,8 @@ def execute(args):
             m.setdefault('qualification','exploratory')
             m.update(runId=str(uuid.uuid4()),timestamp=now(),ordinal=ordinal,profiling=mode,
                      condition='C' if mode=='ON' else 'D',status='incomplete',executableSha256=binary_hash)
+            m['bitrateMatchPolicy']=(benchmark.BITRATE_EXPLORATORY if benchmark.qualification(m)=='exploratory'
+                                    and mode=='ON' and c['bitrateKbps'] in (250000,500000) else benchmark.BITRATE_EXACT)
             apply_discovery(m,discover_evidence(exe))
             m['qualificationLabel']=benchmark.qualification_label(m)
             if m['automaticEvidence'].get('warnings'):
@@ -331,6 +335,9 @@ def execute(args):
                 if verify_package(exe,template['sourceRevision'],template['architecture'])!=binary_hash:
                     raise ValueError('binary changed during experiment')
                 validate_attempt(m,target)
+                if 'bitrateObservation' in m:
+                    b=m['bitrateObservation']
+                    print(f"Bitrate intended {b['intendedKbps']} Kbps; capture configured/requested {b['captureRequestedBitrateKbps']} Kbps; {b['match']} ({b['tolerancePercent']}% tolerance).")
                 m['contextWarnings']=benchmark.context_warnings(m)
                 m['status']='complete'
             except (Exception,KeyboardInterrupt) as error:

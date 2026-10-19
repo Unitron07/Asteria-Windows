@@ -187,7 +187,9 @@ def main():
                 validate_bitrate_pair(manifests)
                 mode = qualification(manifests[0])
                 text = f'READY: matched 250/500 Mbps {mode} setup; saved application settings still require evidence verification.\n'
-                if mode == 'exploratory': text += 'EXPLORATORY / NOT CAUSALLY QUALIFIED\n'
+                if mode == 'exploratory':
+                    text += 'EXPLORATORY / NOT CAUSALLY QUALIFIED\n'
+                    text += 'New ON pilot capture bitrate bands (inclusive): 250000 target accepts 245000..255000; 500000 target accepts 490000..510000 Kbps. Intended and actual configured/requested rates remain separate.\n'
                 text += ''.join('WARNING: '+w+'\n' for w in sorted({w for m in manifests for w in context_warnings(m)}))
             else:
                 manifests = [load_manifest(p) for p in args.files]

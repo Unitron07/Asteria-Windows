@@ -98,6 +98,9 @@ The following ON/OFF design is retained for historical reference. The next
 experiment uses the four-stream all-ON bitrate pilot linked above. Exploratory
 qualification is the default: essential settings are required, extended unknowns
 are warnings. Detailed context is strict only with explicit controlled qualification.
+New exploratory ON pilot attempts accept ±2% around the intended 250/500 Mbps
+targets, using capture `video.requestedBitrateKbps`; intended and actual values
+remain separate. Controlled and unmarked historical records keep exact matching.
 Old manifests remain readable with explicit unknowns.
 
 Use 10-second warmup and 60-second capture, five independent streams per condition.

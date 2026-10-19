@@ -167,6 +167,84 @@ class QualificationTests(unittest.TestCase):
         manifest.write_text(json.dumps(m))
         with self.assertRaisesRegex(ValueError,'runtime pins'):runner.verify_package(exe,self.m['sourceRevision'],'arm64')
 
+    def test_exploratory_bitrate_boundaries_preserve_intended_and_actual(self):
+        for target,low,high in ((250000,245000,255000),(500000,490000,510000)):
+            for actual in (low,target-500,target,target+500,high):
+                with self.subTest(target=target,actual=actual):
+                    m=self.evidence(capture=self.capture(actual));m['context']['bitrateKbps']=target
+                    m['bitrateMatchPolicy']=b.BITRATE_EXPLORATORY
+                    before=(self.root/'capture.json').read_bytes()
+                    runner.validate_attempt(m,self.root)
+                    observation=m['bitrateObservation']
+                    self.assertEqual(observation['intendedKbps'],target)
+                    self.assertEqual(observation['captureRequestedBitrateKbps'],actual)
+                    self.assertEqual(observation['captureField'],'video.requestedBitrateKbps')
+                    self.assertEqual((observation['minimumKbps'],observation['maximumKbps']),(low,high))
+                    self.assertEqual(observation['match'],'exact' if actual==target else 'within-tolerance')
+                    self.assertEqual(m['context']['bitrateKbps'],target)
+                    self.assertEqual((self.root/'capture.json').read_bytes(),before)
+                    m['status']='complete';path=self.root/f'{target}-{actual}.json';runner.save_new(path,m)
+                    loaded=b.load_manifest(path);text=b.report([loaded])
+                    self.assertIn(f'Intended target {target} Kbps; actual capture configured/requested {actual} Kbps',text)
+
+    def test_exploratory_bitrate_just_outside_bands_is_rejected_and_recorded(self):
+        for target,low,high in ((250000,245000,255000),(500000,490000,510000)):
+            for actual in (low-1,high+1,low-0.5,high+0.5):
+                capture=self.capture(actual)
+                # A guessed/unsupported field cannot substitute for the actual exported field.
+                capture['video']['negotiatedBitrateKbps']=target
+                m=self.evidence(capture=capture);m['context']['bitrateKbps']=target
+                m['bitrateMatchPolicy']=b.BITRATE_EXPLORATORY
+                with self.subTest(target=target,actual=actual),self.assertRaisesRegex(ValueError,'bitrateKbps'):
+                    runner.validate_attempt(m,self.root)
+                self.assertEqual(m['bitrateObservation']['captureRequestedBitrateKbps'],actual)
+                self.assertEqual(m['bitrateObservation']['match'],'outside-tolerance')
+
+    def test_controlled_bitrate_stays_exact_and_cannot_select_tolerance(self):
+        for target in (250000,500000):
+            for actual in (target-1,target,target+1):
+                m=self.evidence(capture=self.capture(actual));m['context']['bitrateKbps']=target
+                m.update(qualification='controlled',bitrateMatchPolicy=b.BITRATE_EXACT)
+                if actual==target:runner.validate_attempt(m,self.root)
+                else:
+                    with self.subTest(target=target,actual=actual),self.assertRaisesRegex(ValueError,'bitrateKbps'):
+                        runner.validate_attempt(m,self.root)
+            m['bitrateMatchPolicy']=b.BITRATE_EXPLORATORY
+            with self.assertRaisesRegex(ValueError,'exploratory ON'):b.validate_manifest(m)
+
+    def test_old_failed_bitrate_evidence_is_not_requalified_or_changed(self):
+        m=self.evidence(capture=self.capture(249500));m.update(status='failed',failure='capture profile mismatch: bitrateKbps')
+        path=self.root/'old-failed.json';runner.save_new(path,m)
+        before={p.name:p.read_bytes() for p in self.root.iterdir() if p.is_file()}
+        loaded=b.load_manifest(path);b.report([loaded])
+        self.assertEqual(loaded['status'],'failed')
+        self.assertTrue(any('bitrateKbps' in error for error in loaded['_evidenceErrors']))
+        self.assertEqual(before,{p.name:p.read_bytes() for p in self.root.iterdir() if p.is_file()})
+        tolerant=dict(m,bitrateMatchPolicy=b.BITRATE_EXPLORATORY)
+        self.assertNotEqual(b.match_key(m),b.match_key(tolerant))
+
+    def test_stored_bitrate_evidence_must_match_original_capture(self):
+        m=self.evidence(capture=self.capture(249500));m['bitrateMatchPolicy']=b.BITRATE_EXPLORATORY
+        runner.validate_attempt(m,self.root);m['status']='complete'
+        path=self.root/'tolerant.json';runner.save_new(path,m)
+        m['bitrateObservation']['captureRequestedBitrateKbps']=250000
+        path.write_text(json.dumps(m))
+        with self.assertRaisesRegex(ValueError,'observation differs'):b.load_manifest(path)
+        del m['bitrateObservation'];path.write_text(json.dumps(m))
+        with self.assertRaisesRegex(ValueError,'missing intended/actual'):b.load_manifest(path)
+
+    def test_nonexact_bitrate_does_not_bypass_other_integrity_checks(self):
+        for field,value in (('sourceRevision','0'*40),('selectedGpu','wrong'),('backend','CPU_I420_FALLBACK'),
+                            ('actualDecoderPath','compute'),('cleanupOkay',False),('timelineErrors',1),('fatalPresenterErrors',1)):
+            m=self.evidence(record=dict(self.record,**{field:value}),capture=self.capture(249500))
+            m['bitrateMatchPolicy']=b.BITRATE_EXPLORATORY
+            with self.subTest(log=field),self.assertRaises(ValueError):runner.validate_attempt(m,self.root)
+        for section,field,value in (('video','vsync',False),('video','width',1920),('video','targetFps',60),
+                                    ('capture','durationSeconds',59),('capture','counterOverflow',True)):
+            capture=self.capture(249500);capture[section][field]=value
+            m=self.evidence(capture=capture);m['bitrateMatchPolicy']=b.BITRATE_EXPLORATORY
+            with self.subTest(field=field),self.assertRaises(ValueError):runner.validate_attempt(m,self.root)
+
     @unittest.skipUnless(sys.platform=='win32','Windows orchestration; synthetic process only')
     def test_minimal_250_and_500_full_runner_exports_and_resume(self):
         exe=self.package();launches=[]
@@ -176,7 +254,7 @@ class QualificationTests(unittest.TestCase):
         def launch(command,**kwargs):
             launches.append(command)
             kwargs['stdout'].write(('PYROWAVE_NATIVE_STREAM_SUMMARY '+json.dumps(self.record)).encode('utf-8'))
-            capture=self.capture(rate)
+            capture=self.capture(rate-500)
             runner.save_new(Path(kwargs['env']['ASTERIA_PERF_CAPTURE'])/'capture.json',capture)
             return Child()
         data={'clientOs':'synthetic Windows','applicationVersion':'synthetic version','warnings':[],
@@ -191,6 +269,9 @@ class QualificationTests(unittest.TestCase):
                     runner.main()  # The exact short owner command, no --pairs metadata needed.
                 manifest=next(args.session.glob('run-*/manifest.json'));m=b.load_manifest(manifest)
                 self.assertEqual(m['status'],'complete');self.assertEqual(m['qualification'],'exploratory')
+                self.assertEqual(m['bitrateMatchPolicy'],b.BITRATE_EXPLORATORY)
+                self.assertEqual(m['bitrateObservation']['intendedKbps'],rate)
+                self.assertEqual(m['bitrateObservation']['captureRequestedBitrateKbps'],rate-500)
                 self.assertEqual(m['gpu'],self.record['selectedGpu']);self.assertEqual(m['driver'],'synthetic-driver' if rate==500000 else None)
                 self.assertEqual(m['executableSha256'],runner.digest(exe));self.assertEqual(m['context']['clientOs'],'synthetic Windows')
                 before=manifest.read_bytes();args.resume=True;runner.execute(args)
