@@ -33,6 +33,7 @@ struct NativePresentation::Impl {
     std::unique_ptr<Stage4::Presenter> presenter;
     std::unique_ptr<PyroWaveVulkan::Overlays> overlays;
     PyroWaveVulkan::LiveSlots slots;
+    PyroWaveVulkan::RenderDemand demand;
     std::array<uint64_t,3> readyUs{},captureReadyUs{},decodeCounts{};
     int selected=-1;
     explicit Impl(NativePresentation& s,Runtime& r):self(s),runtime(r) {}
@@ -170,9 +171,14 @@ NativePresentation::RenderResult NativePresentation::render() {
     p.selected=p.slots.current(); if(p.selected<0) return result;
     const bool newFrame=p.slots.pending>=0;
     const bool overlayWork=p.overlayChanged || p.overlays->pending();
+    // A stale/coalesced SDL wake must not acquire, submit and present the
+    // retained image unless video, overlays, window damage or WSI retry needs it.
+    if(!p.demand.needed(newFrame,overlayWork,p.owner->rebuildPending())) return result;
     p.overlayWork=overlayWork;
     const auto started=micros(); p.pickupUs=started;
-    if(p.owner->draw()) {
+    const bool accepted=p.owner->draw();
+    p.demand.completed(accepted,p.owner->rebuildPending());
+    if(accepted) {
         if(newFrame) { result.newFrame=true; result.readyUs=micros()-p.readyUs[p.selected]; ++diagnostics.rendered; }
         else {
             ++diagnostics.retainedFrameRedraws;
@@ -180,8 +186,10 @@ NativePresentation::RenderResult NativePresentation::render() {
         }
         p.overlayChanged=false;
         p.slots.presented(p.selected);
-        result.retry=p.overlays->pending();
-    } else result.retry=true; // Serviced by a bounded SDL timer, never busy reposting.
+    }
+    // Includes a rebuild requested by SUBOPTIMAL/OUT_OF_DATE after submission.
+    // Serviced by the existing bounded SDL timer, never busy reposting.
+    result.retry=p.demand.pending() || p.overlays->pending();
     diagnostics.renderLoopUs+=micros()-started;
     diagnostics.recreations=p.owner->recreations; diagnostics.overlayUploads=p.overlays->uploads;
     diagnostics.queueSubmitUs=uint64_t(p.owner->queueSubmitMs*1000); diagnostics.presentCallUs=uint64_t(p.owner->presentCallMs*1000);
