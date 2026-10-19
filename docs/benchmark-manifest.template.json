@@ -53,6 +53,6 @@
   "commonObservation": null,
   "captures": [],
   "logs": [],
-  "notes": "TEMPLATE ONLY. Fill owner setup before launch; null means unavailable, never guessed. Target bitrate is not observed payload. See PERFORMANCE_PHASE1B_BITRATE_PILOT.md.",
+  "notes": "TEMPLATE ONLY. Detailed context is required only for explicit controlled qualification; default exploratory mode permits extended unknowns. Null means unavailable, never guessed. Target bitrate is not observed payload. See PERFORMANCE_PHASE1B_BITRATE_PILOT.md.",
   "experimentStage": "repeated"
 }

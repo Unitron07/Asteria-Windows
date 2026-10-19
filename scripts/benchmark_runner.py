@@ -8,6 +8,7 @@ import hashlib
 import io
 import json
 import os
+import platform
 from pathlib import Path
 import subprocess
 import shutil
@@ -78,6 +79,56 @@ def no_running_client():
     if any(row and row[0].lower() in ('asteria.exe','moonlight.exe') for row in csv.reader(io.StringIO(result.stdout))):
         raise ValueError('close existing Asteria/Moonlight processes normally before launching/resuming')
 
+def discover_evidence(exe):
+    """Read-only, best effort. Never guess host/workload/route or launch Asteria."""
+    data={'collectedAt':now(),'clientOs':None,'warnings':[]}
+    try:
+        data['clientOs']=platform.platform()
+    except OSError:
+        data['warnings'].append('OS discovery unavailable')
+    script=r'''
+$ErrorActionPreference='Stop'
+[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false)
+$result=@{warnings=@()}
+try { $result.applicationVersion=(Get-Item -LiteralPath $env:ASTERIA_BENCHMARK_EXE).VersionInfo.ProductVersion } catch { $result.warnings+='PE version unavailable' }
+try { $result.videoControllers=@(Get-CimInstance Win32_VideoController | Select-Object Name,DriverVersion,CurrentHorizontalResolution,CurrentVerticalResolution,CurrentRefreshRate) } catch { $result.warnings+='GPU/driver discovery unavailable' }
+try { $result.batteries=@(Get-CimInstance Win32_Battery | Select-Object BatteryStatus,EstimatedChargeRemaining) } catch { $result.warnings+='Battery discovery unavailable' }
+try { $result.brightness=@(Get-CimInstance -Namespace root/wmi WmiMonitorBrightness | Select-Object CurrentBrightness) } catch { $result.warnings+='Brightness discovery unavailable' }
+$result | ConvertTo-Json -Depth 5 -Compress
+'''
+    try:
+        env=dict(os.environ,ASTERIA_BENCHMARK_EXE=str(exe))
+        result=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-Command',script],
+            capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=15,env=env,
+            creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0),check=True)
+        values=json.loads(result.stdout.lstrip('\ufeff'))
+        if type(values) is not dict: raise ValueError('discovery did not return an object')
+        for key in ('warnings','videoControllers','batteries','brightness'):
+            if key in values and not isinstance(values[key],list):
+                raise ValueError('malformed optional discovery field: '+key)
+        data.update(values)
+    except (OSError,ValueError,subprocess.SubprocessError):
+        data['warnings'].append('Optional Windows hardware discovery unavailable; continue as exploratory')
+    for name,path in (('packageManifest',exe.parent/'stage5-package-manifest.json'),
+                      ('runtimeManifest',exe.parent/'pyrowave/pyrowave-runtime.json')):
+        try:
+            data[name]={'sha256':digest(path),'identity':benchmark.read_json(path)}
+            if name=='packageManifest': data[name]['identity'].pop('files',None)
+        except (OSError,ValueError):
+            data['warnings'].append(name+' observation unavailable')
+    return data
+
+def apply_discovery(m, data):
+    m['automaticEvidence']=data
+    for key in ('applicationVersion',):
+        if m[key] is None and isinstance(data.get(key),str) and data[key].strip(): m[key]=data[key]
+    if m['context']['clientOs'] is None: m['context']['clientOs']=data.get('clientOs')
+    # CIM adapter observations are not proof of the selected GPU or active display.
+    # Attach a driver only when the real shutdown GPU has an unambiguous name match.
+    candidates=[v for v in data.get('videoControllers',[]) if isinstance(v,dict) and v.get('Name')==m['gpu']]
+    if m['driver'] is None and len(candidates)==1 and candidates[0].get('DriverVersion'):
+        m['driver']=str(candidates[0]['DriverVersion'])
+
 def collect_logs(root, before, target):
     # The redirected console is already in the attempt directory; never recopy it.
     logs=['console.log'] if (target/'console.log').is_file() else []
@@ -94,7 +145,8 @@ def collect_logs(root, before, target):
     return logs
 
 def summarize_log(m, root):
-    r=benchmark.native_summary(m,root)
+    r=benchmark.native_summary(m,root,discover_gpu=True)
+    m['gpu']=r['selectedGpu']
     m['actualBackend']=r['backend']; m['actualDecoderPath']=r['actualDecoderPath']
     m['commonObservation']={'method':'PYROWAVE_NATIVE_STREAM_SUMMARY','scope':'decoder-lifetime',
         'counts':{k:r[k] for k in benchmark.COUNTERS if k in r},
@@ -110,6 +162,7 @@ def validate_attempt(m, root):
     if m['profiling']=='ON' and len(m['captures'])!=1:
         raise ValueError('ON requires exactly one lifetime capture')
     summarize_log(m,root)
+    if 'automaticEvidence' in m: apply_discovery(m,m['automaticEvidence'])
     for name in m['captures']:
         run=benchmark.performance.load(benchmark.safe_path(root,name))
         benchmark.check_capture(m,run)
@@ -201,7 +254,10 @@ def resume_plan(session, desired):
             if type(ordinal) is not int or not 1<=ordinal<=len(desired['order']):
                 raise ValueError('completed attempt ordinal outside saved plan')
             template=desired['template']
-            if any(m.get(k)!=template.get(k) for k in ('sourceRevision','applicationVersion','architecture','gpu','driver','codec','bitstreamId','hostVersion','actualBackend','actualDecoderPath','experimentStage','profile','context')) or m['executableSha256']!=desired['executableSha256'] or m['profiling']!=desired['order'][ordinal-1]:
+            identity=('sourceRevision','applicationVersion','architecture','gpu','driver','codec','bitstreamId','hostVersion','actualBackend','actualDecoderPath','experimentStage','profile')
+            mismatch=any(m.get(k)!=template.get(k) for k in identity if not (k in ('applicationVersion','gpu','driver') and template.get(k) is None))
+            context_mismatch=any(m['context'].get(k)!=v for k,v in template['context'].items() if not (k=='clientOs' and v is None))
+            if mismatch or context_mismatch or benchmark.qualification(m)!=benchmark.qualification(template) or m['executableSha256']!=desired['executableSha256'] or m['profiling']!=desired['order'][ordinal-1]:
                 raise ValueError('completed attempt does not belong to saved experiment')
             if m['ordinal'] in completed: raise ValueError('duplicate completed plan ordinal')
             completed.add(m['ordinal'])
@@ -212,9 +268,11 @@ def execute(args):
     if not 0<=args.cooldown<=3600: raise ValueError('cooldown must be 0..3600 seconds')
     single_run=getattr(args,'single_run',False)
     if single_run and args.pairs!=1: raise ValueError('--single-run requires --pairs 1')
-    template=benchmark.validate_ready(benchmark.read_json(args.config))
-    if template['evidenceGroup']!='phase1b-controlled' or template['status']!='planned' or template['captures'] or template['logs']:
-        raise ValueError('config must be an empty planned controlled run')
+    template=benchmark.validate_ready(benchmark.prepare_config(benchmark.read_json(args.config),getattr(args,'qualification',None)))
+    if template['status']!='planned' or template['captures'] or template['logs']:
+        raise ValueError('config must be an empty planned run')
+    print(benchmark.qualification_label(template))
+    for warning in benchmark.context_warnings(template): print('WARNING: '+warning)
     c=template['context']
     if type(c['warmupSeconds']) is not int or not 0<=c['warmupSeconds']<=3600 or type(c['measurementSeconds']) is not int or not 1<=c['measurementSeconds']<=86400:
         raise ValueError('warmup/duration outside production environment bounds')
@@ -243,8 +301,13 @@ def execute(args):
             target.mkdir()
             captures=target/'captures'; captures.mkdir()
             m=copy.deepcopy(template)
+            m.setdefault('qualification','exploratory')
             m.update(runId=str(uuid.uuid4()),timestamp=now(),ordinal=ordinal,profiling=mode,
                      condition='C' if mode=='ON' else 'D',status='incomplete',executableSha256=binary_hash)
+            apply_discovery(m,discover_evidence(exe))
+            m['qualificationLabel']=benchmark.qualification_label(m)
+            if m['automaticEvidence'].get('warnings'):
+                print('WARNING: optional discovery incomplete; details retained in automaticEvidence. Evidence integrity checks remain strict.')
             save_new(target/'started.json',m)
             before={p.name:digest(p) for p in exe.parent.glob('Asteria-*.log')}
             process=None
@@ -265,7 +328,10 @@ def execute(args):
                     m['exitCode']=process.returncode
                 m['logs']=collect_logs(exe.parent,before,target)
                 m['captures']=[str(p.relative_to(target)) for p in sorted(captures.glob('*.json'))]
+                if verify_package(exe,template['sourceRevision'],template['architecture'])!=binary_hash:
+                    raise ValueError('binary changed during experiment')
                 validate_attempt(m,target)
+                m['contextWarnings']=benchmark.context_warnings(m)
                 m['status']='complete'
             except (Exception,KeyboardInterrupt) as error:
                 m['status']='interrupted' if isinstance(error,KeyboardInterrupt) else 'failed'
@@ -297,12 +363,14 @@ def main():
     parser.add_argument('--session',type=Path)
     parser.add_argument('--revalidate',type=Path,help='offline validation of an original failed ON attempt; never launches Asteria')
     parser.add_argument('--recovery-output',type=Path,help='new standalone directory outside the original session')
-    parser.add_argument('--pairs',type=int,default=5)
-    parser.add_argument('--single-run',action='store_true',help='one launch using --start; requires --pairs 1 (bitrate pilot uses ON)')
+    parser.add_argument('--pairs',type=int,help='default five pairs, or one with --single-run')
+    parser.add_argument('--single-run',action='store_true',help='one launch using --start (default ON); --pairs defaults to 1')
     parser.add_argument('--start',choices=('ON','OFF'),default='ON')
     parser.add_argument('--cooldown',type=int,default=60)
     parser.add_argument('--resume',action='store_true')
+    parser.add_argument('--qualification',choices=('exploratory','controlled'),help='default exploratory; controlled explicitly requires detailed setup')
     args=parser.parse_args()
+    if args.pairs is None: args.pairs=1 if args.single_run else 5
     if args.revalidate:
         if not args.recovery_output or any((args.exe,args.config,args.session,args.resume)):
             parser.error('--revalidate requires --recovery-output and cannot launch/resume a session')

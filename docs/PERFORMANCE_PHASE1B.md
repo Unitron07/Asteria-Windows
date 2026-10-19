@@ -2,7 +2,7 @@
 
 Status: **next controlled experiment prepared; Phase 1B INCOMPLETE**. The owner
 completed ten exploratory 1440p120 streams (five ON, five OFF). The next step is
-the [matched 250/500 Mbps counterbalanced pilot](PERFORMANCE_PHASE1B_BITRATE_PILOT.md),
+the [simple exploratory 250/500 Mbps counterbalanced pilot](PERFORMANCE_PHASE1B_QUICKSTART.md),
 which records the supplied independent findings, context checklist, exact commands
 and evidence gate. Follow that procedure before any full repeated benchmark.
 A valid conclusion can be that no optimization is justified.
@@ -95,8 +95,10 @@ and [ffplay loop/fullscreen options](https://ffmpeg.org/ffplay.html).
 ## Design, order and predetermined exclusions
 
 The following ON/OFF design is retained for historical reference. The next
-experiment uses the four-stream all-ON bitrate pilot linked above. New launches
-require complete owner setup; old manifests remain readable with explicit unknowns.
+experiment uses the four-stream all-ON bitrate pilot linked above. Exploratory
+qualification is the default: essential settings are required, extended unknowns
+are warnings. Detailed context is strict only with explicit controlled qualification.
+Old manifests remain readable with explicit unknowns.
 
 Use 10-second warmup and 60-second capture, five independent streams per condition.
 Runner's five-pair order: **C D D C C D D C C D**. Use `--start OFF` to reverse it

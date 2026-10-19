@@ -177,16 +177,25 @@ def main():
     parser.add_argument('command', choices=('validate', 'report', 'summary', 'benchmark-validate', 'benchmark-report', 'benchmark-ready'))
     parser.add_argument('files', nargs='+', type=Path)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--qualification', choices=('exploratory','controlled'), help='controlled explicitly requires detailed context; default is exploratory')
     args = parser.parse_args()
     try:
         if args.command.startswith('benchmark-'):
-            from benchmark import load_manifest, report, validate_bitrate_pair
-            manifests = [load_manifest(p) for p in args.files]
+            from benchmark import load_manifest, read_json, prepare_config, report, validate_bitrate_pair, validate_ready, qualification, qualification_label, context_warnings
             if args.command == 'benchmark-ready':
+                manifests = [prepare_config(read_json(p), args.qualification) for p in args.files]
                 validate_bitrate_pair(manifests)
-                text = 'READY: matched 250/500 Mbps owner setup; verify saved settings and actual evidence on hardware.\n'
+                mode = qualification(manifests[0])
+                text = f'READY: matched 250/500 Mbps {mode} setup; saved application settings still require evidence verification.\n'
+                if mode == 'exploratory': text += 'EXPLORATORY / NOT CAUSALLY QUALIFIED\n'
+                text += ''.join('WARNING: '+w+'\n' for w in sorted({w for m in manifests for w in context_warnings(m)}))
             else:
+                manifests = [load_manifest(p) for p in args.files]
+                if args.qualification == 'controlled':
+                    for m in manifests: validate_ready(m, 'controlled')
                 text = report(manifests) if args.command == 'benchmark-report' else f'VALID: {len(manifests)} benchmark manifests (qualification assessed separately)\n'
+                if args.command == 'benchmark-validate':
+                    text += ''.join(label+'\n' for label in sorted({qualification_label(m) for m in manifests}))
         elif args.command == 'validate':
             runs = [load(p) for p in args.files]
             text = f'VALID: {len(runs)} schemaVersion=1 captures\n'

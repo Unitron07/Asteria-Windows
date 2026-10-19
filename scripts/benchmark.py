@@ -1,5 +1,6 @@
 """Companion manifests and analysis; no streaming control or second profiler."""
 import json
+import copy
 from pathlib import Path
 import re
 import statistics
@@ -13,7 +14,7 @@ MATCH = ('width', 'height', 'targetFps', 'bitrateKbps', 'vsync', 'displayRefresh
          'hostWorkload', 'hostHardware', 'networkRoute', 'transport', 'linkSpeedMbps', 'mtu',
          'powerState', 'chargingState', 'brightness', 'clientOs', 'warmupSeconds', 'measurementSeconds')
 EVIDENCE = ('stage5-qualification', 'official-v0.2.0', 'official-v0.3.0',
-            'phase1a-initial', 'phase1a-metadata-fixed', 'phase1b-controlled')
+            'phase1a-initial', 'phase1a-metadata-fixed', 'phase1b-controlled', 'phase1b-exploratory')
 COUNTERS = ('receivedFrames', 'decodedFrames', 'renderedFrames', 'presentationDrops',
             'nativeRetiredDrops', 'networkDrops', 'retainedFrameRedraws', 'overlayRedraws')
 # Required before NEW launches; old manifests remain readable without retrofilling.
@@ -21,13 +22,84 @@ SETUP = ('hostWorkloadSha256', 'workloadStartProtocol', 'hostDisplaySettings',
          'hostEncoderSettings', 'displayMode', 'hdr', 'vrr', 'networkAdapter',
          'clientPowerMode', 'backgroundLoad', 'cooldownPolicy', 'thermalCondition')
 
-def validate_ready(m):
+ESSENTIAL_CONTEXT = ('width', 'height', 'targetFps', 'bitrateKbps', 'vsync',
+                     'warmupSeconds', 'measurementSeconds')
+
+def qualification(m, override=None):
+    level = override if override is not None else m.get('qualification', 'exploratory')
+    if level not in ('exploratory', 'controlled'):
+        raise ValueError('qualification must be exploratory or controlled')
+    return level
+
+def prepare_config(value, level=None):
+    """Expand small launch configs; never expand or rewrite historical results."""
+    if type(value) is not dict:
+        raise ValueError('config must be an object')
+    if 'benchmarkSchemaVersion' in value:
+        m = copy.deepcopy(value)
+        if level is not None: m['qualification'] = qualification(m, level)
+        return m
+    allowed = set(IDENTITY) | {'profile', 'context', 'qualification', 'experimentStage', 'notes'}
+    if set(value) - allowed:
+        raise ValueError('unknown config fields: ' + ', '.join(sorted(set(value) - allowed)))
+    profile = value.get('profile', '1440p120')
+    sizes = {'1080p60': (1920,1080,60), '1440p120': (2560,1440,120),
+             '1080p120': (1920,1080,120), '1440p60': (2560,1440,60)}
+    if profile not in sizes: raise ValueError('unknown profile')
+    context = value.get('context', {})
+    if type(context) is not dict or set(context) - set(MATCH + SETUP):
+        raise ValueError('invalid/unknown config context fields')
+    m = dict.fromkeys(IDENTITY)
+    m.update(benchmarkSchemaVersion=1, runId='assigned-by-runner', condition='C',
+             evidenceGroup='phase1b-exploratory', profile=profile, profiling='ON',
+             status='planned', notes='Exploratory pilot; extended context may be unavailable.',
+             architecture='arm64', codec='PyroWave', actualBackend='NATIVE_VULKAN',
+             actualDecoderPath='fragment', bitstreamId='186f0393', experimentStage='pilot',
+             captures=[], logs=[], commonObservation=None)
+    m.update({k:v for k,v in value.items() if k != 'context'})
+    m['qualification'] = qualification(m, level)
+    if m['qualification'] == 'controlled': m['evidenceGroup'] = 'phase1b-controlled'
+    m['context'] = dict.fromkeys(MATCH + SETUP)
+    m['context'].update(zip(('width','height','targetFps'), sizes[profile]))
+    m['context'].update(vsync=True, warmupSeconds=10, measurementSeconds=60)
+    m['context'].update(context)
+    return m
+
+def context_warnings(m):
+    missing = [k for k in ('applicationVersion','driver','hostVersion') if m.get(k) is None]
+    missing += ['context.'+k for k in MATCH + SETUP
+                if k not in ESSENTIAL_CONTEXT and m['context'].get(k) is None]
+    if not missing: return []
+    names = ', '.join(missing[:5])
+    if len(missing) > 5: names += f', +{len(missing)-5} more'
+    return [f'extended context unavailable ({len(missing)} fields: {names}); optional for exploratory runs']
+
+def qualification_label(m):
+    if qualification(m) == 'exploratory': return 'EXPLORATORY / NOT CAUSALLY QUALIFIED'
+    try:
+        validate_ready(m)
+    except ValueError:
+        return 'CONTROLLED / INCOMPLETE CONTEXT'
+    return 'CONTROLLED CONTEXT / causal attribution not established'
+
+def validate_ready(m, level=None):
     """Owner-declared setup gate, not proof of actual hardware configuration."""
     validate_manifest(m)
-    if m['evidenceGroup'] != 'phase1b-controlled':
-        raise ValueError('new launches require controlled evidence group')
+    mode = qualification(m, level)
+    if m['evidenceGroup'] not in ('phase1b-controlled', 'phase1b-exploratory'):
+        raise ValueError('new launches require Phase 1B evidence group')
     if m.get('experimentStage') not in ('pilot', 'repeated'):
         raise ValueError('experimentStage must be pilot or repeated')
+    for key in ('sourceRevision','architecture','codec','actualBackend','actualDecoderPath','bitstreamId'):
+        if m[key] is None: raise ValueError(f'missing essential experiment setting: {key}')
+    if m['architecture'] not in ('arm64','x64') or m['codec'] != 'PyroWave' or m['actualBackend'] != 'NATIVE_VULKAN' or m['actualDecoderPath'] not in ('fragment','compute') or m['bitstreamId'] != '186f0393':
+        raise ValueError('expected supported native PyroWave identity/path')
+    for key in ESSENTIAL_CONTEXT:
+        if m['context'][key] is None: raise ValueError(f'missing essential experiment setting: context.{key}')
+    c = m['context']
+    if type(c['warmupSeconds']) is not int or not 0 <= c['warmupSeconds'] <= 3600 or type(c['measurementSeconds']) is not int or not 1 <= c['measurementSeconds'] <= 86400:
+        raise ValueError('warmup/duration outside production environment bounds')
+    if mode == 'exploratory': return m
     for key in IDENTITY:
         if key not in ('timestamp', 'executableSha256') and m[key] is None:
             raise ValueError(f'complete owner setup before launch: {key}')
@@ -46,10 +118,12 @@ def validate_ready(m):
         raise ValueError('hostWorkloadSha256 must be exact SHA-256')
     return m
 
-def validate_bitrate_pair(manifests):
+def validate_bitrate_pair(manifests, level=None):
     if len(manifests) != 2:
         raise ValueError('benchmark-ready requires the 250 and 500 Mbps configs')
-    a, b = [validate_ready(m) for m in manifests]
+    a, b = [validate_ready(m, level) for m in manifests]
+    if qualification(a, level) != qualification(b, level):
+        raise ValueError('matched configs require the same qualification level')
     for m in (a, b):
         if m['status'] != 'planned' or m['captures'] or m['logs']:
             raise ValueError('bitrate configs must be empty planned runs')
@@ -60,7 +134,15 @@ def validate_bitrate_pair(manifests):
     identity = ('sourceRevision', 'applicationVersion', 'architecture', 'gpu', 'driver', 'codec',
                 'actualBackend', 'actualDecoderPath', 'bitstreamId', 'hostVersion',
                 'executableSha256', 'experimentStage', 'condition', 'evidenceGroup')
-    if any(a[k] != b[k] for k in identity) or {k:v for k,v in a['context'].items() if k != 'bitrateKbps'} != {k:v for k,v in b['context'].items() if k != 'bitrateKbps'}:
+    controlled=qualification(a,level)=='controlled'
+    # An optional value known in only one exploratory config is still missing
+    # context, not a fatal mismatch. Known contradictions remain visible gates.
+    mismatch=any(a[k] != b[k] for k in identity
+                 if controlled or (a[k] is not None and b[k] is not None))
+    context_keys=set(a['context']) | set(b['context'])
+    mismatch |= any(a['context'].get(k) != b['context'].get(k) for k in context_keys if k != 'bitrateKbps'
+                    and (controlled or (a['context'].get(k) is not None and b['context'].get(k) is not None)))
+    if mismatch:
         raise ValueError('matched configs may differ only in target bitrate (and run labels/notes)')
     return manifests
 
@@ -75,6 +157,7 @@ def read_json(path):
 def validate_manifest(m):
     if type(m) is not dict or type(m.get('benchmarkSchemaVersion')) is not int or m['benchmarkSchemaVersion'] != 1:
         raise ValueError('expected benchmarkSchemaVersion integer 1')
+    qualification(m)
     for key in ('runId', 'condition', 'evidenceGroup', 'profiling', 'status', 'notes'):
         if not isinstance(m.get(key), str) or not m[key]:
             raise ValueError(f'missing {key}')
@@ -142,7 +225,7 @@ def safe_path(root, name):
         raise ValueError('evidence escapes manifest directory')
     return path
 
-def native_summary(m, root):
+def native_summary(m, root, discover_gpu=False):
     """Select one real lifetime, sharing identical copies across log files only.
 
     A repeated record within ONE log remains ambiguous and must not be deduped:
@@ -180,7 +263,8 @@ def native_summary(m, root):
         raise ValueError(f'requires exactly one real native shutdown summary; found {real_count} real lifetimes (preflight excluded)')
     r = records[next(iter(counts))]
     for field, identity in (('sourceRevision', 'sourceRevision'), ('selectedGpu', 'gpu'), ('bitstreamId', 'bitstreamId')):
-        if not isinstance(r.get(field), str) or not r[field] or r[field] != m[identity]:
+        discover = identity == 'gpu' and m[identity] is None and discover_gpu
+        if not isinstance(r.get(field), str) or not r[field] or (not discover and r[field] != m[identity]):
             raise ValueError(f'shutdown summary {identity} mismatch')
     if r.get('backend') != 'NATIVE_VULKAN':
         raise ValueError('shutdown summary backend must be NATIVE_VULKAN')
@@ -247,16 +331,33 @@ def load_manifest(path):
         r=native_summary(m,root)
         counts=m['commonObservation']['counts']
         if any(r.get(k)!=v for k,v in counts.items()): raise ValueError('common counters differ from original log')
+    # New runs explicitly record qualification. Historical manifests keep their
+    # original schema/unknowns and are never silently promoted or rewritten.
+    if 'qualification' in m and m['status'] == 'complete':
+        validate_ready(m)
+        if m['executableSha256'] is None or m['commonObservation'] is None:
+            raise ValueError('completed run missing binary identity or shutdown observation')
+        if type(m.get('exitCode')) is not int or m['exitCode'] != 0:
+            raise ValueError('application exit must be recorded as zero')
+        if m['profiling'] == 'ON' and len(m['_runs']) != 1:
+            raise ValueError('ON requires exactly one lifetime capture')
+        for run in m['_runs']:
+            if run['capture']['durationSeconds'] < m['context']['measurementSeconds']:
+                raise ValueError('partial measurement window')
+            if run['capture'].get('counterOverflow'):
+                raise ValueError('capture counter overflow')
     return m
 
 def issues(m):
     result=list(m.get('_evidenceErrors', []))
-    if m.get('experimentStage'):
+    if m.get('experimentStage') and qualification(m) == 'controlled':
         try:
             validate_ready(m)
         except ValueError as error:
             result.append(str(error))
-    missing=[k for k in IDENTITY if m[k] is None]+['context.'+k for k in MATCH if m['context'][k] is None]
+    identity=IDENTITY if qualification(m)=='controlled' or 'qualification' not in m else ('timestamp','sourceRevision','architecture','gpu','actualBackend','actualDecoderPath','bitstreamId','executableSha256')
+    context=MATCH if qualification(m)=='controlled' or 'qualification' not in m else ESSENTIAL_CONTEXT
+    missing=[k for k in identity if m[k] is None]+['context.'+k for k in context if m['context'][k] is None]
     if missing: result.append('unknown: '+', '.join(missing))
     if m['status'] != 'complete': result.append('status='+m['status'])
     if m['profiling']=='ON':
@@ -265,7 +366,7 @@ def issues(m):
         if any(m['context']['measurementSeconds'] is None or r['capture']['durationSeconds'] < m['context']['measurementSeconds'] for r in runs): result.append('partial capture')
         if any(r['capture'].get('counterOverflow') for r in runs): result.append('counter overflow')
     if not m['logs']: result.append('missing common log evidence')
-    if m['evidenceGroup']=='phase1b-controlled' and m.get('commonObservation') is None:
+    if m['evidenceGroup'] in ('phase1b-controlled','phase1b-exploratory') and m.get('commonObservation') is None:
         result.append('missing common-method observations')
     return result
 
@@ -278,7 +379,7 @@ def distribution(values):
             'mad':mad,'outlierIndices':[i for i,v in enumerate(values) if mad and abs(v-median)>3*1.4826*mad]}
 
 def match_key(m):
-    return json.dumps([m.get('experimentStage'),m['profile'],*[m[k] for k in ('architecture','gpu','driver','codec','bitstreamId','hostVersion')],m['context']],sort_keys=True)
+    return json.dumps([qualification(m),m.get('experimentStage'),m['profile'],*[m[k] for k in ('architecture','gpu','driver','codec','bitstreamId','hostVersion')],m['context']],sort_keys=True)
 
 def report(manifests):
     ids=[m['runId'] for m in manifests]
@@ -288,7 +389,7 @@ def report(manifests):
     lines=['# Phase 1B recorded experiments','','All supplied attempts retained. Unknowns are unavailable, never zero. No winner or causal conclusion.','Lifetime logs and capture windows remain separate. Inferred networkDrops may include local decoder queue discard.','nativeRetiredDrops is presentation-drop retirement accounting; it is not added to presentationDrops.','','| Run | Condition | Status / qualifications | Lifetime presentationDrops / decoded |','| --- | --- | --- | --- |']
     groups={}
     for m in manifests:
-        problem=issues(m)
+        problem=[qualification_label(m), *issues(m), *context_warnings(m)]
         counts=(m.get('commonObservation') or {}).get('counts',{})
         d,n=counts.get('presentationDrops'),counts.get('decodedFrames')
         fraction=d/n if d is not None and n else None
@@ -318,7 +419,7 @@ def report(manifests):
             if c.get('decodedFrames') and c.get('presentationDrops') is not None: fractions.append(c['presentationDrops']/c['decodedFrames'])
         stats=distribution(fractions)
         summaries.append((key,members,stats))
-        lines += [f"### {key[0]} / {key[1]} / {key[5]}",f'Source `{key[2]}`; backend `{key[3]}`; decoder `{key[4]}`.',f'Attempts {len(members)}, completed {len(usable)}. Lifetime drop-fraction statistics: `{json.dumps(stats)}`.', 'Outlier indices refer to completed observations in input order; flagged samples remain included.']
+        lines += [f"### {key[0]} / {key[1]} / {key[5]}",qualification_label(members[0]),f'Source `{key[2]}`; backend `{key[3]}`; decoder `{key[4]}`.',f'Attempts {len(members)}, completed {len(usable)}. Lifetime drop-fraction statistics: `{json.dumps(stats)}`.', 'Outlier indices refer to completed observations in input order; flagged samples remain included.']
         if len(usable)<5: lines.append('INCOMPLETE: fewer than five completed repeats.')
         if any(issues(m) for m in members): lines.append('UNQUALIFIED: missing context or incomplete evidence; descriptive statistics only.')
         captures=[r for m in usable for r in m.get('_runs',[]) if len(m.get('_runs',[]))==1]
@@ -338,7 +439,7 @@ def report(manifests):
                 lines.append(prefix+': NON-COMPARABLE ON/OFF binary source; no deltas.')
                 continue
             if a[4]!=b[4]: lines.append(prefix+': actual decoder path differs; confounded, no codec-time equivalence.')
-            complete=all(not issues(m) for m in am+bm) and len(am)>=5 and len(bm)>=5
+            complete=all(qualification(m)=='controlled' and not issues(m) for m in am+bm) and len(am)>=5 and len(bm)>=5
             lines.append(prefix+(': context complete; correlation only.' if complete else ': UNQUALIFIED/descriptive only.'))
             if astats and bstats: lines.append(f"Lifetime drop-fraction median delta {bstats['median']-astats['median']:+.6f}; sample variation retained above. No pooled p99 or latency claim.")
             if a[3]!=b[3]: lines.append('Backend boundary differs: parser setup, async decode/readback, pickup and submission scopes require individual compatibility checks.')

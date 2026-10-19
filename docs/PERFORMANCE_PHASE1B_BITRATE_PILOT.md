@@ -1,7 +1,10 @@
-# Phase 1B next experiment: matched bitrate pilot
+# Phase 1B: exploratory evidence and optional controlled bitrate pilot
 
 Status: **PREPARED; awaiting owner hardware results. Phase 1B incomplete.**
-Use this procedure for the next experiment; the earlier ON/OFF commands in
+For the default exploratory pilot use the [short owner guide](PERFORMANCE_PHASE1B_QUICKSTART.md)
+and small 250/500 Mbps configs; no manual metadata inventory is required.
+The detailed setup requirements below apply only to explicitly requested
+**controlled** qualification. Earlier ON/OFF commands in
 [PERFORMANCE_PHASE1B.md](PERFORMANCE_PHASE1B.md) describe the previous design.
 No production streaming, shaders, synchronization, presentation or codec pins change.
 Keep PR #46 draft; do not merge or release. Stop after preparation/CI, then after
@@ -59,7 +62,7 @@ policy. Only the saved target bitrate changes. Do not change codec pins or force
 another decoder path. If either target cannot negotiate the expected stream or
 path, retain the failure and stop; do not quietly substitute another setting.
 
-## Owner setup gate (before any measured launch)
+## Optional controlled setup gate (only with --qualification controlled)
 
 1. Use Windows and Python 3.10+. Check out this PR's updated tooling. Extract the
    previously qualified exact-source portable ARM64 package with `portable.dat`,
@@ -101,9 +104,11 @@ path, retain the failure and stop; do not quietly substitute another setting.
    starting rule. Leave only runner-assigned timestamp/runId/hash fields unset
    as appropriate; prefer filling executableSha256 from Get-FileHash.
 7. Clone the completed 250 config to 500 and change only bitrate. Run
-   `benchmark-ready` on both. It rejects missing setup, placeholder strings,
+   `benchmark-ready --qualification controlled` on both. It rejects missing setup, placeholder strings,
    mismatched identities/context and wrong targets. Live runner repeats the setup
-   gate before package verification/launch. Historical manifests with explicit
+   gate in controlled mode before package verification/launch. Exploratory mode
+   requires essential settings and warns about missing extended context instead.
+   Historical manifests with explicit
    nulls remain readable; missing historical information is never fabricated.
    This is an owner-declaration check; actual capture/log evidence must still
    agree. Missing required setup means prepare it before benchmarking.
@@ -119,16 +124,17 @@ $pilot = 'C:\Benchmarks\Phase1B\bitrate-pilot-v1'
 $exe = 'C:\Benchmarks\Packages\phase1a-00b805\Asteria.exe'
 if (Test-Path -LiteralPath $pilot) { throw 'Choose a NEW pilot directory; preserve existing evidence' }
 New-Item -ItemType Directory -Path $pilot -ErrorAction Stop | Out-Null
-Copy-Item .\docs\benchmark-1440p120-250mbps.template.json "$pilot\250.json"
+Copy-Item .\docs\benchmark-manifest.template.json "$pilot\250.json"
 Get-FileHash -LiteralPath $exe -Algorithm SHA256
 notepad "$pilot\250.json"
-# Fill the owner setup checklist above in 250.json, save, then close Notepad.
+# CONTROLLED ONLY: fill detailed context, set bitrateKbps=250000,
+# experimentStage=pilot, actualBackend=NATIVE_VULKAN, actualDecoderPath=fragment.
 $m = Get-Content -LiteralPath "$pilot\250.json" -Raw | ConvertFrom-Json
 $m.context.bitrateKbps = 500000
 $m.notes = 'PILOT 500 Mbps target; matched to 250.json; actual payload recorded separately.'
 if (Test-Path -LiteralPath "$pilot\500.json") { throw 'Preserve existing config' }
 $m | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath "$pilot\500.json" -Encoding utf8
-python .\scripts\performance.py benchmark-ready "$pilot\250.json" "$pilot\500.json"
+python .\scripts\performance.py benchmark-ready "$pilot\250.json" "$pilot\500.json" --qualification controlled
 if ($LASTEXITCODE) { throw 'Complete/correct setup before any stream' }
 ```
 
@@ -142,7 +148,7 @@ The existing paired mode remains the default for other experiments.
 
 ```powershell
 # A1: saved target 250000 Kbps; ready configs must still match.
-python .\scripts\benchmark_runner.py --exe $exe --config "$pilot\250.json" --session "$pilot\01-250" --single-run --pairs 1 --start ON --cooldown 60
+python .\scripts\benchmark_runner.py --exe $exe --config "$pilot\250.json" --session "$pilot\01-250" --single-run --pairs 1 --start ON --cooldown 60 --qualification controlled
 ```
 
 Stop on any nonzero exit, preserve files and inspect before retrying. For a failed
@@ -154,19 +160,19 @@ the owner must wait between these separate commands.
 ```powershell
 # B1: change ONLY saved target to 500000 Kbps, confirm controls, close, reset host.
 Start-Sleep -Seconds 60
-python .\scripts\benchmark_runner.py --exe $exe --config "$pilot\500.json" --session "$pilot\02-500" --single-run --pairs 1 --start ON --cooldown 60
+python .\scripts\benchmark_runner.py --exe $exe --config "$pilot\500.json" --session "$pilot\02-500" --single-run --pairs 1 --start ON --cooldown 60 --qualification controlled
 ```
 
 ```powershell
 # B2: keep 500000 Kbps; confirm controls, close, reset host identically.
 Start-Sleep -Seconds 60
-python .\scripts\benchmark_runner.py --exe $exe --config "$pilot\500.json" --session "$pilot\03-500" --single-run --pairs 1 --start ON --cooldown 60
+python .\scripts\benchmark_runner.py --exe $exe --config "$pilot\500.json" --session "$pilot\03-500" --single-run --pairs 1 --start ON --cooldown 60 --qualification controlled
 ```
 
 ```powershell
 # A2: change ONLY saved target back to 250000 Kbps, confirm, close, reset host.
 Start-Sleep -Seconds 60
-python .\scripts\benchmark_runner.py --exe $exe --config "$pilot\250.json" --session "$pilot\04-250" --single-run --pairs 1 --start ON --cooldown 60
+python .\scripts\benchmark_runner.py --exe $exe --config "$pilot\250.json" --session "$pilot\04-250" --single-run --pairs 1 --start ON --cooldown 60 --qualification controlled
 ```
 
 Retain original configs unchanged once the first run starts. If a fixed control

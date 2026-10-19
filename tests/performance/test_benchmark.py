@@ -17,7 +17,7 @@ def ready_config(m):
     """Synthetic setup only; no hardware measurements."""
     m=copy.deepcopy(m)
     m.update(applicationVersion='synthetic',driver='synthetic-driver',hostVersion='synthetic-host',
-             actualBackend='NATIVE_VULKAN',actualDecoderPath='fragment',experimentStage='pilot')
+             actualBackend='NATIVE_VULKAN',actualDecoderPath='fragment',experimentStage='pilot',qualification='controlled')
     for key in b.MATCH:
         if m['context'][key] is None: m['context'][key]='synthetic-setting'
     m['context'].update(vsync=False,displayRefreshHz=120,linkSpeedMbps=1000,mtu=1500,brightness=50)
@@ -128,7 +128,7 @@ class BenchmarkTests(unittest.TestCase):
 
     def test_ready_requires_context_but_old_unknown_evidence_remains_readable(self):
         b.validate_manifest(self.m)
-        with self.assertRaisesRegex(ValueError,'owner setup'): b.validate_ready(self.m)
+        with self.assertRaises(ValueError): b.validate_ready(self.m,'controlled')
         ready=ready_config(self.m)
         b.validate_ready(ready)
         for key in b.MATCH+b.SETUP:
@@ -165,14 +165,15 @@ class BenchmarkTests(unittest.TestCase):
             paths=[]
             for rate in (250,500):
                 m=b.read_json(ROOT/f'docs/benchmark-1440p120-{rate}mbps.template.json')
-                b.validate_manifest(m)
-                with self.assertRaises(ValueError): b.validate_ready(m)
-                path=Path(d)/f'{rate}.json';runner.save_new(path,ready_config(m));paths.append(str(path))
+                m=b.prepare_config(m)
+                b.validate_ready(m)
+                with self.assertRaises(ValueError): b.validate_ready(m,'controlled')
+                path=Path(d)/f'{rate}.json';runner.save_new(path,m);paths.append(str(path))
             command=[sys.executable,str(ROOT/'scripts/performance.py'),'benchmark-ready',*paths]
             result=subprocess.run(command,capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertIn('READY:',result.stdout)
-            m=b.read_json(paths[1]);m['context']['networkRoute']='changed'
+            m=b.read_json(paths[1]);m['context']['vsync']=False
             Path(paths[1]).write_text(json.dumps(m),encoding='utf-8')
             result=subprocess.run(command,capture_output=True,text=True)
             self.assertNotEqual(result.returncode,0)
@@ -181,8 +182,9 @@ class BenchmarkTests(unittest.TestCase):
     @unittest.skipUnless(sys.platform=='win32','Windows launch gate')
     def test_missing_setup_blocks_before_package_session_or_process(self):
         with tempfile.TemporaryDirectory() as d:
-            root=Path(d);config=root/'config.json';runner.save_new(config,self.m)
-            args=type('Args',(),dict(config=config,cooldown=60))()
+            root=Path(d);config=root/'config.json';runner.save_new(config,ready_config(self.m))
+            args=type('Args',(),dict(config=config,cooldown=60,qualification='controlled'))()
+            m=b.read_json(config);m['context']['networkRoute']=None;config.write_text(json.dumps(m))
             with patch.object(runner,'verify_package') as package,patch.object(runner.subprocess,'Popen') as launch:
                 with self.assertRaisesRegex(ValueError,'owner setup'): runner.execute(args)
                 package.assert_not_called();launch.assert_not_called()
@@ -232,7 +234,7 @@ class BenchmarkTests(unittest.TestCase):
                     runner.save_new(Path(env['ASTERIA_PERF_CAPTURE'])/'synthetic.json',r)
                 return Child()
             args=type('Args',(),dict(config=config,exe=exe,session=session,pairs=2,start='ON',cooldown=0,resume=False))()
-            with patch.object(runner,'verify_package',return_value='a'*64),patch.object(runner,'no_running_client'),patch.object(runner,'timer'),patch.object(runner.subprocess,'Popen',side_effect=launch),patch('builtins.input',return_value=''):
+            with patch.object(runner,'verify_package',return_value='a'*64),patch.object(runner,'discover_evidence',return_value={'warnings':[]}),patch.object(runner,'no_running_client'),patch.object(runner,'timer'),patch.object(runner.subprocess,'Popen',side_effect=launch),patch('builtins.input',return_value=''):
                 with patch.object(runner,'timer',side_effect=ValueError('fixture stream interruption')):
                     with self.assertRaisesRegex(ValueError,'interruption'): runner.execute(args)
                 failed=next(session.glob('run-*/manifest.json'))
