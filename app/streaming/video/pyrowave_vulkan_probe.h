@@ -40,6 +40,7 @@ public:
     void initialize();
     bool draw(); // false = finite retry/suspended, true = submission/present accepted
     void resize() { progress.rebuild = true; }
+    bool rebuildPending() const { return progress.rebuild; }
     void close() noexcept;
     uint64_t presents = 0, recreations = 0;
     VkFormat swapchainFormat = VK_FORMAT_UNDEFINED;

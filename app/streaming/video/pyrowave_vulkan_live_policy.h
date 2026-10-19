@@ -5,6 +5,17 @@
 #include <exception>
 
 namespace PyroWaveVulkan {
+// SDL frame-ready events are wakeups, not a request to present the retained
+// image again. Keep unfinished WSI work alive after a finite retry/recreation.
+class RenderDemand {
+    bool retry=false;
+public:
+    bool needed(bool newFrame,bool overlayWork,bool rebuild) const {
+        return newFrame || overlayWork || rebuild || retry;
+    }
+    void completed(bool accepted,bool rebuild) { retry=!accepted || rebuild; }
+    bool pending() const { return retry; }
+};
 // Used by decode, overlay-only and window notifications under the decoder mutex.
 // A failed SDL publication must remain retryable, without another video frame.
 template<class Publish> void wakeFrame(bool& queued,Publish publish) {

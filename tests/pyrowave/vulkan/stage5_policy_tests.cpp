@@ -8,6 +8,30 @@ static void require(bool condition) { if(!condition) throw std::runtime_error("S
 template<class F> void rejects(F operation) { bool rejected=false; try { operation(); } catch(const std::exception&) { rejected=true; } require(rejected); }
 int main() {
     try {
+        RenderDemand demand;
+        unsigned draws=0;
+        const auto render=[&](bool video,bool overlay,bool rebuild,bool accepted,bool rebuildAfter) {
+            if(!demand.needed(video,overlay,rebuild)) return;
+            ++draws; demand.completed(accepted,rebuildAfter);
+        };
+        for(unsigned i=0;i<1000;++i) render(false,false,false,true,false);
+        require(draws==0); // Duplicate/stale wakes must not enter WSI.
+        render(true,false,false,true,false); require(draws==1 && !demand.pending());
+        render(false,false,false,true,false); require(draws==1);
+        render(false,true,false,true,false); require(draws==2); // Overlay-only redraw.
+        render(false,false,true,false,false); // Window recreation cleared rebuild, no submission yet.
+        require(draws==3 && demand.pending());
+        render(false,false,false,false,false); // Command/acquisition fence or finite acquire retry.
+        require(draws==4 && demand.pending());
+        render(false,false,false,true,false); require(draws==5 && !demand.pending());
+        render(false,false,false,true,false); require(draws==5);
+        render(true,false,false,true,true); // Accepted submission with SUBOPTIMAL/OUT_OF_DATE rebuild.
+        require(draws==6 && demand.pending());
+        render(false,false,true,false,false); require(draws==7 && demand.pending());
+        render(true,false,false,true,false); // Newest video can satisfy pending redraw/retry.
+        require(draws==8 && !demand.pending());
+        render(false,false,false,true,false); require(draws==8);
+        std::cout<<"PASS native render demand: idle wakes skip WSI; video/overlay/window redraw; finite retries and post-submit rebuild preserved\n";
         bool queued=false; unsigned publications=0;
         const auto overlayNotification=[&] { wakeFrame(queued,[&] { ++publications; return true; }); };
         for(unsigned i=0;i<1000;++i) overlayNotification();
