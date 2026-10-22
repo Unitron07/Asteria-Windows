@@ -1,5 +1,10 @@
+# Asteria P1a base: aeba988e0a302145eff2e70fa3e11cd98ec01f5d
+# Reviewed f900dd4..aeba988: RTSP parser/option ownership and periodic ping fixes.
+# The five PyroWave source files are unchanged upstream; protocol hunks are retained.
+# Review and regression coverage: docs/COMMON_C_AEBA988.md
+
 diff --git a/src/Limelight.h b/src/Limelight.h
-index 22bee46..61c20c7 100644
+index 22bee469ad8f8a95e2b0c75db2a7414bf26a7e51..61c20c74ffff647b55ea768bd9b04f2a14b8fd7a 100644
 --- a/src/Limelight.h
 +++ b/src/Limelight.h
 @@ -234,6 +234,15 @@ typedef struct _DECODE_UNIT {
@@ -34,7 +39,7 @@ index 22bee46..61c20c7 100644
  #define SCM_MASK_HEVC   (SCM_HEVC | SCM_HEVC_MAIN10 | SCM_HEVC_REXT8_444 | SCM_HEVC_REXT10_444)
 diff --git a/src/PyroWave.h b/src/PyroWave.h
 new file mode 100644
-index 0000000..9e8c744
+index 0000000000000000000000000000000000000000..9e8c744ad86d9ae03e225d3ac74e87774cda87f3
 --- /dev/null
 +++ b/src/PyroWave.h
 @@ -0,0 +1,57 @@
@@ -96,7 +101,7 @@ index 0000000..9e8c744
 +    return 0;
 +}
 diff --git a/src/RtspConnection.c b/src/RtspConnection.c
-index e958101..45e4a7f 100644
+index e95810165b5ba52f572e39366c9a71f398f62d8c..45e4a7f0372c87525d5953662ffe53c4e1cce433 100644
 --- a/src/RtspConnection.c
 +++ b/src/RtspConnection.c
 @@ -1,4 +1,5 @@
@@ -130,7 +135,7 @@ index e958101..45e4a7f 100644
                  NegotiatedVideoFormat = VIDEO_FORMAT_AV1_HIGH10_444;
              }
 diff --git a/src/SdpGenerator.c b/src/SdpGenerator.c
-index 22467c0..318b907 100644
+index 22467c06e060001612acfd9f088789fcc24114b6..318b907abc8289293cd492c37109bd8c1b8e4db6 100644
 --- a/src/SdpGenerator.c
 +++ b/src/SdpGenerator.c
 @@ -431,7 +431,11 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
@@ -147,7 +152,7 @@ index 22467c0..318b907 100644
          }
          else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
 diff --git a/src/VideoDepacketizer.c b/src/VideoDepacketizer.c
-index 5baa1d5..b33ef6f 100644
+index 5baa1d5d3d6662d17edb4cfc92d179dddf4ceb21..b33ef6f74a20ce9ede878430a76c397a1ec01d96 100644
 --- a/src/VideoDepacketizer.c
 +++ b/src/VideoDepacketizer.c
 @@ -215,8 +215,8 @@ void validateDecodeUnitForPlayback(PDECODE_UNIT decodeUnit) {
