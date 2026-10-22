@@ -7,14 +7,16 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'moonlight-common-c/moonlight-common-c'
+      - 'moonlight-common-c/pyrowave_patch.pri'
+      - 'scripts/apply-common-c-p1a.ps1'
+      - 'scripts/test-common-c-p1a.ps1'
+      - 'scripts/pyrowave/common-c-p1a.patch'
       - 'app/streaming/video/pyrowave*'
       - 'app/streaming/session.*'
       - 'app/settings/streamingpreferences.*'
       - 'app/gui/SettingsView.qml'
-      - 'moonlight-common-c/pyrowave_patch.pri'
-      - 'scripts/pyrowave/common-c-p1a.patch'
       - 'scripts/build-pyrowave-live.ps1'
-      - 'scripts/apply-common-c-p1a.ps1'
       - 'tests/pyrowave/**'
       - 'tests/performance/**'
       - 'scripts/test-performance-teardown.ps1'
@@ -54,6 +56,9 @@ jobs:
         run: |
           git diff --check HEAD^ HEAD
           if ($LASTEXITCODE) { throw 'diff whitespace check failed' }
+      - name: Test common-c revision and patch guards
+        shell: pwsh
+        run: ./scripts/test-common-c-p1a.ps1
       - name: Apply reviewed P1a delta to pinned common-c
         shell: pwsh
         run: ./scripts/apply-common-c-p1a.ps1
