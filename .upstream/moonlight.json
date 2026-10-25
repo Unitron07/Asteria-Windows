@@ -1,6 +1,6 @@
 {
   "repository": "moonlight-stream/moonlight-qt",
   "branch": "master",
-  "ref": "v6.2.0",
-  "commit": "de2467e433821664cdd2224aad8c89a625be1ad9"
+  "ref": "master",
+  "commit": "e4db5c2c18e0a55fd8a33d8d735d8b71c1f9a710"
 }
