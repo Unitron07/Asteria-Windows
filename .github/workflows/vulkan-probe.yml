@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'moonlight-common-c/moonlight-common-c'
+      - 'moonlight-common-c/pyrowave_patch.pri'
+      - 'scripts/apply-common-c-p1a.ps1'
+      - 'scripts/test-common-c-p1a.ps1'
+      - 'scripts/pyrowave/common-c-p1a.patch'
       - 'app/streaming/video/pyrowave_vulkan_*'
       - 'tests/pyrowave/vulkan/**'
       - 'scripts/*vulkan-probe.ps1'

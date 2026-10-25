@@ -11,6 +11,14 @@ HDR/444 rejection, full/limited range acceptance, recovery and a structurally va
 with 1,501 codec packets (larger than both old offline limits). Existing parser,
 legacy, loader/export/API, Granite and P0.5 presentation suites are retained.
 
+The RTSP parser, SDP generator and handshake suites also compile the production
+common-c implementation. They cover full DESCRIBE/ANNOUNCE boundaries, numeric
+and malformed input, duplicate-header ownership, strict PyroWave identity checks,
+AV1/HEVC/H.264 selection, fragmented mock TCP responses and reconnect after
+rejection. The handshake fixture does not test real sockets, encryption or pairing.
+Run `./scripts/test-common-c-p1a.ps1` for SHA, idempotence and patched-source/archive
+guards. See [the aeba988 review](../../docs/COMMON_C_AEBA988.md).
+
 Runtime policy tests inject a mock C API/Vulkan-property module on both targets,
 cover preferred fragment/compute GPU modes independently of vendor IDs, nonfatal
 GPU initialization failure followed by recreated default compute CPU fallback,
