@@ -1,7 +1,7 @@
-# Asteria P1a base: aeba988e0a302145eff2e70fa3e11cd98ec01f5d
-# Reviewed f900dd4..aeba988: RTSP parser/option ownership and periodic ping fixes.
+# Asteria P1a base: 5d3c0ecca00c1bb3f587acb8060476edcf8e24aa
+# Reviewed aeba988..5d3c0ec: input batching and UTF-8 delivery, ENet disconnect scope, control encryption, nanors.
 # The five PyroWave source files are unchanged upstream; protocol hunks are retained.
-# Review and regression coverage: docs/COMMON_C_AEBA988.md
+# Review and regression coverage: docs/COMMON_C_5D3C0EC.md
 
 diff --git a/src/Limelight.h b/src/Limelight.h
 index 22bee469ad8f8a95e2b0c75db2a7414bf26a7e51..61c20c74ffff647b55ea768bd9b04f2a14b8fd7a 100644

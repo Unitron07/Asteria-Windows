@@ -5,7 +5,7 @@ COMMON_C_CHECKOUT = $$PWD/moonlight-common-c
 COMMON_C_PATCH = $$PWD/../scripts/pyrowave/common-c-p1a.patch
 exists($$COMMON_C_CHECKOUT/.git) {
     COMMON_C_PIN = $$system(git -C $$shell_quote($$COMMON_C_CHECKOUT) rev-parse HEAD)
-    !equals(COMMON_C_PIN, aeba988e0a302145eff2e70fa3e11cd98ec01f5d): error("Unexpected common-c revision; review/rebase the P1a patch first")
+    !equals(COMMON_C_PIN, 5d3c0ecca00c1bb3f587acb8060476edcf8e24aa): error("Unexpected common-c revision; review/rebase the P1a patch first")
 } else {
     # The corresponding-source archive contains the already patched submodule,
     # without Git metadata. Require that delta rather than resolving a parent HEAD.

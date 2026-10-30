@@ -16,8 +16,10 @@ common-c implementation. They cover full DESCRIBE/ANNOUNCE boundaries, numeric
 and malformed input, duplicate-header ownership, strict PyroWave identity checks,
 AV1/HEVC/H.264 selection, fragmented mock TCP responses and reconnect after
 rejection. The handshake fixture does not test real sockets, encryption or pairing.
+The input text suite runs production UTF-8 packing and legacy pacing against a fake
+control stream, so host text handling still needs a live check.
 Run `./scripts/test-common-c-p1a.ps1` for SHA, idempotence and patched-source/archive
-guards. See [the aeba988 review](../../docs/COMMON_C_AEBA988.md).
+guards. See [the 5d3c0ec review](../../docs/COMMON_C_5D3C0EC.md).
 
 Runtime policy tests inject a mock C API/Vulkan-property module on both targets,
 cover preferred fragment/compute GPU modes independently of vendor IDs, nonfatal

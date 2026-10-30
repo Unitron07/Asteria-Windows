@@ -48,7 +48,7 @@ Malformed independent frames clear decoder state and can recover on the next fra
 runtime/presentation failure ends the attempt. Retry is manual: choose a standard
 codec and reconnect. No hot switch or automatic host launch/resume replay occurs.
 
-The reviewed common-c gitlink is `aeba988e0a302145eff2e70fa3e11cd98ec01f5d`.
+The reviewed common-c gitlink is `5d3c0ecca00c1bb3f587acb8060476edcf8e24aa`.
 `scripts/pyrowave/common-c-p1a.patch` is a maintained, separately reviewable delta
 to Limelight constants, strict SDP validation, ANNOUNCE and opaque-picture
 validation. qmake verifies the pin and applies it idempotently; the explicit
