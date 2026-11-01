@@ -8,7 +8,7 @@ Keep D3D11VA state/overlay reuse, legacy PyroWave demand gating and Qualcomm cop
 
 ## Preserved release and qualification history
 
-**[v0.3.0 â€” Native Vulkan Release is published](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.3.0)**
+**[v0.3.0 — Native Vulkan Release is published](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.3.0)**
 from `2f29a8963078dadbe4e5031791a6390098e4635d`, with exact-source x64/native ARM64 packages,
 verified public downloads and final ARM64 owner-confirmed functional smoke.
 See the [release record](VALIDATION.md#asteria-v030-release-record) and
@@ -19,9 +19,9 @@ v1.0 implementation, MultiSeat or VR work.
 
 [Stage 3 offline shared-device proof](../tests/pyrowave/vulkan/STAGE3.md) now
 distinguishes exact identity from approved numerical equivalence: every decoded
-Y/U/V byte must be within Ã‚Â±1 of CPU decode; a single Ã‚Â±2 fails. Exact hashes and
+Y/U/V byte must be within Â±1 of CPU decode; a single Â±2 fails. Exact hashes and
 all diagnostic metrics remain recorded. At diagnostic head f08ecabb, the owner
-found deterministic Ã‚Â±1 variants in BOTH AUTO fragment and forced compute on
+found deterministic Â±1 variants in BOTH AUTO fragment and forced compute on
 Surface X1-85, using identical fixtures and the same caller device. Repeats were
 stable, device idle did not change bytes, and external handles/D3D11 stayed zero.
 Pinned upstream validation permits bounded reconstruction error; no exact
@@ -33,9 +33,9 @@ Stage 3 is complete. Exact-head Surface Pro 11 / Snapdragon X Plus / Adreno X1-8
 ARM64 owner qualification passed with `PASS_NUMERIC_EQUIVALENCE_OWNER_RUN` on
 `a3cf6b0c59db9465d01178900cd954390728363f`. [PR #36](https://github.com/Unitron07/Asteria-Windows/pull/36)
 merged via `06ea4adb745432842af81b73549f74c696fa5a39`. AUTO/fragment and
-FORCE_COMPUTE/compute both passed the per-byte Ã‚Â±1 contract; factory cleanup was
+FORCE_COMPUTE/compute both passed the per-byte Â±1 contract; factory cleanup was
 `PATCHED_AND_VERIFIED`. Vulkan validation remained `SKIP` because the layer was
-unavailable. The precise arithmetic cause of the Ã‚Â±1 differences remains unproven.
+unavailable. The precise arithmetic cause of the Â±1 differences remains unproven.
 
 **Stage 4 is COMPLETE and qualified.** The exact implementation head
 `7c6bf8e085ffe26fd36d7d72d7405b0ed5aa2e85` was merged through [PR #39](https://github.com/Unitron07/Asteria-Windows/pull/39)
@@ -115,7 +115,7 @@ P1b live records/FEC/partial recovery and bandwidth probing remain later work.
 v2 MultiSeat and v3 VR are future milestones, outside this task. Both need a
 separate Asteria-oriented Vibepollo fork/host extension; VR does not require
 PyroWave. See [the roadmap](PORTING_PLAN.md#host-dependent-roadmap-boundaries).
-Old M2Ã¢â‚¬â€œM4 Apollo convenience work is deprioritized; its notes are retained as
+Old M2â€“M4 Apollo convenience work is deprioritized; its notes are retained as
 possible supporting integrations rather than standalone active milestones.
 
 ## Historical P0/P0.5 evidence

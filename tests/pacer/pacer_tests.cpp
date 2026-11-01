@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <condition_variable>
 #include <cstdlib>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -66,6 +67,7 @@ struct Renderer : IFFmpegRenderer {
     int attributes = 0;
     std::atomic<int> rendered{0}, cleaned{0};
     std::vector<int> ids;
+    std::function<void()> onCleanup;
     void renderFrame(AVFrame* f) override {
         CHECK(f && f->buf[0] && av_buffer_get_ref_count(f->buf[0]) > 0);
         ids.push_back(int(f->pts));
@@ -75,7 +77,7 @@ struct Renderer : IFFmpegRenderer {
     }
     bool isRenderThreadSupported() override { return threaded; }
     int getRendererAttributes() override { return attributes; }
-    void cleanupRenderContext() override { ++cleaned; }
+    void cleanupRenderContext() override { if (onCleanup) onCleanup(); ++cleaned; }
 };
 struct ManualVsync : IVsyncSource {
     bool initialize(SDL_Window*, int) override { return true; }
@@ -167,11 +169,18 @@ void concurrentAndReconnect(bool pacing, int attributes) {
     for (int cycle = 0; cycle < 12; ++cycle) {
         Ledger ledger; Renderer renderer; VIDEO_STATS stats{};
         renderer.threaded = true; renderer.attributes = attributes;
+        uint64_t savedDrops = 0, savedRendered = 0;
+        int unconsumed = 0;
+        renderer.onCleanup = [&] {
+            // Workers have stopped; only queued frames and the last displayed
+            // reference remain. Destructor draining is not a policy drop.
+            unconsumed = ledger.count() - (renderer.rendered > 0 ? 1 : 0);
+        };
         {
             Pacer p(&renderer, &stats); CHECK(p.initialize(nullptr, 120, false));
             if (pacing) PacerTestPeer::paced(p);
             // Exercise concurrent producer, VBlank, renderer and stats rollover.
-            std::atomic<bool> done{false}; uint64_t savedDrops = 0, savedRendered = 0;
+            std::atomic<bool> done{false};
             std::thread snapshot([&] {
                 while (!done) {
                     QMutexLocker lock(p.videoStatsLock());
@@ -183,10 +192,10 @@ void concurrentAndReconnect(bool pacing, int attributes) {
             if (pacing) for (int i = 0; i < 300; ++i) PacerTestPeer::tick(p);
             producer.join();
             done = true; snapshot.join();
-            QMutexLocker lock(p.videoStatsLock());
-            CHECK(savedDrops + stats.pacerDroppedFrames + savedRendered + stats.renderedFrames <= 300);
             // Teardown joins workers before releasing frames and renderer context.
         }
+        CHECK(savedDrops + stats.pacerDroppedFrames + savedRendered + stats.renderedFrames + unconsumed == 300);
+        CHECK(savedRendered + stats.renderedFrames == uint64_t(renderer.rendered));
         CHECK(ledger.count() == 0); CHECK(renderer.cleaned == 1);
     }
 }

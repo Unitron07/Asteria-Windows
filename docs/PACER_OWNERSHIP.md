@@ -86,11 +86,20 @@ passed all four upstream/candidate architecture jobs. No unrelated rerun is need
 ## Separate next candidates
 
 - D3D11VA redundant binding and same-size overlay resource reuse: inspect context
-  invalidation and concurrent COM ownership first; test NV12/P010, changed/disabled
-  overlays, resize and allocation failure. Keep shared-device synchronization.
+  invalidation and concurrent COM ownership first. `renderOverlay()` changes the
+  vertex buffer and pixel shader, so those video bindings are not automatically
+  redundant on the next frame. `renderVideo()` explicitly clears SRVs after draw;
+  preserve resource hazard handling. Updated overlays currently create immutable
+  texture/SRV/vertex objects; same-size reuse requires a different upload strategy
+  and consumer retirement, rather than updating an immutable/in-use texture.
+  Test NV12/P010, changed/disabled overlays, resize and allocation failure.
+  Keep shared-device synchronization.
 - Legacy PyroWave demand gating: port #50's demand semantics only after covering
   window damage, overlay disable, SDL recovery/retry, displayed-slot fences and
-  reconnect. Native and legacy paths stay independently functional.
+  reconnect. Its retained-output branch currently reaches clear/copy/present and
+  interop begin/end even when `newFrame` is false; a stale SDL event is not proof
+  of new video, but may still represent damage/retry demand. Native and legacy
+  paths stay independently functional.
 - Qualcomm copy/shared-device overhead: retain current defaults. Any bind/copy or
   device-policy change is a separate opt-in experiment requiring Adreno X1-85
   validation for Main8/Main10, HDR, resize and teardown. No such change is bundled.
