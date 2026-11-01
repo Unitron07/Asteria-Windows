@@ -1,8 +1,10 @@
 # Cross-codec audit validation
 
+Current status: PR #51 (cross-codec audit) is merged; Phase 2 targeted optimization is active. Phase 1B remains paused. This document preserves its original audit/qualification scope; implementation is tracked in [PACER_OWNERSHIP.md](PACER_OWNERSHIP.md).
+
 Audit base: `4944dd5364a8285a03d0da24cf44cf88bb3ac971` (merged PR #50).
 Scope: documentation only. Runtime, tests, workflow definitions and dependency
-pins are unchanged. Phase 1B remains paused; draft PR #46 is untouched.
+pins are unchanged. Phase 1B remains paused; PR #46 is closed without merging; its historical evidence is preserved.
 
 ## Local verification
 
