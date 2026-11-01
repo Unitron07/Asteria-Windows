@@ -38,9 +38,10 @@ AV1 Main8/Main10, HEVC/H.264 selection, metadata, HDR and shader paths are uncha
 
 Saturation replacement previously freed frames without incrementing the drop
 counter. Every Pacer drop now counts exactly once. A small stats mutex serializes
-Pacer writers and FFDecoder's existing window snapshot/reset. GPU rendering and
-AVFrame finalizers do not run under the stats mutex. Queue-to-stats is the only
-nested lock order; FFDecoder holds only stats during its snapshot/reset.
+Pacer writers and FFDecoder's window snapshot/reset. GPU rendering, AVFrame
+finalizers, overlay formatting/publication and RTT queries do not run under the
+stats mutex. Queue-to-stats is the only nested lock order; FFDecoder holds only
+stats briefly while copying and resetting the completed window.
 
 Shutdown uses an atomic stop flag and publishes stop/wakes under the queue mutex,
 preventing a worker from missing shutdown between its empty check and wait.

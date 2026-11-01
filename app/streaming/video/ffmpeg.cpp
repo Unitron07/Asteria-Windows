@@ -2136,12 +2136,20 @@ int FFmpegVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
 
     // Flip stats windows roughly every second
     if (LiGetMicroseconds() > m_ActiveWndVideoStats.measurementStartUs + 1000000) {
-        QMutexLocker statsLocker(m_Pacer ? m_Pacer->videoStatsLock() : nullptr);
+        VIDEO_STATS completedWndVideoStats;
+        {
+            // Only snapshot/reset while excluding Pacer writers. Formatting,
+            // RTT queries and overlay resource publication can take longer.
+            QMutexLocker statsLocker(m_Pacer ? m_Pacer->videoStatsLock() : nullptr);
+            completedWndVideoStats = m_ActiveWndVideoStats;
+            SDL_zero(m_ActiveWndVideoStats);
+            m_ActiveWndVideoStats.measurementStartUs = LiGetMicroseconds();
+        }
         // Update overlay stats if it's enabled
         if (Session::get()->getOverlayManager().isOverlayEnabled(Overlay::OverlayDebug)) {
             VIDEO_STATS lastTwoWndStats = {};
             addVideoStats(m_LastWndVideoStats, lastTwoWndStats);
-            addVideoStats(m_ActiveWndVideoStats, lastTwoWndStats);
+            addVideoStats(completedWndVideoStats, lastTwoWndStats);
 
             stringifyVideoStats(lastTwoWndStats,
                                 Session::get()->getOverlayManager().getOverlayText(Overlay::OverlayDebug),
@@ -2150,12 +2158,10 @@ int FFmpegVideoDecoder::submitDecodeUnit(PDECODE_UNIT du)
         }
 
         // Accumulate these values into the global stats
-        addVideoStats(m_ActiveWndVideoStats, m_GlobalVideoStats);
+        addVideoStats(completedWndVideoStats, m_GlobalVideoStats);
 
-        // Move this window into the last window slot and clear it for next window
-        SDL_memcpy(&m_LastWndVideoStats, &m_ActiveWndVideoStats, sizeof(m_ActiveWndVideoStats));
-        SDL_zero(m_ActiveWndVideoStats);
-        m_ActiveWndVideoStats.measurementStartUs = LiGetMicroseconds();
+        // Keep the completed snapshot for the next two-window display average.
+        m_LastWndVideoStats = completedWndVideoStats;
     }
 
     if (du->frameHostProcessingLatency != 0) {

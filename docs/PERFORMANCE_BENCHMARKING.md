@@ -1,10 +1,11 @@
 # Phase 1A: streaming performance capture
 
-Status: implementation under validation; Phase 1A is not complete until the
-exact implementation passes normal x64/native ARM64 and all regressions.
-Phase 1B and hardware performance qualification have not started. No optimization,
-renderer architecture change, codec pin/patch, shader change, forced backend,
-release, merge or 120 FPS qualification threshold is included.
+Current status: Phase 1B remains **paused**, and PR #46 is closed without merging.
+PR #51 (cross-codec audit) is merged; Phase 2 targeted optimization is active.
+See [NEXT_STEP.md](NEXT_STEP.md) and [PACER_OWNERSHIP.md](PACER_OWNERSHIP.md).
+This document preserves the Phase 1A instrumentation contract and historical
+qualification scope. It does not establish hardware performance qualification,
+a 120 FPS threshold, or approval for a benchmark campaign, merge or release.
 
 Audited main base: `0f897c0f591d736371c5a3352b48f3e445810842`.
 Immutable reference v0.3.0: `2f29a8963078dadbe4e5031791a6390098e4635d`.
