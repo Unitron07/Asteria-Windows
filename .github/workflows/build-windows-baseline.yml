@@ -71,6 +71,20 @@ jobs:
         timeout-minutes: 8
         shell: pwsh
         run: ./harness/scripts/test-settings.ps1 -SourceRoot ./source -Architecture '${{ inputs.architecture }}' -QtRoot '${{ runner.workspace }}/Qt/6.11.2'
+      - name: Test production Pacer surface ownership and lifecycle
+        if: inputs.label == 'asteria'
+        timeout-minutes: 8
+        shell: pwsh
+        run: |
+          $platform = if ('${{ inputs.architecture }}' -eq 'arm64') { 'ARM64' } else { 'x64' }
+          $kit = if ('${{ inputs.architecture }}' -eq 'arm64') { 'msvc2022_arm64' } else { 'msvc2022_64' }
+          $env:PATH = "${{ runner.workspace }}/Qt/6.11.2/$kit/bin;$((Resolve-Path 'source/libs/windows/lib/${{ inputs.architecture }}').Path);$env:PATH"
+          cmake -S source/tests/pacer -B source/build/pacer-tests -A $platform -DSDL_ARCH=${{ inputs.architecture }} -DCMAKE_PREFIX_PATH="${{ runner.workspace }}/Qt/6.11.2/$kit" -DQT_HOST_PATH="${{ runner.workspace }}/Qt/6.11.2/msvc2022_64"
+          if ($LASTEXITCODE) { throw 'Pacer test configuration failed' }
+          cmake --build source/build/pacer-tests --config Release --parallel 2
+          if ($LASTEXITCODE) { throw 'Pacer test build failed' }
+          ctest --test-dir source/build/pacer-tests -C Release --output-on-failure
+          if ($LASTEXITCODE) { throw 'Pacer regressions failed' }
       - name: Test keyboard mapping and extended-key release state
         if: inputs.label == 'asteria'
         shell: pwsh

@@ -1,8 +1,10 @@
 #include "pacer.h"
+#ifndef PACER_TEST
 #include "streaming/streamutils.h"
 #include "streaming/session.h"
+#endif
 
-#ifdef Q_OS_WIN32
+#if defined(Q_OS_WIN32) && !defined(PACER_TEST)
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include "dxvsyncsource.h"
@@ -16,12 +18,8 @@
 
 // Limit the number of queued frames to prevent excessive memory consumption
 // if the V-Sync source or renderer is blocked for a while. It's important
-// that the sum of all queued frames between both pacing and rendering queues
-// must not exceed the number buffer pool size to avoid running the decoder
-// out of available decoding surfaces.
-#define MAX_QUEUED_FRAMES 3
-static_assert(PACER_MAX_OUTSTANDING_FRAMES == MAX_QUEUED_FRAMES + 2,
-              "PACER_MAX_OUTSTANDING_FRAMES and MAX_QUEUED_FRAMES must agree");
+// that the decoder budget includes BOTH queues plus frames held outside them.
+// Keep the per-queue caps and historical catch-up policy unchanged.
 
 // We may be woken up slightly late so don't go all the way
 // up to the next V-sync since we may accidentally step into
@@ -46,12 +44,18 @@ Pacer::Pacer(IFFmpegRenderer* renderer, PVIDEO_STATS videoStats) :
 
 Pacer::~Pacer()
 {
-    m_Stopping = true;
+    {
+        // Pair shutdown with the condition checks under this lock, so a worker
+        // cannot miss the wake between checking m_Stopping and starting to wait.
+        QMutexLocker locker(&m_FrameQueueLock);
+        m_Stopping = true;
+        m_PacingQueueNotEmpty.wakeAll();
+        m_VsyncSignalled.wakeAll();
+        m_RenderQueueNotEmpty.wakeAll();
+    }
 
     // Stop the V-sync thread
     if (m_VsyncThread != nullptr) {
-        m_PacingQueueNotEmpty.wakeAll();
-        m_VsyncSignalled.wakeAll();
         SDL_WaitThread(m_VsyncThread, nullptr);
     }
 
@@ -61,7 +65,6 @@ Pacer::~Pacer()
 
     // Stop the render thread
     if (m_RenderThread != nullptr) {
-        m_RenderQueueNotEmpty.wakeAll();
         SDL_WaitThread(m_RenderThread, nullptr);
     }
     else {
@@ -120,7 +123,9 @@ int Pacer::vsyncThread(void *context)
         if (async) {
             // Wait for the VSync source to invoke signalVsync() or 100ms to elapse
             QMutexLocker locker(&me->m_FrameQueueLock);
-            me->m_VsyncSignalled.wait(&me->m_FrameQueueLock, 100);
+            if (!me->m_Stopping) {
+                me->m_VsyncSignalled.wait(&me->m_FrameQueueLock, 100);
+            }
         }
         else {
             // Let the VSync source wait in the context of our thread
@@ -248,10 +253,13 @@ void Pacer::handleVsync(int timeUntilNextVsyncMillis)
     // Catch up if we're several frames ahead
     while (m_PacingQueue.count() > frameDropTarget) {
         AVFrame* frame = m_PacingQueue.dequeue();
+        {
+            QMutexLocker statsLocker(&m_VideoStatsLock);
+            m_VideoStats->pacerDroppedFrames++;
+        }
 
         // Drop the lock while we call av_frame_free()
         m_FrameQueueLock.unlock();
-        m_VideoStats->pacerDroppedFrames++;
         av_frame_free(&frame);
         m_FrameQueueLock.lock();
     }
@@ -295,7 +303,7 @@ bool Pacer::initialize(SDL_Window* window, int maxVideoFps, bool enablePacing)
         }
 
         switch (info.subsystem) {
-    #ifdef Q_OS_WIN32
+    #if defined(Q_OS_WIN32) && !defined(PACER_TEST)
         case SDL_SYSWM_WINDOWS:
             m_VsyncSource = new DxVsyncSource(this);
             break;
@@ -354,7 +362,10 @@ void Pacer::renderFrame(AVFrame* frame)
 {
     // Count time spent in Pacer's queues
     uint64_t beforeRender = LiGetMicroseconds();
-    m_VideoStats->totalPacerTimeUs += (beforeRender - (uint64_t)frame->pkt_dts);
+    {
+        QMutexLocker statsLocker(&m_VideoStatsLock);
+        m_VideoStats->totalPacerTimeUs += (beforeRender - (uint64_t)frame->pkt_dts);
+    }
 
     // Render it
     m_VsyncRenderer->acquireRenderLock();
@@ -362,8 +373,11 @@ void Pacer::renderFrame(AVFrame* frame)
     m_VsyncRenderer->releaseRenderLock();
     uint64_t afterRender = LiGetMicroseconds();
 
-    m_VideoStats->totalRenderTimeUs += (afterRender - beforeRender);
-    m_VideoStats->renderedFrames++;
+    {
+        QMutexLocker statsLocker(&m_VideoStatsLock);
+        m_VideoStats->totalRenderTimeUs += (afterRender - beforeRender);
+        m_VideoStats->renderedFrames++;
+    }
 
     // Wait until after next frame to free this one to ensure the GPU
     // doesn't stall or read garbage if the backing buffer gets returned
@@ -403,10 +417,13 @@ void Pacer::renderFrame(AVFrame* frame)
     // Catch up if we're several frames ahead
     while (m_RenderQueue.count() > frameDropTarget) {
         AVFrame* frame = m_RenderQueue.dequeue();
+        {
+            QMutexLocker statsLocker(&m_VideoStatsLock);
+            m_VideoStats->pacerDroppedFrames++;
+        }
 
         // Drop the lock while we call av_frame_free()
         frameQueueLocker.unlock();
-        m_VideoStats->pacerDroppedFrames++;
         av_frame_free(&frame);
         frameQueueLocker.relock();
     }
@@ -414,9 +431,13 @@ void Pacer::renderFrame(AVFrame* frame)
 
 void Pacer::dropFrameForEnqueue(QQueue<AVFrame*>& queue)
 {
-    SDL_assert(queue.size() <= MAX_QUEUED_FRAMES);
-    if (queue.size() == MAX_QUEUED_FRAMES) {
+    SDL_assert(queue.size() <= PACER_MAX_QUEUED_FRAMES);
+    if (queue.size() == PACER_MAX_QUEUED_FRAMES) {
         AVFrame* frame = queue.dequeue();
+        {
+            QMutexLocker statsLocker(&m_VideoStatsLock);
+            m_VideoStats->pacerDroppedFrames++;
+        }
         av_frame_free(&frame);
     }
 }

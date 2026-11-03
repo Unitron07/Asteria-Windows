@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 3.27)
+project(asteria_pacer_regressions LANGUAGES CXX)
+find_package(Qt6 REQUIRED COMPONENTS Core)
+set(DEPS "${CMAKE_CURRENT_SOURCE_DIR}/../../libs/windows")
+set(PACER "${CMAKE_CURRENT_SOURCE_DIR}/../../app/streaming/video/ffmpeg-renderers/pacer")
+add_executable(pacer-tests pacer_tests.cpp "${PACER}/pacer.cpp")
+target_compile_features(pacer-tests PRIVATE cxx_std_17)
+target_compile_definitions(pacer-tests PRIVATE PACER_TEST SDL_MAIN_HANDLED)
+target_include_directories(pacer-tests PRIVATE . "${PACER}"
+    "${DEPS}/include/${SDL_ARCH}" "${DEPS}/include/${SDL_ARCH}/SDL2")
+target_link_libraries(pacer-tests PRIVATE Qt6::Core
+    "${DEPS}/lib/${SDL_ARCH}/avutil.lib" "${DEPS}/lib/${SDL_ARCH}/SDL2.lib")
+enable_testing()
+add_test(NAME pacer-ownership COMMAND pacer-tests)
+set_tests_properties(pacer-ownership PROPERTIES TIMEOUT 45)

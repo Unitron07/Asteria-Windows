@@ -1,14 +1,12 @@
-# Next step: Phase 1A performance instrumentation and benchmarking infrastructure
+# Next step: targeted Phase 2 cross-codec optimization
 
-**Active milestone: Phase 1A**, implementation under validation. Add opt-in local
-capture, an audited metric dictionary, bounded CPU/frame-pacing distributions,
-versioned JSON, tested analysis tools and measured instrumentation overhead.
-See [PERFORMANCE_BENCHMARKING.md](PERFORMANCE_BENCHMARKING.md). Completion requires
-passing exact-source x64/native ARM64 builds and parser/runtime/Stage 2–5 checks;
-no new hardware qualification or Phase 1B completion is claimed. Surface owner
-instrumentation qualification precedes matched Phase 1B benchmarks. No tuning,
-Phase 2, release, automatic merge or forced backend selection is authorized.
-Published v0.3.0 remains the immutable benchmark reference.
+**Active milestone: Phase 2 implementation.** The cross-codec audit [PR #51](https://github.com/Unitron07/Asteria-Windows/pull/51) is merged. Start with shared FFmpeg Pacer ownership regression coverage and the demonstrated surface-budget correction; see [PACER_OWNERSHIP.md](PACER_OWNERSHIP.md). AV1 is the first target, with HEVC/H.264 and both PyroWave paths preserved.
+
+Phase 1B remains **paused**. [PR #46](https://github.com/Unitron07/Asteria-Windows/pull/46) is closed without merging. Its original qualification records, ten-run block and failed attempts remain historical evidence; no new benchmark campaign or manual JSON manifest is requested. Phase 1A instrumentation remains available and optional. Published v0.3.0 remains the immutable benchmark reference.
+
+Keep D3D11VA state/overlay reuse, legacy PyroWave demand gating and Qualcomm copy/shared-device experiments as separate follow-ups. Driver-specific experiments stay opt-in until validated on Adreno X1-85. Owner testing is a few minutes of ordinary gameplay. No merge, tag or release is authorized.
+
+## Preserved release and qualification history
 
 **[v0.3.0 — Native Vulkan Release is published](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.3.0)**
 from `2f29a8963078dadbe4e5031791a6390098e4635d`, with exact-source x64/native ARM64 packages,
@@ -96,9 +94,9 @@ and [retained owner procedure](../tests/pyrowave/vulkan/STAGE5-OWNER-TEST.md).
 Stage 2/3/4 historical qualification remains unchanged. Native success did not
 exercise legacy GPU/CPU-I420 fallback or prove physical device-loss recovery.
 
-## Next phase: controlled performance qualification and v1.0 polish
+## Historical planning: controlled performance qualification and v1.0 polish
 
-Planning only; implementation and optimization require separate work:
+This earlier planning record is preserved. Current targeted Phase 2 work is described above; Phase 1B remains paused:
 
 - Repeat matched native-versus-old-fallback benchmarks on Surface Pro 11 with
   the same resolution, frame rate, bitrate and workload; record which fallback
