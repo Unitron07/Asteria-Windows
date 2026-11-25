@@ -19,14 +19,14 @@ function Assert-Rejected([scriptblock]$Action, [string]$Message) {
 
 # A synthetic revision with the exact same tree proves the SHA check is active.
 # This also works with Actions' shallow submodule checkout, without fetching history.
-$tree = git -C $fixture rev-parse '5d3c0ecca00c1bb3f587acb8060476edcf8e24aa^{tree}'
+$tree = git -C $fixture rev-parse '94c65fd364d17b223f00a8763c9a5d94a66cb8dd^{tree}'
 if ($LASTEXITCODE) { throw 'Reviewed tree unavailable' }
 $unexpected = git -C $fixture -c user.name=Fixture -c user.email=fixture@example.invalid commit-tree $tree -m 'Unexpected revision fixture'
 if ($LASTEXITCODE) { throw 'Cannot create unexpected revision fixture' }
 git -C $fixture checkout --quiet $unexpected
 if ($LASTEXITCODE) { throw 'Unexpected revision fixture unavailable' }
 Assert-Rejected { & "$PSScriptRoot/apply-common-c-p1a.ps1" -SourceRoot $scratch } 'Unexpected common-c gitlink'
-git -C $fixture checkout --quiet 5d3c0ecca00c1bb3f587acb8060476edcf8e24aa
+git -C $fixture checkout --quiet 94c65fd364d17b223f00a8763c9a5d94a66cb8dd
 if ($LASTEXITCODE) { throw 'New revision fixture unavailable' }
 & "$PSScriptRoot/apply-common-c-p1a.ps1" -SourceRoot $scratch
 $before = git -C $fixture diff

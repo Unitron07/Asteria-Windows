@@ -3,7 +3,7 @@
 #include "common_c_test_env.h"
 
 SOCKADDR_LEN AddrLen = sizeof(struct sockaddr_in);
-volatile bool ConnectionInterrupted;
+atomic_bool ConnectionInterrupted;
 bool ReferenceFrameInvalidationSupported;
 uint16_t AudioPortNumber, ControlPortNumber;
 SS_PING AudioPingPayload, VideoPingPayload;
@@ -38,7 +38,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage* addr, SOCKADDR_LEN len, unsigne
 void closeSocket(SOCKET socket) { (void)socket; CHECK(openSockets == 1); --openSockets; }
 int enableNoDelay(SOCKET socket) { (void)socket; return 0; }
 int pollSockets(struct pollfd* fds, int count, int timeout) { (void)fds; (void)count; (void)timeout; return 1; }
-void PltSleepMs(int ms) { (void)ms; CHECK(false); }
+void PltSleepMs(uint32_t ms) { (void)ms; CHECK(false); }
 int notifyAudioPortNegotiationComplete(void) { return 0; }
 void* extendBuffer(void* ptr, size_t size) { void* p = realloc(ptr, size); CHECK(p); return p; }
 
@@ -73,13 +73,14 @@ int sendMtuSafe(SOCKET socket, char* buffer, int size) {
     return size;
 }
 
-PPLT_CRYPTO_CONTEXT PltCreateCryptoContext(void) { ++cryptoContexts; return calloc(1, sizeof(PLT_CRYPTO_CONTEXT)); }
+PPLT_CRYPTO_CONTEXT PltCreateCryptoContext(unsigned char replayWindowCount) { (void)replayWindowCount; ++cryptoContexts; return calloc(1, sizeof(PLT_CRYPTO_CONTEXT)); }
 void PltDestroyCryptoContext(PPLT_CRYPTO_CONTEXT ctx) { CHECK(ctx); --cryptoContexts; free(ctx); }
 bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
     unsigned char* key, int keyLength, unsigned char* iv, int ivLength,
     unsigned char* tag, int tagLength, unsigned char* input, int inputLength,
     unsigned char* output, int* outputLength) { CHECK(false); return false; }
 bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
+    unsigned char replayWindowIndex, unsigned int sequenceNumber,
     unsigned char* key, int keyLength, unsigned char* iv, int ivLength,
     unsigned char* tag, int tagLength, unsigned char* input, int inputLength,
     unsigned char* output, int* outputLength) { CHECK(false); return false; }

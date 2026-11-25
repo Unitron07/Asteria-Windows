@@ -16,6 +16,8 @@ static void announce(int format, const char* bitstream, int hevc) {
     CHECK(strstr(sdp, bitstream) != NULL);
     CHECK(strstr(sdp, "a=x-nv-video[0].dynamicRangeMode:0 \r\n") != NULL);
     CHECK(strstr(sdp, "a=x-ss-video[0].chromaSamplingType:0 \r\n") != NULL);
+    // Asteria does not opt into CAPABILITY_INTRA_REFRESH (common-c 0d92c94).
+    CHECK(strstr(sdp, "a=x-ss-video[0].intraRefresh:0 \r\n") != NULL);
     CHECK(strstr(sdp, "pyrowave.features") == NULL && strstr(sdp, "adaptiveFec") == NULL);
     if (hevc >= 0)
         CHECK(strstr(sdp, hevc ? "a=x-nv-clientSupportHevc:1 \r\n" :

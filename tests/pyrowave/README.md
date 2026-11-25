@@ -19,7 +19,7 @@ rejection. The handshake fixture does not test real sockets, encryption or pairi
 The input text suite runs production UTF-8 packing and legacy pacing against a fake
 control stream, so host text handling still needs a live check.
 Run `./scripts/test-common-c-p1a.ps1` for SHA, idempotence and patched-source/archive
-guards. See [the 5d3c0ec review](../../docs/COMMON_C_5D3C0EC.md).
+guards. See [the 94c65fd review](../../docs/COMMON_C_94C65FD.md).
 
 Runtime policy tests inject a mock C API/Vulkan-property module on both targets,
 cover preferred fragment/compute GPU modes independently of vendor IDs, nonfatal
