@@ -5,7 +5,7 @@ $SourceRoot = (Resolve-Path -LiteralPath $SourceRoot).Path
 $checkout = Join-Path $SourceRoot 'moonlight-common-c/moonlight-common-c'
 $patch = Join-Path $SourceRoot 'scripts/pyrowave/common-c-p1a.patch'
 $revision = git -C $checkout rev-parse HEAD
-if ($LASTEXITCODE -or $revision -cne '5d3c0ecca00c1bb3f587acb8060476edcf8e24aa') {
+if ($LASTEXITCODE -or $revision -cne '94c65fd364d17b223f00a8763c9a5d94a66cb8dd') {
     throw 'Unexpected common-c gitlink; initialize the pinned submodule before applying P1a'
 }
 git -C $checkout apply --reverse --check $patch 2>$null

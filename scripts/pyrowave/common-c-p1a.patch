@@ -1,10 +1,10 @@
-# Asteria P1a base: 5d3c0ecca00c1bb3f587acb8060476edcf8e24aa
-# Reviewed aeba988..5d3c0ec: input batching and UTF-8 delivery, ENet disconnect scope, control encryption, nanors.
-# The five PyroWave source files are unchanged upstream; protocol hunks are retained.
-# Review and regression coverage: docs/COMMON_C_5D3C0EC.md
+# Asteria P1a base: 94c65fd364d17b223f00a8763c9a5d94a66cb8dd
+# Reviewed 5d3c0ec..94c65fd: C11 atomics, replay-checked RTSP/control decryption, bounded frame reassembly, intra refresh SDP, STUN, ENet.
+# The five P1a hunks are semantically unchanged; only context offsets and index lines moved.
+# Review and regression coverage: docs/COMMON_C_94C65FD.md
 
 diff --git a/src/Limelight.h b/src/Limelight.h
-index 22bee469ad8f8a95e2b0c75db2a7414bf26a7e51..61c20c74ffff647b55ea768bd9b04f2a14b8fd7a 100644
+index 552d54ad41818805d2cfd96511b4cc6f75a0e2da..b5b9dfc9fdbfd0133fd96fe8565faeb3e7fad840 100644
 --- a/src/Limelight.h
 +++ b/src/Limelight.h
 @@ -234,6 +234,15 @@ typedef struct _DECODE_UNIT {
@@ -23,7 +23,7 @@ index 22bee469ad8f8a95e2b0c75db2a7414bf26a7e51..61c20c74ffff647b55ea768bd9b04f2a
  #define VIDEO_FORMAT_MASK_H264   0x000F
  #define VIDEO_FORMAT_MASK_H265   0x0F00
  #define VIDEO_FORMAT_MASK_AV1    0xF000
-@@ -514,6 +523,13 @@ void LiInitializeConnectionCallbacks(PCONNECTION_LISTENER_CALLBACKS clCallbacks)
+@@ -518,6 +527,13 @@ void LiInitializeConnectionCallbacks(PCONNECTION_LISTENER_CALLBACKS clCallbacks)
  #define SCM_AV1_HIGH8_444   0x00200000 // Sunshine extension
  #define SCM_AV1_HIGH10_444  0x00400000 // Sunshine extension
  
@@ -101,7 +101,7 @@ index 0000000000000000000000000000000000000000..9e8c744ad86d9ae03e225d3ac74e8777
 +    return 0;
 +}
 diff --git a/src/RtspConnection.c b/src/RtspConnection.c
-index e95810165b5ba52f572e39366c9a71f398f62d8c..45e4a7f0372c87525d5953662ffe53c4e1cce433 100644
+index 33b1d431aeafeb206eb34792902fc937bf2b3079..8c92d6548d3a1695f3fef6f20a711b45230584d6 100644
 --- a/src/RtspConnection.c
 +++ b/src/RtspConnection.c
 @@ -1,4 +1,5 @@
@@ -110,7 +110,7 @@ index e95810165b5ba52f572e39366c9a71f398f62d8c..45e4a7f0372c87525d5953662ffe53c4
  #include "Rtsp.h"
  
  #define RTSP_CONNECT_TIMEOUT_SEC 10
-@@ -1087,7 +1088,22 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
+@@ -1088,7 +1089,22 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
              goto Exit;
          }
  
@@ -135,10 +135,10 @@ index e95810165b5ba52f572e39366c9a71f398f62d8c..45e4a7f0372c87525d5953662ffe53c4
                  NegotiatedVideoFormat = VIDEO_FORMAT_AV1_HIGH10_444;
              }
 diff --git a/src/SdpGenerator.c b/src/SdpGenerator.c
-index 22467c06e060001612acfd9f088789fcc24114b6..318b907abc8289293cd492c37109bd8c1b8e4db6 100644
+index 5ea5cbbed35bf499b3b453d451c440c626a39ea1..9a2fcdae1b0d49a32a75f14d7396230a467f3b8c 100644
 --- a/src/SdpGenerator.c
 +++ b/src/SdpGenerator.c
-@@ -431,7 +431,11 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
+@@ -438,7 +438,11 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
          snprintf(payloadStr, sizeof(payloadStr), "%d", slicesPerFrame);
          err |= addAttributeString(&optionHead, "x-nv-video[0].videoEncoderSlicesPerFrame", payloadStr);
  
@@ -152,10 +152,10 @@ index 22467c06e060001612acfd9f088789fcc24114b6..318b907abc8289293cd492c37109bd8c
          }
          else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
 diff --git a/src/VideoDepacketizer.c b/src/VideoDepacketizer.c
-index 5baa1d5d3d6662d17edb4cfc92d179dddf4ceb21..b33ef6f74a20ce9ede878430a76c397a1ec01d96 100644
+index 69ec1dbc2e5ccf0e6c2ee4c47a74d5a80bf686f6..f51bd2c72b16dd56fb7e6cc10a1cc3ff1ad414db 100644
 --- a/src/VideoDepacketizer.c
 +++ b/src/VideoDepacketizer.c
-@@ -215,8 +215,8 @@ void validateDecodeUnitForPlayback(PDECODE_UNIT decodeUnit) {
+@@ -248,8 +248,8 @@ void validateDecodeUnitForPlayback(PDECODE_UNIT decodeUnit) {
              LC_ASSERT_VT(decodeUnit->bufferList->next->next->bufferType == BUFFER_TYPE_PPS);
              LC_ASSERT_VT(decodeUnit->bufferList->next->next->next != NULL);
          }

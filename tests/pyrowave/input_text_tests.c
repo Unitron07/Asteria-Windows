@@ -17,7 +17,7 @@ static int sentCount, flushCalls, sleptMs;
 static ThreadEntry threadEntry;
 static void* threadContext;
 
-int sendInputPacketOnControlStream(unsigned char* data, int length, uint8_t channelId, uint32_t flags, bool moreData) {
+int sendInputPacketOnControlStream(unsigned char* data, unsigned int length, uint8_t channelId, uint32_t flags, bool moreData) {
     NV_INPUT_HEADER header;
     memcpy(&header, data, sizeof(header));
     // The enable-haptics packet from startInputStream() is not text.
@@ -26,7 +26,7 @@ int sendInputPacketOnControlStream(unsigned char* data, int length, uint8_t chan
     uint32_t size = BE32(header.size) - sizeof(uint32_t);
     CHECK(sentCount < MAX_SENT_PACKETS);
     CHECK(size <= UTF8_TEXT_EVENT_MAX_COUNT);
-    CHECK((uint32_t)length == sizeof(header) + size);
+    CHECK(length == sizeof(header) + size);
     memcpy(sent[sentCount].text, data + sizeof(header), size);
     sent[sentCount].size = size;
     sent[sentCount].flags = flags;
@@ -43,6 +43,7 @@ void PltWaitForConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex) { (void)cond;
 int PltCreateConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex) { (void)cond; (void)mutex; return 0; }
 void PltDeleteConditionVariable(PLT_COND* cond) { (void)cond; }
 void PltSignalConditionVariable(PLT_COND* cond) { (void)cond; }
+void PltBroadcastConditionVariable(PLT_COND* cond) { (void)cond; }
 int PltCreateMutex(PLT_MUTEX* mutex) { (void)mutex; return 0; }
 void PltDeleteMutex(PLT_MUTEX* mutex) { (void)mutex; }
 void PltLockMutex(PLT_MUTEX* mutex) { (void)mutex; }
@@ -57,10 +58,10 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
 }
 void PltJoinThread(PLT_THREAD* thread) { (void)thread; threadEntry(threadContext); }
 bool PltIsThreadInterrupted(PLT_THREAD* thread) { (void)thread; return false; }
-void PltSleepMs(int ms) { sleptMs += ms; }
+void PltSleepMs(uint32_t ms) { sleptMs += (int)ms; }
 uint64_t PltGetMillis(void) { return 0; }
 
-PPLT_CRYPTO_CONTEXT PltCreateCryptoContext(void) { return NULL; }
+PPLT_CRYPTO_CONTEXT PltCreateCryptoContext(unsigned char replayWindowCount) { (void)replayWindowCount; return NULL; }
 void PltDestroyCryptoContext(PPLT_CRYPTO_CONTEXT ctx) { (void)ctx; }
 bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
                        unsigned char* key, int keyLength,
