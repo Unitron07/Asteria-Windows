@@ -293,6 +293,28 @@ private slots:
         QCOMPARE(prefs->bitrateKbps,708000); QCOMPARE(slider->property("value").toInt(),708000);
         QVERIFY(reset->property("text").toString().contains("708"));
         QVERIFY(!reset->property("visible").toBool());
+        // Typed bitrate entry: exact values, clamping, rejection and slider sync.
+        auto field=expression("bitrateField").value<QObject*>(); QVERIFY(field);
+        QCOMPARE(field->property("text").toString(),QString("708"));
+        field->setProperty("text","1234.5"); QVERIFY(QMetaObject::invokeMethod(field,"editingFinished"));
+        QCOMPARE(prefs->bitrateKbps,1234500); QVERIFY(!prefs->autoAdjustBitrate);
+        QCOMPARE(slider->property("value").toInt(),1234500);
+        QCOMPARE(field->property("text").toString(),QString("1234.5"));
+        field->setProperty("text","850,25"); QVERIFY(QMetaObject::invokeMethod(field,"editingFinished"));
+        QCOMPARE(prefs->bitrateKbps,850250);
+        field->setProperty("text","99999"); QVERIFY(QMetaObject::invokeMethod(field,"editingFinished"));
+        QCOMPARE(prefs->bitrateKbps,3000000); QCOMPARE(field->property("text").toString(),QString("3000"));
+        field->setProperty("text","0"); QVERIFY(QMetaObject::invokeMethod(field,"editingFinished"));
+        QCOMPARE(prefs->bitrateKbps,500); QCOMPARE(field->property("text").toString(),QString("0.5"));
+        field->setProperty("text","fast"); QVERIFY(QMetaObject::invokeMethod(field,"editingFinished"));
+        QCOMPARE(prefs->bitrateKbps,500); QCOMPARE(field->property("text").toString(),QString("0.5"));
+        slider->setProperty("value",250000); QVERIFY(QMetaObject::invokeMethod(slider,"moved"));
+        QCOMPARE(prefs->bitrateKbps,250000); QCOMPARE(field->property("text").toString(),QString("250"));
+        QVERIFY(QMetaObject::invokeMethod(reset,"clicked"));
+        QVERIFY(prefs->autoAdjustBitrate); QCOMPARE(field->property("text").toString(),QString("708"));
+        // Typing the current automatic value keeps automatic mode.
+        field->setProperty("text","708"); QVERIFY(QMetaObject::invokeMethod(field,"editingFinished"));
+        QVERIFY(prefs->autoAdjustBitrate);
         // Use the actual tab focus chain and responsive Flow at both sizes.
         auto resolution=qobject_cast<QQuickItem*>(expression("resolutionComboBox").value<QObject*>()); QVERIFY(resolution);
         resolution->forceActiveFocus(Qt::TabFocusReason); QTest::keyClick(&view,Qt::Key_Tab);

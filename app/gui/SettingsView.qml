@@ -703,12 +703,66 @@ Flickable {
                     }
                 }
 
-                Label {
+                Row {
                     width: parent.width
-                    id: bitrateTitle
-                    text: qsTr("Video bitrate:")
-                    font.pointSize: 12
-                    wrapMode: Text.Wrap
+                    spacing: 5
+
+                    Label {
+                        id: bitrateTitle
+                        text: qsTr("Video bitrate:")
+                        font.pointSize: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    // Exact entry alongside the slider. Applies on Enter or focus loss;
+                    // Escape restores the current value.
+                    TextField {
+                        id: bitrateField
+
+                        function format(kbps) {
+                            return (kbps / 1000.0).toString()
+                        }
+
+                        function commit() {
+                            var input = text.trim().replace(",", ".")
+                            var mbps = Number(input)
+                            if (input !== "" && isFinite(mbps)) {
+                                var kbps = Math.max(500, Math.min(Math.round(mbps * 1000),
+                                                                  StreamingPreferences.maximumBitrateKbps))
+                                if (kbps !== StreamingPreferences.bitrateKbps) {
+                                    StreamingPreferences.autoAdjustBitrate = false
+                                    StreamingPreferences.bitrateKbps = kbps
+                                }
+                            }
+                            text = format(StreamingPreferences.bitrateKbps)
+                        }
+
+                        width: 90
+                        font.pointSize: 12
+                        horizontalAlignment: TextInput.AlignRight
+                        maximumLength: 8
+                        inputMethodHints: Qt.ImhFormattedNumbersOnly
+                        selectByMouse: true
+                        text: format(StreamingPreferences.bitrateKbps)
+                        Accessible.name: qsTr("Video bitrate in Mbps")
+
+                        onEditingFinished: commit()
+                        onActiveFocusChanged: {
+                            if (activeFocus) {
+                                selectAll()
+                            }
+                        }
+                        Keys.onEscapePressed: {
+                            text = format(StreamingPreferences.bitrateKbps)
+                            focus = false
+                        }
+                    }
+
+                    Label {
+                        text: qsTr("Mbps")
+                        font.pointSize: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
                 }
 
                 Label {
@@ -738,7 +792,10 @@ Flickable {
                         width: Math.min(bitrateDesc.implicitWidth, parent.width - (resetBitrateButton.visible ? resetBitrateButton.width + parent.spacing : 0))
 
                         onValueChanged: {
-                            bitrateTitle.text = qsTr("Video bitrate: %1 Mbps").arg(value / 1000.0)
+                            // Don't overwrite a value the user is still typing.
+                            if (!bitrateField.activeFocus) {
+                                bitrateField.text = bitrateField.format(value)
+                            }
                         }
 
                         onMoved: {
