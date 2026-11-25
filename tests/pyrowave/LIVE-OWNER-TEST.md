@@ -33,7 +33,7 @@ Use the included `pyrowave/` directory intact; do not copy a different codec DLL
    60 FPS, default packet size, and record the configured bitrate. PyroWave
    needs substantially more bandwidth than conventional codecs. Use Default
    suggests 1.6 bits/pixel/frame, rounded to 0.5 Mbps (about 708 Mbps for
-   2560x1440/120). The PyroWave ceiling is 3000 Mbps; standard codecs use
+   2560x1440/120), capped at 800 Mbps. The manual PyroWave ceiling is 3000 Mbps; standard codecs use
    500 Mbps. A manual slider move disables automatic bitrate updates; resolution
    and FPS changes preserve it, and selecting a lower-cap codec clamps only an
    out-of-range value. Use Default re-enables automatic updates. No bandwidth

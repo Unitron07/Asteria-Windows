@@ -78,6 +78,11 @@ QString PyroWaveVideoDecoder::getError() {
     return m_Error;
 }
 
+bool PyroWaveVideoDecoder::hasDecodedFrame() {
+    std::lock_guard<std::mutex> guard(m_Mutex);
+    return !m_FirstFrame;
+}
+
 bool PyroWaveVideoDecoder::fail(const QString& reason) {
     std::lock_guard<std::mutex> guard(m_Mutex);
     if (!m_Failed) {

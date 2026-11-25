@@ -37,6 +37,9 @@ public:
     };
     Q_ENUM(VideoCodecConfig)
 
+    // Automatic PyroWave bitrate never exceeds this; manual values may (see #64).
+    static constexpr int kPyroWaveAutoBitrateCapKbps = 800000;
+
     Q_INVOKABLE static int getMaximumBitrate(VideoCodecConfig codec);
     Q_INVOKABLE static int getDefaultBitrateForCodec(int width, int height, int fps,
                                                     bool yuv444, VideoCodecConfig codec);

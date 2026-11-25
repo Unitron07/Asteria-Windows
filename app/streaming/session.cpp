@@ -186,6 +186,16 @@ void Session::clRumble(unsigned short controllerNumber, unsigned short lowFreqMo
     SDL_PushEvent(&rumbleEvent);
 }
 
+// PyroWave defaults to very high bitrates, so loss usually means the link cannot
+// carry the configured rate. Name the rate and the fix instead of a generic warning.
+static QByteArray pyroWaveBitrateHint(const char* headline, int bitrateKbps)
+{
+    return QStringLiteral("%1\nPyroWave at %2 Mbps may exceed your network\nLower the bitrate in Settings")
+            .arg(QString::fromUtf8(headline))
+            .arg(bitrateKbps / 1000.0)
+            .toUtf8();
+}
+
 void Session::clConnectionStatusUpdate(int connectionStatus)
 {
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
@@ -204,9 +214,16 @@ void Session::clConnectionStatusUpdate(int connectionStatus)
     switch (connectionStatus)
     {
     case CONN_STATUS_POOR:
-        s_ActiveSession->m_OverlayManager.updateOverlayText(Overlay::OverlayStatusUpdate,
-                                                            s_ActiveSession->m_StreamConfig.bitrate > 5000 ?
-                                                                "Slow connection to PC\nReduce your bitrate" : "Poor connection to PC");
+        if (s_ActiveSession->m_StreamConfig.supportedVideoFormats == VIDEO_FORMAT_PYROWAVE) {
+            s_ActiveSession->m_OverlayManager.updateOverlayText(
+                        Overlay::OverlayStatusUpdate,
+                        pyroWaveBitrateHint("Slow connection to PC", s_ActiveSession->m_StreamConfig.bitrate).constData());
+        }
+        else {
+            s_ActiveSession->m_OverlayManager.updateOverlayText(Overlay::OverlayStatusUpdate,
+                                                                s_ActiveSession->m_StreamConfig.bitrate > 5000 ?
+                                                                    "Slow connection to PC\nReduce your bitrate" : "Poor connection to PC");
+        }
         s_ActiveSession->m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, true);
         break;
     case CONN_STATUS_OKAY:
@@ -2101,6 +2118,15 @@ void Session::exec()
     // Toggle the stats overlay if requested by the user
     m_OverlayManager.setOverlayState(Overlay::OverlayDebug, m_Preferences->showPerformanceOverlay);
 
+    // A PyroWave stream that has shown nothing after a few seconds is almost always
+    // a link that cannot sustain the bitrate (see #64). Arm a one-shot check.
+    m_PyroWaveFirstFrameDeadline = 0;
+    m_PyroWaveNoFrameHintShown = false;
+    if (m_ActiveVideoFormat == VIDEO_FORMAT_PYROWAVE) {
+        m_PyroWaveFirstFrameDeadline = SDL_GetTicks() + 5000;
+        if (m_PyroWaveFirstFrameDeadline == 0) m_PyroWaveFirstFrameDeadline = 1;
+    }
+
     // Switch to async logging mode when we enter the SDL loop
     StreamUtils::enterAsyncLoggingMode();
 
@@ -2116,6 +2142,32 @@ void Session::exec()
                 m_UnexpectedTermination = true;
                 emit displayLaunchError(tr("PyroWave stream failed: %1. Select a standard codec and reconnect.").arg(error));
                 goto DispatchDeferredCleanup;
+            }
+            // The loop wakes at least once per second, so this fires within ~1 s of the deadline.
+            if (m_PyroWaveFirstFrameDeadline != 0 &&
+                    SDL_TICKS_PASSED(SDL_GetTicks(), m_PyroWaveFirstFrameDeadline)) {
+                m_PyroWaveFirstFrameDeadline = 0;
+                if (!static_cast<PyroWaveVideoDecoder*>(m_VideoDecoder)->hasDecodedFrame()) {
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                                "No PyroWave frame decoded 5 s after stream start at %d kbps; "
+                                "the network likely cannot sustain this bitrate",
+                                m_StreamConfig.bitrate);
+                    if (m_Preferences->connectionWarnings && m_MouseEmulationRefCount == 0) {
+                        m_OverlayManager.updateOverlayText(
+                                    Overlay::OverlayStatusUpdate,
+                                    pyroWaveBitrateHint("No video from PC yet", m_StreamConfig.bitrate).constData());
+                        m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, true);
+                        m_PyroWaveNoFrameHintShown = true;
+                    }
+                }
+            }
+            // Withdraw the hint once video finally arrives (e.g. after the host adapts).
+            else if (m_PyroWaveNoFrameHintShown &&
+                     static_cast<PyroWaveVideoDecoder*>(m_VideoDecoder)->hasDecodedFrame()) {
+                m_PyroWaveNoFrameHintShown = false;
+                if (m_MouseEmulationRefCount == 0) {
+                    m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, false);
+                }
             }
         }
 #if SDL_VERSION_ATLEAST(2, 0, 18) && !defined(STEAM_LINK)

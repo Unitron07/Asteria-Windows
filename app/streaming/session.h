@@ -296,6 +296,9 @@ private:
     int m_PortTestResults;
 
     int m_ActiveVideoFormat;
+    // SDL tick at which to check that PyroWave produced a frame; 0 when not armed.
+    Uint32 m_PyroWaveFirstFrameDeadline = 0;
+    bool m_PyroWaveNoFrameHintShown = false;
     int m_ActiveVideoWidth;
     int m_ActiveVideoHeight;
     int m_ActiveVideoFrameRate;

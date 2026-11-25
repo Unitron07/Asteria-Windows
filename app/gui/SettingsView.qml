@@ -714,7 +714,9 @@ Flickable {
                 Label {
                     width: parent.width
                     id: bitrateDesc
-                    text: qsTr("Lower the bitrate on slower connections. Raise the bitrate to increase image quality.")
+                    text: StreamingPreferences.videoCodecConfig === StreamingPreferences.VCC_FORCE_PYROWAVE ?
+                              qsTr("PyroWave needs high bitrates on a fast wired link. The default stops at 800 Mbps; raise it manually if your network can sustain more, or lower it if the stream stays black or stutters.") :
+                              qsTr("Lower the bitrate on slower connections. Raise the bitrate to increase image quality.")
                     font.pointSize: 9
                     wrapMode: Text.Wrap
                 }

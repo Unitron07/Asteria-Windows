@@ -33,6 +33,8 @@ public:
     bool usesNativeVulkan() const { return bool(m_Native); }
     void notifyNativeWindowEvent();
     void abortNative(const QString& reason) { if(m_Native) fail(reason); }
+    // True once any decode unit was accepted and decoded in this decoder's lifetime.
+    bool hasDecodedFrame();
 
 private:
     friend struct PyroWavePerformanceExportTest;
