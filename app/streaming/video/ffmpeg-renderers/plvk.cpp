@@ -2,6 +2,7 @@
 
 #include "streaming/session.h"
 #include "streaming/streamutils.h"
+#include "utils.h"
 
 // Implementation in plvk_c.c
 #define PL_LIBAV_IMPLEMENTATION 0
@@ -185,6 +186,7 @@ PlVkRenderer::~PlVkRenderer()
 #ifdef Q_OS_DARWIN
         m_MetalTextureFactory.reset();
 #endif
+        av_buffer_unref(&m_HwDeviceCtx);
         pl_vulkan_destroy(&m_Vulkan);
 
         // This surface was created by SDL, so there's no libplacebo API to destroy it
@@ -192,7 +194,6 @@ PlVkRenderer::~PlVkRenderer()
             fn_vkDestroySurfaceKHR(m_PlVkInstance->instance, m_VkSurface, nullptr);
         }
 
-        av_buffer_unref(&m_HwDeviceCtx);
         pl_vk_inst_destroy(&m_PlVkInstance);
     }
 
@@ -374,6 +375,41 @@ bool PlVkRenderer::tryInitializeDevice(VkPhysicalDevice device, VkPhysicalDevice
 #endif
         vkParams.extra_queues = VK_QUEUE_FLAG_BITS_MAX_ENUM;
     }
+
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(60, 31, 101) && defined(VK_KHR_internally_synchronized_queues)
+    // libplacebo needs explicit opt-in to use internally synchronized queues, since
+    // it requires cooperation with the app (ex: using vkGetDeviceQueue2). We know
+    // FFmpeg 9.0+ always wants internally synchronized queues if available, so we
+    // will turn it on when supported by the physical device.
+    if (isExtensionSupportedByPhysicalDevice(device, "VK_KHR_internally_synchronized_queues")) {
+        bool internallySynchronizedQueues;
+        if (!Utils::getEnvironmentVariableOverride("PLVK_INT_SYNC_QUEUES", &internallySynchronizedQueues)) {
+#if LIBAVUTIL_VERSION_MAJOR < 62
+            // The Gamescope WSI layer currently breaks apps using internally synchronized queues
+            // (failing to use vkGetDeviceQueue2), so we disable this feature when the Gamescope
+            // WSI layer is enabled. See gamescope#2261 for details.
+            internallySynchronizedQueues = (qEnvironmentVariableIntValue("ENABLE_GAMESCOPE_WSI") == 0 ||
+                                            qEnvironmentVariableIntValue("DISABLE_GAMESCOPE_WSI") == 1);
+#else
+            // We have no choice but to enable it since the queue locking callbacks are gone
+            internallySynchronizedQueues = true;
+#endif
+        }
+
+        static VkPhysicalDeviceInternallySynchronizedQueuesFeaturesKHR featInternalSyncQueues = {
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INTERNALLY_SYNCHRONIZED_QUEUES_FEATURES_KHR,
+            nullptr,
+            internallySynchronizedQueues,
+        };
+
+        static const VkPhysicalDeviceFeatures2 features = {
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+            (void*)&featInternalSyncQueues,
+        };
+
+        vkParams.features = &features;
+    }
+#endif
 
     {
         // Don't let Qt take DRM master from us during pl_vulkan_create()
@@ -590,7 +626,9 @@ bool PlVkRenderer::initialize(PDECODER_PARAMETERS params)
 #endif
 
         // Populate the device queues for decoding this video format
-        populateQueues(params->videoFormat);
+        if (!populateQueues(params->videoFormat)) {
+            return false;
+        }
 
         int err = av_hwdevice_ctx_init(m_HwDeviceCtx);
         if (err < 0) {
@@ -753,13 +791,14 @@ bool PlVkRenderer::populateQueues(int videoFormat)
 #if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(59, 34, 100)
     Q_UNUSED(videoFormat);
 
-    for (uint32_t i = 0; i < queueFamilyCount; i++) {
+    uint32_t maxQf = SDL_min(queueFamilyCount, (uint32_t)SDL_arraysize(vkDeviceContext->qf));
+    for (uint32_t i = 0; i < maxQf; i++) {
         vkDeviceContext->qf[i].idx = i;
         vkDeviceContext->qf[i].num = queueFamilies[i].queueFamilyProperties.queueCount;
         vkDeviceContext->qf[i].flags = (VkQueueFlagBits)queueFamilies[i].queueFamilyProperties.queueFlags;
         vkDeviceContext->qf[i].video_caps = (VkVideoCodecOperationFlagBitsKHR)queueFamilyVideoProps[i].videoCodecOperations;
     }
-    vkDeviceContext->nb_qf = queueFamilyCount;
+    vkDeviceContext->nb_qf = maxQf;
 #else
     vkDeviceContext->queue_family_index = m_Vulkan->queue_graphics.index;
     vkDeviceContext->nb_graphics_queues = m_Vulkan->queue_graphics.count;
@@ -978,7 +1017,15 @@ void PlVkRenderer::renderFrame(AVFrame *frame)
     }
 
     if (!mapAvFrameToPlacebo(frame, &mappedFrame)) {
-        // This function logs internally
+        // Submit the pending swapchain frame so swapchain state stays consistent
+        m_HasPendingSwapchainFrame = false;
+        if (!pl_swapchain_submit_frame(m_Swapchain)) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "pl_swapchain_submit_frame() failed");
+            SDL_Event event;
+            event.type = SDL_RENDER_DEVICE_RESET;
+            SDL_PushEvent(&event);
+        }
         return;
     }
 
