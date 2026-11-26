@@ -1,11 +1,4 @@
 #define PYROWAVE_EXPORT_SYMBOLS
-#ifdef STAGE3_NO_BORROW
-// The no-borrow runtime must not export pyrowave_create_device. Leaving the
-// header's exported declaration undefined broke the ARM64 link on runner image
-// win11-vs2026-arm64 20261123 (LNK2001), so rename it and define a stub instead:
-// the DLL still has no "pyrowave_create_device" export for the runtime to find.
-#define pyrowave_create_device asteria_mock_no_borrow_create_device
-#endif
 #define VK_NO_PROTOTYPES
 #include <vulkan/vulkan_core.h>
 #include <pyrowave/pyrowave.h>
@@ -25,11 +18,6 @@ pyrowave_result pyrowave_create_default_device(pyrowave_device*) { ++defaultCall
 pyrowave_result pyrowave_create_device(const pyrowave_device_create_info* info,pyrowave_device* out) {
     if (mode==1) return PYROWAVE_ERROR_NO_VULKAN;
     borrowed=*info; *out=reinterpret_cast<pyrowave_device>(uintptr_t(10)); return PYROWAVE_SUCCESS;
-}
-#else
-// Exported only under the renamed symbol above; never reachable by name lookup.
-pyrowave_result pyrowave_create_device(const pyrowave_device_create_info*,pyrowave_device*) {
-    return PYROWAVE_ERROR_NO_VULKAN;
 }
 #endif
 void pyrowave_device_destroy(pyrowave_device) { ++destroyed; borrowed.queue_lock_callback(borrowed.userdata); borrowed.queue_unlock_callback(borrowed.userdata); }
