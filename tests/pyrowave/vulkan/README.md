@@ -149,5 +149,5 @@ is log-verified; Stage 4 independently qualified FULL and LIMITED. See the
 [evidence and limits](STAGE5.md#stage-5-owner-qualification-record) and
 [retained reproduction procedure](STAGE5-OWNER-TEST.md).
 Stage 2/3/4 remain historical qualified/offline boundaries. PyroWave remains
-Experimental; [controlled performance qualification and v1.0 polish](../../../docs/NEXT_STEP.md#next-phase-controlled-performance-qualification-and-v10-polish)
+Experimental; [controlled performance qualification and v1.0 polish](../../../docs/NEXT_STEP.md#planned-order)
 are next, with no release/graduation, MultiSeat or VR work authorized here.

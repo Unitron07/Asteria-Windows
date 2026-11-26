@@ -233,7 +233,7 @@ PyroWave Vulkan decode
       fallback and standard codecs on named x64/ARM64 hardware under matched conditions.
 
 **Next:** controlled matched native-versus-old-fallback benchmarks and v1.0
-UI/QoL/regression polish, as [planned](NEXT_STEP.md#next-phase-controlled-performance-qualification-and-v10-polish).
+UI/QoL/regression polish, as [planned](NEXT_STEP.md#planned-order).
 Separate CPU submission, GPU iDWT/Dequant and final scanout latency. The initial
 Surface sample is not a calibrated latency result or matched speedup. Validation
 remains SKIP; broader hardware, long-run performance and physical device-loss
