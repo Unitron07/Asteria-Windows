@@ -87,11 +87,15 @@ if(PYROWAVE_VULKAN_SHARED_DEVICE)
     endforeach()
     add_library(stage3-mock SHARED shared_mock.cpp)
     target_include_directories(stage3-mock PRIVATE ${VULKAN_HEADERS} ${PYROWAVE_ROOT}/include)
-    set_target_properties(stage3-mock PROPERTIES OUTPUT_NAME libpyrowave-shared-0 RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage3-mock)
+    # Same OUTPUT_NAME: keep each mock's import .lib/.exp apart too, or a parallel build
+    # can link one mock against the other's export file (LNK2001 pyrowave_create_device).
+    set_target_properties(stage3-mock PROPERTIES OUTPUT_NAME libpyrowave-shared-0 RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage3-mock
+        ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage3-mock)
     add_library(stage3-no-borrow SHARED shared_mock.cpp)
     target_include_directories(stage3-no-borrow PRIVATE ${VULKAN_HEADERS} ${PYROWAVE_ROOT}/include)
     target_compile_definitions(stage3-no-borrow PRIVATE STAGE3_NO_BORROW)
-    set_target_properties(stage3-no-borrow PROPERTIES OUTPUT_NAME libpyrowave-shared-0 RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage3-no-borrow)
+    set_target_properties(stage3-no-borrow PROPERTIES OUTPUT_NAME libpyrowave-shared-0 RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage3-no-borrow
+        ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/stage3-no-borrow)
     add_executable(pyrowave-vulkan-shared-runtime-tests shared_runtime_tests.cpp)
     target_link_libraries(pyrowave-vulkan-shared-runtime-tests PRIVATE stage3-runtime)
     add_test(NAME vulkan-shared-runtime-mocks COMMAND pyrowave-vulkan-shared-runtime-tests $<TARGET_FILE_DIR:stage3-mock> $<TARGET_FILE_DIR:stage3-no-borrow>)
