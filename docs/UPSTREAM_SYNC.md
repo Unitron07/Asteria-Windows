@@ -45,10 +45,29 @@ client builds, runtime/GPU and physical input qualification.
 ## Review and full qualification
 
 The built-in `GITHUB_TOKEN` needs contents, pull-request and issue write access;
-repository Actions settings must allow it to create PRs. No PAT is required.
-**Token-created PRs do not trigger ordinary PR workflows.** Manually dispatch
-`Windows baseline` and `Optional PyroWave P1a and offline regressions` selecting
-the proposal branch, and review both architecture results/packages before merging.
+repository Actions settings must allow it to create PRs. It can never push commits
+that change `.github/workflows/`, and upstream ranges sometimes do (for example
+`build-appimage.yml` in the `dc99771` range; see #73).
+
+### Optional `UPSTREAM_SYNC_TOKEN`
+
+When the repository secret `UPSTREAM_SYNC_TOKEN` exists, the workflow uses it for
+checkout, push and GitHub API calls instead of `GITHUB_TOKEN`. Create a
+**fine-grained personal access token** limited to this repository with read and
+write access to **Contents**, **Workflows**, **Pull requests** and **Issues**, then
+add it under *Settings → Secrets and variables → Actions*. Give it an expiry and
+rotate it; an expired secret fails the push the same way as no secret.
+
+Without the secret, the job behaves as before. If GitHub rejects the push, the
+maintenance issue now records the rejection and these setup steps instead of the
+job ending silently. A maintainer can also push the validated merge manually to a
+`sync/moonlight-<sha>` branch and open the PR.
+
+**`GITHUB_TOKEN`-created PRs do not trigger ordinary PR workflows.** In that case,
+manually dispatch `Windows baseline` and `Optional PyroWave P1a and offline
+regressions` selecting the proposal branch. PRs opened with `UPSTREAM_SYNC_TOKEN`
+trigger them normally; the proposal body says which applies. Review both
+architecture results/packages before merging.
 Weekly checks do not substitute for settings UI, input or live hardware tests. The Windows baseline also runs a focused keyboard harness using production mapping/state expressions (Enter/Numpad Enter, extended keys, non-normalized keys and release-state encoding); it does not qualify physical event delivery or OS capture.
 
 Review overlapping Asteria behavior intentionally: branding/application identity,
@@ -59,7 +78,8 @@ upstream dependency change requires it. Never auto-merge. Preserve merge history
 when accepting the PR (use a merge commit rather than squash/rebase).
 
 Local workflow tests: `python -m unittest discover -s tests/upstream -v`.
-They cover no-change exit, actual clean two-parent merge, conflict abort and
-create-versus-update PR routing. They do not live-test scheduled GitHub behavior.
+They cover no-change exit, actual clean two-parent merge, conflict abort,
+create-versus-update PR routing, reporting a rejected workflow push (with and
+without the token hint) and token-dependent CI guidance. They do not live-test scheduled GitHub behavior.
 
 [Asteria v0.2.0](https://github.com/Unitron07/Asteria-Windows/releases/tag/v0.2.0) is released. This upstream-tracking workflow only proposes reviewed maintenance changes; it does not create releases, tags or release assets.

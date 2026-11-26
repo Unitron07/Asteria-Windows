@@ -129,6 +129,86 @@ class SyncTests(unittest.TestCase):
             self.assertEqual(validate.call_count, 1)
             self.assertEqual(publish.call_count, 2)
 
+    def proposal_fixture(self):
+        """A main branch with a recorded baseline, one upstream commit and a local bare origin."""
+        sync.git('switch', '-c', 'upstream')
+        self.change('upstream-feature', 'upstream\n')
+        new = sync.git('rev-parse', 'HEAD').stdout.strip()
+        sync.git('switch', 'main')
+        Path('.upstream').mkdir()
+        Path(sync.RECORD).write_text(json.dumps({'repository': 'moonlight-stream/moonlight-qt',
+                                              'branch': 'master', 'ref': 'v6.2.0', 'commit': self.base}))
+        sync.git('add', sync.RECORD)
+        sync.git('commit', '-m', 'Asteria baseline')
+        Path('build').mkdir()
+        sync.git('init', '--bare', 'build/origin.git')
+        sync.git('remote', 'add', 'origin', str(Path('build/origin.git').resolve()))
+        sync.git('update-ref', 'refs/remotes/moonlight/master', new)
+        return new
+
+    def run_with_push(self, push_result):
+        real_git = sync.git
+        def fake_git(*args, **kwargs):
+            if args[:2] == ('fetch', '--no-tags'):
+                return subprocess.CompletedProcess(args, 0, '', '')
+            if args[0] == 'push':
+                return push_result(args)
+            return real_git(*args, **kwargs)
+        with patch.object(sync, 'git', side_effect=fake_git), patch.object(sync, 'validate'), \
+                patch.object(sync, 'publish_pr') as publish, patch.object(sync, 'notice') as notice:
+            try:
+                sync.main()
+                error = None
+            except RuntimeError as exc:
+                error = exc
+        return error, publish, notice
+
+    def test_rejected_workflow_push_is_reported_with_token_setup(self):
+        # GitHub refuses GITHUB_TOKEN pushes that change workflows. That must reach the
+        # maintenance issue with the fix, not end the job silently (run 45724209525).
+        self.proposal_fixture()
+        rejection = ('To https://github.com/Unitron07/Asteria-Windows\n ! [remote rejected] HEAD -> '
+                     f'{sync.BRANCH} (refusing to allow a GitHub App to create or update workflow '
+                     '`.github/workflows/build-appimage.yml` without `workflows` permission)\n')
+        error, publish, notice = self.run_with_push(
+            lambda args: subprocess.CompletedProcess(args, 1, '', rejection))
+        self.assertIsInstance(error, RuntimeError)
+        publish.assert_not_called()
+        notice.assert_called_once()
+        reported = Path('build/upstream-notice.md').read_text(encoding='utf-8')
+        self.assertIn('Validation passed, but the proposal branch could not be pushed', reported)
+        self.assertIn('UPSTREAM_SYNC_TOKEN', reported)
+        self.assertIn('build-appimage.yml', reported)
+        self.assertEqual(Path('build/upstream-summary.md').read_text(encoding='utf-8'), reported)
+
+    def test_other_push_failure_is_reported_without_token_hint(self):
+        self.proposal_fixture()
+        error, publish, notice = self.run_with_push(
+            lambda args: subprocess.CompletedProcess(args, 1, '', 'stale info\n'))
+        self.assertIsInstance(error, RuntimeError)
+        publish.assert_not_called()
+        notice.assert_called_once()
+        reported = Path('build/upstream-notice.md').read_text(encoding='utf-8')
+        self.assertIn('stale info', reported)
+        self.assertNotIn('UPSTREAM_SYNC_TOKEN', reported)
+
+    def test_ci_guidance_follows_token_configuration(self):
+        self.proposal_fixture()
+        ok = lambda args: subprocess.CompletedProcess(args, 0, '', '')
+        with patch.dict(os.environ, {'UPSTREAM_SYNC_TOKEN_CONFIGURED': 'false'}):
+            error, publish, _ = self.run_with_push(ok)
+        self.assertIsNone(error)
+        publish.assert_called_once()
+        self.assertIn('manually dispatch', Path('build/upstream-notice.md').read_text(encoding='utf-8'))
+        sync.git('switch', 'main')
+        sync.git('branch', '-D', sync.BRANCH)
+        with patch.dict(os.environ, {'UPSTREAM_SYNC_TOKEN_CONFIGURED': 'true'}):
+            error, publish, _ = self.run_with_push(ok)
+        self.assertIsNone(error)
+        body = Path('build/upstream-notice.md').read_text(encoding='utf-8')
+        self.assertIn('Normal PR workflows run', body)
+        self.assertNotIn('manually dispatch', body)
+
 
 if __name__ == '__main__':
     unittest.main()

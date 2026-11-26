@@ -7,6 +7,22 @@ import subprocess
 BRANCH = 'automation/moonlight-upstream-sync'
 RECORD = '.upstream/moonlight.json'
 ISSUE_TITLE = 'maintenance: Moonlight upstream integration requires review'
+WORKFLOW_PUSH_HINT = (
+    'Upstream changed files under `.github/workflows/`. The default `GITHUB_TOKEN` can never '
+    'push workflow changes. Add a fine-grained token as the `UPSTREAM_SYNC_TOKEN` repository '
+    'secret (see `docs/UPSTREAM_SYNC.md`) and re-run this workflow, or push this merge '
+    'manually to a `sync/moonlight-<sha>` branch and open the PR yourself.\n\n')
+
+
+def token_configured():
+    return os.environ.get('UPSTREAM_SYNC_TOKEN_CONFIGURED', '').lower() == 'true'
+
+
+def push_rejection_notice(body, error):
+    """Report a validated proposal that GitHub refused to accept, instead of failing silently."""
+    hint = WORKFLOW_PUSH_HINT if 'workflow' in error and 'permission' in error else ''
+    return (body + 'Validation passed, but the proposal branch could not be pushed.\n\n'
+            + hint + f'```\n{error.strip()}\n```\n')
 
 
 def run(*args, check=True):
@@ -139,14 +155,22 @@ def main():
         notice(body_path)
         summary.write_text(body_path.read_text(encoding='utf-8'), encoding='utf-8')
         raise
+    ci = ('Normal PR workflows run on this proposal because it was opened with '
+          '`UPSTREAM_SYNC_TOKEN`.\n' if token_configured() else
+          'GITHUB_TOKEN PRs do not trigger normal PR workflows: manually dispatch the Windows '
+          'baseline and PyroWave workflows on this branch before merging.\n')
     body_path.write_text(body + 'Validation: diff whitespace, PowerShell preflight/package guards, '
                          'CMake configuration and GPU-free PyroWave regression tests passed.\n\n'
                          'Qt/qmake, settings UI, live input, runtime/GPU and full x64/ARM64 package '
-                         'qualification were not run by this weekly job. GITHUB_TOKEN PRs do not '
-                         'trigger normal PR workflows: manually dispatch the Windows baseline and '
-                         'PyroWave workflows on this branch before merging.\n', encoding='utf-8')
-    git('push', f'--force-with-lease=refs/heads/{BRANCH}:{remote_sha}', 'origin',
-        f'HEAD:refs/heads/{BRANCH}')
+                         'qualification were not run by this weekly job. ' + ci, encoding='utf-8')
+    pushed = git('push', f'--force-with-lease=refs/heads/{BRANCH}:{remote_sha}', 'origin',
+                 f'HEAD:refs/heads/{BRANCH}', check=False)
+    if pushed.returncode:
+        error = pushed.stderr + pushed.stdout
+        body_path.write_text(push_rejection_notice(body, error), encoding='utf-8')
+        notice(body_path)
+        summary.write_text(body_path.read_text(encoding='utf-8'), encoding='utf-8')
+        raise RuntimeError(f'git push failed ({pushed.returncode}):\n{error}')
     publish_pr(body_path)
     summary.write_text(body_path.read_text(encoding='utf-8'), encoding='utf-8')
 
