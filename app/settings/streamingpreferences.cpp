@@ -384,8 +384,11 @@ int StreamingPreferences::getDefaultBitrateForCodec(int width, int height, int f
     }
     // P1a SDR 8-bit 4:2:0: 1.6 bits per pixel per frame, rounded to 500 kbps.
     // Promote before multiplying to avoid integer overflow at high resolutions.
+    // The automatic value stops at kPyroWaveAutoBitrateCapKbps so that a default
+    // stream fits a Gigabit Ethernet link with FEC and burst headroom; above the
+    // cap, the user raises the bitrate manually (up to getMaximumBitrate()).
     const double kbps = double(width) * height * fps * 1.6 / 1000.0;
-    return qRound(qBound(500.0, kbps, 3000000.0) / 500.0) * 500;
+    return qRound(qBound(500.0, kbps, double(kPyroWaveAutoBitrateCapKbps)) / 500.0) * 500;
 }
 
 int StreamingPreferences::defaultBitrateKbps() const

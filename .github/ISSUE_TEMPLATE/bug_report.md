@@ -46,7 +46,8 @@ List the games you've tried that exhibit the issue. To see if the issue is game-
  - GPU driver: [e.g. 24.1.1]
 
 **Asteria logs (please attach)**
-- On Windows, `Asteria-*.log` files are in `%TEMP%`. Type that into the File Explorer path field.
+- Portable release (a `portable.dat` file beside `Asteria.exe`): `Asteria-*.log` files are in that same folder.
+- Installed (no `portable.dat`): `Asteria-*.log` files are in `%TEMP%`. Type that into the File Explorer path field.
 - Review logs for private information before uploading.
 
 **Additional context**

@@ -144,18 +144,23 @@ private slots:
         QTest::newRow("4K60")<<3840<<2160<<60<<796500;
         QTest::newRow("1080p120")<<1920<<1080<<120<<398000;
         QTest::newRow("1440p120")<<2560<<1440<<120<<708000;
-        QTest::newRow("4K120")<<3840<<2160<<120<<1592500;
+        // Above the automatic cap (#64): 1.6 bpp would be 1061500 and 1592500.
+        QTest::newRow("2880x1920@120")<<2880<<1920<<120<<800000;
+        QTest::newRow("4K120")<<3840<<2160<<120<<800000;
     }
     void pyroDefaults() {
         QFETCH(int,width); QFETCH(int,height); QFETCH(int,fps); QFETCH(int,expected);
         QCOMPARE(Prefs::getDefaultBitrateForCodec(width,height,fps,false,Prefs::VCC_FORCE_PYROWAVE),expected);
-        QVERIFY(qAbs(expected-double(width)*height*fps*1.6/1000.0)<=250.0);
+        const double formula = double(width)*height*fps*1.6/1000.0;
+        if (formula < Prefs::kPyroWaveAutoBitrateCapKbps) QVERIFY(qAbs(expected-formula)<=250.0);
+        else QCOMPARE(expected,Prefs::kPyroWaveAutoBitrateCapKbps);
         // An unsupported profile setting must not change the P1a recommendation.
         QCOMPARE(Prefs::getDefaultBitrateForCodec(width,height,fps,true,Prefs::VCC_FORCE_PYROWAVE),expected);
     }
     void defaultBoundsAndStandardFormula() {
         QCOMPARE(Prefs::getDefaultBitrateForCodec(1,1,1,false,Prefs::VCC_FORCE_PYROWAVE),500);
-        QCOMPARE(Prefs::getDefaultBitrateForCodec(8192,8192,9999,false,Prefs::VCC_FORCE_PYROWAVE),3000000);
+        QCOMPARE(Prefs::getDefaultBitrateForCodec(8192,8192,9999,false,Prefs::VCC_FORCE_PYROWAVE),800000);
+        QVERIFY(Prefs::kPyroWaveAutoBitrateCapKbps < Prefs::getMaximumBitrate(Prefs::VCC_FORCE_PYROWAVE));
         QCOMPARE(Prefs::getDefaultBitrate(1920,1080,60,false),20000);
         QCOMPARE(Prefs::getDefaultBitrate(1920,1080,120,false),28000);
         for (auto codec : {Prefs::VCC_AUTO,Prefs::VCC_FORCE_H264,Prefs::VCC_FORCE_HEVC,Prefs::VCC_FORCE_AV1}) {
@@ -176,6 +181,20 @@ private slots:
         const auto expected = snapshot(prefs);
         QCOMPARE(restart(),expected);
         prefs->reload(); QCOMPARE(snapshot(prefs),expected);
+    }
+    void manualAboveAutomaticCap() {
+        // The automatic cap must never limit a manual choice; only the slider maximum does.
+        select(Prefs::VCC_FORCE_PYROWAVE);
+        prefs->setProperty("width",3840); prefs->setProperty("height",2160); prefs->setProperty("fps",120);
+        QCOMPARE(prefs->bitrateKbps,800000); QVERIFY(prefs->autoAdjustBitrate);
+        prefs->setProperty("autoAdjustBitrate",false); prefs->setProperty("bitrateKbps",2500000);
+        prefs->setProperty("fps",60);
+        QCOMPARE(prefs->bitrateKbps,2500000); QVERIFY(!prefs->autoAdjustBitrate);
+        const auto expected = snapshot(prefs);
+        QCOMPARE(restart(),expected);
+        prefs->setProperty("bitrateKbps",3000000); QCOMPARE(prefs->bitrateKbps,3000000);
+        prefs->useDefaultBitrate(); QVERIFY(prefs->autoAdjustBitrate);
+        QCOMPARE(prefs->bitrateKbps,796500); // 4K60 is below the cap
     }
     void manualCodecCapAndRestart() {
         select(Prefs::VCC_FORCE_PYROWAVE);
@@ -274,6 +293,28 @@ private slots:
         QCOMPARE(prefs->bitrateKbps,708000); QCOMPARE(slider->property("value").toInt(),708000);
         QVERIFY(reset->property("text").toString().contains("708"));
         QVERIFY(!reset->property("visible").toBool());
+        // Typed bitrate entry: exact values, clamping, rejection and slider sync.
+        auto field=expression("bitrateField").value<QObject*>(); QVERIFY(field);
+        QCOMPARE(field->property("text").toString(),QString("708"));
+        field->setProperty("text","1234.5"); QVERIFY(QMetaObject::invokeMethod(field,"editingFinished"));
+        QCOMPARE(prefs->bitrateKbps,1234500); QVERIFY(!prefs->autoAdjustBitrate);
+        QCOMPARE(slider->property("value").toInt(),1234500);
+        QCOMPARE(field->property("text").toString(),QString("1234.5"));
+        field->setProperty("text","850,25"); QVERIFY(QMetaObject::invokeMethod(field,"editingFinished"));
+        QCOMPARE(prefs->bitrateKbps,850250);
+        field->setProperty("text","99999"); QVERIFY(QMetaObject::invokeMethod(field,"editingFinished"));
+        QCOMPARE(prefs->bitrateKbps,3000000); QCOMPARE(field->property("text").toString(),QString("3000"));
+        field->setProperty("text","0"); QVERIFY(QMetaObject::invokeMethod(field,"editingFinished"));
+        QCOMPARE(prefs->bitrateKbps,500); QCOMPARE(field->property("text").toString(),QString("0.5"));
+        field->setProperty("text","fast"); QVERIFY(QMetaObject::invokeMethod(field,"editingFinished"));
+        QCOMPARE(prefs->bitrateKbps,500); QCOMPARE(field->property("text").toString(),QString("0.5"));
+        slider->setProperty("value",250000); QVERIFY(QMetaObject::invokeMethod(slider,"moved"));
+        QCOMPARE(prefs->bitrateKbps,250000); QCOMPARE(field->property("text").toString(),QString("250"));
+        QVERIFY(QMetaObject::invokeMethod(reset,"clicked"));
+        QVERIFY(prefs->autoAdjustBitrate); QCOMPARE(field->property("text").toString(),QString("708"));
+        // Typing the current automatic value keeps automatic mode.
+        field->setProperty("text","708"); QVERIFY(QMetaObject::invokeMethod(field,"editingFinished"));
+        QVERIFY(prefs->autoAdjustBitrate);
         // Use the actual tab focus chain and responsive Flow at both sizes.
         auto resolution=qobject_cast<QQuickItem*>(expression("resolutionComboBox").value<QObject*>()); QVERIFY(resolution);
         resolution->forceActiveFocus(Qt::TabFocusReason); QTest::keyClick(&view,Qt::Key_Tab);

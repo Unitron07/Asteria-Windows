@@ -58,7 +58,8 @@ Normal Windows x64 and ARM64 builds include the pinned API 0.6.0 runtime,
 bitstream `186f0393`, restricted loading and provenance metadata.
 Codec-aware bitrate QoL is integrated: standard codecs have a 500 Mbps UI ceiling,
 PyroWave a 3000 Mbps ceiling, and PyroWave automatic bitrate is approximately
-`width * height * fps * 1.6` bits/s. Manual overrides survive resolution/FPS changes.
+`width * height * fps * 1.6` bits/s, capped at 800 Mbps (#64); higher values
+remain available manually. Manual overrides survive resolution/FPS changes.
 The codec selector remains in Basic Settings.
 
 The historical v0.2.0 Qualcomm path rejects Vulkan/D3D11 shared-fence import with
