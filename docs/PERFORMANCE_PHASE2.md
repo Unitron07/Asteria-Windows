@@ -53,6 +53,15 @@ unchanged. Standard codecs and legacy PyroWave fallback are outside the gate.
    period (8.33 ms). Any change needs explicit bounded retry/coalescing tests and
    consideration of SDL timer granularity and CPU wake cost. No timing tuning is
    included in this first change.
+   **Implemented separately:** the native retry timer now waits one frame period
+   at the negotiated FPS, clamped to 4-16 ms (`PyroWaveVulkan::retryDelayMs`):
+   8 ms at 120 FPS, 6 ms at 144, unchanged 16 ms at 60 FPS and below. One timer
+   is armed at a time and any new frame cancels it; a continuously pending retry
+   wakes at most 250 times per second. Minimized or zero-size windows return
+   before requesting a retry, so they never poll. Session already requests 1 ms
+   Windows timer resolution while streaming. `stage5_policy_tests` covers the
+   delay table, bounds and monotonicity. No spike or drop improvement is claimed
+   until a matched Surface measurement shows one.
 4. Consider narrower native mutex ownership only if future evidence warrants it.
    Separating decode/publication from presentation changes slot/timeline ownership
    and is higher risk. Do not change locking or WSI modes speculatively.

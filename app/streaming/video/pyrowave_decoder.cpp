@@ -202,7 +202,7 @@ bool PyroWaveVideoDecoder::initializeCpu() {
 
 void PyroWaveVideoDecoder::retryRenderer() {
     if(m_RetryTimer || m_TestOnly) return;
-    m_RetryTimer=SDL_AddTimer(16,[](Uint32,void*) -> Uint32 {
+    m_RetryTimer=SDL_AddTimer(PyroWaveVulkan::retryDelayMs(m_TargetFps),[](Uint32,void*) -> Uint32 {
         // No decoder pointer crosses the timer callback; teardown can cancel the
         // timer and an already posted event is harmless to Session's null check.
         SDL_Event event{}; event.type=SDL_USEREVENT; event.user.code=SDL_CODE_FRAME_READY;

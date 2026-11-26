@@ -32,6 +32,25 @@ int main() {
         require(draws==8 && !demand.pending());
         render(false,false,false,true,false); require(draws==8);
         std::cout<<"PASS native render demand: idle wakes skip WSI; video/overlay/window redraw; finite retries and post-submit rebuild preserved\n";
+        // Retry delay follows the frame period instead of a fixed 16 ms.
+        static_assert(retryDelayMs(120)==8 && retryDelayMs(144)==6 && retryDelayMs(240)==4,
+                      "retry within one frame period at high refresh");
+        static_assert(retryDelayMs(60)==16 && retryDelayMs(30)==16 && retryDelayMs(1)==16,
+                      "60 FPS and below keep the previous 16 ms delay");
+        static_assert(retryDelayMs(0)==16 && retryDelayMs(-5)==16, "unknown rate falls back to 16 ms");
+        static_assert(retryDelayMs(1000)==4 && retryDelayMs(100000)==4, "never below the 4 ms floor");
+        for(int fps=1;fps<=1000;++fps) {
+            const unsigned delay=retryDelayMs(fps);
+            require(delay>=MinRetryMilliseconds && delay<=MaxRetryMilliseconds);
+            // Never slower than the old fixed timer, and within one frame period whenever
+            // the floor allows it (fps >= 63 has a period below 16 ms).
+            require(delay<=16);
+            if(1000/fps>=int(MinRetryMilliseconds)) require(delay<=unsigned(1000/fps) || delay==MaxRetryMilliseconds);
+            // A continuously pending retry wakes at most 1000/delay times per second.
+            require(1000/delay<=250);
+            if(fps>1) require(delay<=retryDelayMs(fps-1)); // Monotonic in frame rate.
+        }
+        std::cout<<"PASS native retry delay: one frame period, clamped to 4-16 ms, unchanged at 60 FPS and below\n";
         bool queued=false; unsigned publications=0;
         const auto overlayNotification=[&] { wakeFrame(queued,[&] { ++publications; return true; }); };
         for(unsigned i=0;i<1000;++i) overlayNotification();
