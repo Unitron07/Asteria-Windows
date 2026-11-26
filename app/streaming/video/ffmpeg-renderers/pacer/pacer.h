@@ -16,6 +16,9 @@
 // - 1 frame rendering (or being released by render-side catch-up)
 // - 1 frame for deferred free
 // - 1 frame being released by V-sync catch-up, outside the queue lock
+//   (or held in transit by the V-sync thread while it frees a render-queue drop)
+// Saturation drops are also freed outside the lock, but each queue has a single
+// adder, so a queue plus its detached drop never exceeds its 3-frame allowance.
 // The caller's incoming decoded frame is not yet owned by these queues.
 #define PACER_MAX_QUEUED_FRAMES 3
 #define PACER_MAX_OUTSTANDING_FRAMES (2 * PACER_MAX_QUEUED_FRAMES + 1 + 1 + 1)

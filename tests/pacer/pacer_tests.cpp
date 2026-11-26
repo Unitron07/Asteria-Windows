@@ -92,6 +92,11 @@ struct PacerTestPeer {
         CHECK(p.m_PacingQueue.size() == pacing);
         CHECK(p.m_RenderQueue.size() == rendering);
     }
+    // A finite try-lock, so a regression that frees under the mutex fails instead of hanging.
+    static void queueLockFree(Pacer& p) {
+        CHECK(p.m_FrameQueueLock.tryLock(5000));
+        p.m_FrameQueueLock.unlock();
+    }
     static void vsyncWorker(Pacer& p) {
         p.m_VsyncThread = SDL_CreateThread(Pacer::vsyncThread, "test-vsync", &p);
         CHECK(p.m_VsyncThread);
@@ -128,6 +133,40 @@ void stalledAggregate() {
     CHECK(stats.renderedFrames == 2);
     p.reset(); CHECK(ledger.count() == 0); CHECK(renderer.cleaned == 1);
     std::cout << "PASS aggregate: 6 queued + render + deferred + VBlank release = 9 (old budget 5)\n";
+}
+
+void stalledSaturationRelease() {
+    // Upstream dd795e35 frees the producer's saturation drop outside the queue mutex.
+    // The queue keeps its single adder, so queue + detached release stays within the
+    // pacing allowance and the aggregate budget of 9 is unchanged.
+    Ledger ledger; Renderer renderer; VIDEO_STATS stats{};
+    auto p = std::make_unique<Pacer>(&renderer, &stats);
+    CHECK(p->initialize(nullptr, 120, false));
+    PacerTestPeer::paced(*p);
+    p->submitFrame(ledger.frame()); PacerTestPeer::tick(*p); p->renderOnMainThread(); // id 0 deferred
+    p->submitFrame(ledger.frame()); PacerTestPeer::tick(*p);                            // id 1
+    Gate renderGate; renderer.stall = &renderGate;
+    std::thread rendering([&] { p->renderOnMainThread(); }); renderGate.wait();
+    for (int i = 0; i < 3; ++i) { p->submitFrame(ledger.frame()); PacerTestPeer::tick(*p); } // ids 2-4
+    Gate releaseGate;
+    p->submitFrame(ledger.frame(&releaseGate));                                         // id 5
+    p->submitFrame(ledger.frame()); p->submitFrame(ledger.frame());                     // ids 6-7
+    PacerTestPeer::queues(*p, 3, 3);
+    CHECK(ledger.count() == 8);
+    // The producer replaces id 5; its finalizer stalls with the queue mutex released.
+    std::thread producer([&] { p->submitFrame(ledger.frame()); });                      // id 8
+    releaseGate.wait();
+    PacerTestPeer::queueLockFree(*p);
+    PacerTestPeer::queues(*p, 2, 3);
+    CHECK(ledger.count() == 9); // 2 + detached + incoming, 3 render, rendering, deferred
+    CHECK(stats.pacerDroppedFrames == 1);
+    releaseGate.open(); producer.join();
+    PacerTestPeer::queues(*p, 3, 3); // incoming enqueued; per-queue cap preserved
+    CHECK(ledger.released(5)); CHECK(ledger.count() == 8);
+    CHECK(stats.pacerDroppedFrames == 1); // counted once
+    renderGate.open(); rendering.join(); renderer.stall = nullptr;
+    p.reset(); CHECK(ledger.count() == 0); CHECK(renderer.cleaned == 1);
+    std::cout << "PASS saturation release outside the mutex stays within the budget and counts once\n";
 }
 
 void saturationAndLifetime(bool pacing) {
@@ -216,6 +255,7 @@ void teardownWorkers() {
 int main() {
     SDL_SetMainReady(); CHECK(SDL_Init(SDL_INIT_TIMER | SDL_INIT_EVENTS) == 0);
     stalledAggregate();
+    stalledSaturationRelease();
     saturationAndLifetime(false); saturationAndLifetime(true);
     vblankAndHistory();
     for (bool pacing : {false, true}) for (int attrs : {0, RENDERER_ATTRIBUTE_NO_BUFFERING})

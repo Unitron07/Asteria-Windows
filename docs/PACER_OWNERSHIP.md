@@ -1,6 +1,8 @@
 # Shared FFmpeg Pacer: first targeted implementation
 
-Base: `2c299babdb14a511f614850beaf068af235cd028` (latest main at start).
+Originally based on `2c299babdb14a511f614850beaf068af235cd028`; rebased onto
+`639d3f96` after the Moonlight `dc99771` sync (#73), which brought upstream's own
+Pacer fixes `dd795e35`, `fe5a0aea` and `ec59857a`. See "Rebase onto upstream" below.
 Upstream PRs #47/#49/#56/#57 and native PyroWave demand gating (#50) are preserved.
 PR #51 is merged; Phase 2 cross-codec optimization is active. PR #46 is closed
 without merging; Phase 1B remains paused. Historical hardware records are unchanged.
@@ -43,14 +45,40 @@ finalizers, overlay formatting/publication and RTT queries do not run under the
 stats mutex. Queue-to-stats is the only nested lock order; FFDecoder holds only
 stats briefly while copying and resetting the completed window.
 
-Shutdown uses an atomic stop flag and publishes stop/wakes under the queue mutex,
-preventing a worker from missing shutdown between its empty check and wait.
+Shutdown publishes stop/wakes under the queue mutex, preventing a worker from
+missing shutdown between its empty check and wait. Upstream `fe5a0aea` made the
+same change and reads the stop flag only under that mutex, so it stays a plain bool.
 FFDecoder still joins its producer before destroying Pacer; Pacer joins workers
 before draining frames, and codec/device teardown still follows Pacer destruction.
 Concurrent calls on an already-destroyed Pacer are not supported.
 
-## Releasing saturation drops outside the mutex
+## Rebase onto upstream
 
+Upstream `fe5a0aea` (lost wakeups) supersedes this PR's shutdown/V-sync wait changes,
+which were dropped in favor of upstream's versions. Upstream `dd795e35` counts
+saturation drops and frees them outside the queue mutex. This PR keeps that release
+but moves the counter under the stats mutex, so all five Pacer stats writers stay
+serialized with FFDecoder's snapshot and each drop is still counted once.
+
+The budget of nine still holds with saturation releases outside the mutex:
+
+- Each queue has exactly one adder: the producer for the pacing queue (or the
+  render queue when pacing is off), and the V-sync thread for the render queue when
+  pacing is on. The size check before unlocking therefore still holds after relock.
+- While the producer frees a pacing-queue drop, that queue holds at most two frames
+  and only the producer could refill it, so queue plus detached frame stays within
+  the pacing allowance of three. The same applies to the render queue.
+- While the V-sync thread frees a render-queue drop, it also holds the frame it is
+  moving between queues. That thread cannot be doing a catch-up release at the same
+  time, so the in-transit frame reuses the V-sync release allowance.
+
+`stalledSaturationRelease` in `tests/pacer` stalls the producer's release finalizer
+with the renderer blocked, checks the queue mutex is free, queues stay at 2/3, the
+ledger stays within the budget, and the drop is counted once.
+
+## Releasing saturation drops outside the mutex (historical)
+
+The section below predates the rebase; upstream has since made this change.
 Gemini's suggestion was evaluated and deferred. These releases currently occur
 under the queue lock; the existing VBlank/render catch-up releases already unlock.
 Moving producer saturation release out adds a detached surface while both queues
