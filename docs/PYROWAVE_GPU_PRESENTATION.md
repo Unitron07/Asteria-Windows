@@ -58,7 +58,7 @@ Shutdown GPU diagnostics reported iDWT fragment 1.886 ms/frame and Dequant
 0.782 ms/frame. Async CPU submission is distinct from GPU execution; these
 samples do not measure final scanout/end-to-end latency or establish a matched
 speedup against the historical fallback. Controlled performance qualification
-and v1.0 polish are [next](NEXT_STEP.md#next-phase-controlled-performance-qualification-and-v10-polish).
+and v1.0 polish are [next](NEXT_STEP.md#planned-order).
 PyroWave stays Experimental; no release or graduation is implied.
 
 ## Historical live ARM64 compute/CPU-I420 fallback result

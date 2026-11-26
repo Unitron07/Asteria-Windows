@@ -221,6 +221,6 @@ Validation remains **SKIP**, not PASS. The native success run did not exercise
 initialization-time legacy GPU interoperability/CPU-I420 fallbacks, which remain
 available. Forced physical device-loss recovery, broader/x64 live hardware and
 controlled performance qualification remain separate. The next phase is
-[controlled native performance qualification and v1.0 polish](../../../docs/NEXT_STEP.md#next-phase-controlled-performance-qualification-and-v10-polish),
+[controlled native performance qualification and v1.0 polish](../../../docs/NEXT_STEP.md#planned-order),
 with no code optimization, release, Experimental graduation, MultiSeat or VR work
 included in this qualification record.
