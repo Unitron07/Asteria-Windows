@@ -16,6 +16,20 @@ public:
     void completed(bool accepted,bool rebuild) { retry=!accepted || rebuild; }
     bool pending() const { return retry; }
 };
+// One-shot SDL timer delay for a pending native retry (fence/acquire not ready,
+// post-submit rebuild or overlay upload). A fixed 16 ms exceeded a 120 FPS frame
+// period (8.33 ms), so a failed draw could cost two frames. Wait about one frame
+// period at the negotiated rate instead, clamped to [4, 16] ms: never slower than
+// before (60 FPS and below stay at 16 ms) and never more than 250 wakes/s. Only one
+// timer is armed at a time and any new frame cancels it, so wakes stay coalesced.
+// Session requests 1 ms Windows timer resolution while streaming.
+constexpr unsigned MinRetryMilliseconds=4,MaxRetryMilliseconds=16;
+constexpr unsigned retryDelayMs(int fps) {
+    if(fps<=0) return MaxRetryMilliseconds;
+    const unsigned period=1000u/unsigned(fps);
+    return period<MinRetryMilliseconds ? MinRetryMilliseconds
+         : period>MaxRetryMilliseconds ? MaxRetryMilliseconds : period;
+}
 // Used by decode, overlay-only and window notifications under the decoder mutex.
 // A failed SDL publication must remain retryable, without another video frame.
 template<class Publish> void wakeFrame(bool& queued,Publish publish) {
