@@ -18,7 +18,8 @@ published build and the benchmark reference.
 | PyroWave automatic bitrate capped at 800 Mbps, "no video yet" hint, typed bitrate entry, portable log path in the bug template | #72 | Merged (addresses #64) |
 | Moonlight upstream `dc99771b` merged; baseline recorded | #73 | Merged |
 | Upstream sync: optional `UPSTREAM_SYNC_TOKEN`, rejected pushes reported | #74 | Merged |
-| Pacer aggregate surface budget (9), rebased onto upstream's Pacer fixes | #58 | Draft: CI and owner smoke |
+| Pacer aggregate surface budget (9), rebased onto upstream's Pacer fixes | #58 | Merged |
+| Native PyroWave retry within one frame period (Phase 2 step 3) | #78 | Draft: CI and owner smoke |
 
 ### Open items and blockers
 
@@ -28,6 +29,8 @@ published build and the benchmark reference.
   `VIDEO_FORMAT_MPEG2 = 0x00010000 = VIDEO_FORMAT_PYROWAVE`. The P1a patch also no
   longer applies. The SCM bits are host-advertised, so new PyroWave bits must be
   agreed with the Vibepollo host before any further common-c update. Do not merge #75.
+  Proposed new values are in [Nonary/Vibepollo#790](https://github.com/Nonary/Vibepollo/issues/790)
+  and draft [Nonary/Vibepollo#791](https://github.com/Nonary/Vibepollo/pull/791).
 - **Prebuilt dependencies:** Asteria builds from the hash-pinned v19 archives in
   `scripts/baseline-deps.json`; upstream's setup scripts now name v21. Moving to v21
   needs a separate change with verified hashes.
@@ -36,7 +39,7 @@ published build and the benchmark reference.
 
 ### Planned order
 
-1. Native PyroWave retry scheduling, with bounded retry/coalescing tests.
+1. Native PyroWave retry scheduling, with bounded retry/coalescing tests (#78).
 2. One matched Surface measurement using the Phase 1A capture: native PyroWave and
    AV1 at the same resolution, FPS and bitrate, before and after step 1.
 3. v0.4.0 unsigned portable preview with the same exact-source x64/ARM64

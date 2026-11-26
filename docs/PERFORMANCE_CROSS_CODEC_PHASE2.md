@@ -1,5 +1,7 @@
 # Phase 2: cross-codec performance audit
 
+Current status: PR #51 (cross-codec audit) is merged; Phase 2 targeted optimization is active. Phase 1B remains paused. This document preserves its original audit/qualification scope; implementation is tracked in [PACER_OWNERSHIP.md](PACER_OWNERSHIP.md).
+
 Audited starting point: `4944dd5364a8285a03d0da24cf44cf88bb3ac971`
 (`main`, including merged PR #50). Primary target: Surface Pro 11,
 Snapdragon X Plus / Adreno X1-85, Windows ARM64. Windows x64 remains in scope.
@@ -10,7 +12,7 @@ context ownership or surface accounting and need more focused regression coverag
 before implementation. Smaller confirmed CPU costs are ranked below rather than
 being presented as a practical Surface performance fix.
 
-Phase 1B remains **paused**. Draft PR #46 and all prior evidence remain untouched.
+Phase 1B remains **paused**. PR #46 is closed without merging; all prior evidence remains preserved.
 The ten successful native PyroWave 1440p120 runs establish functional evidence;
 their spikes/drops do not establish a cause. No additional benchmark campaign,
 JSON manifest, dependency update, merge, tag or release is requested.

@@ -1,6 +1,8 @@
 # Phase 2: native Vulkan pacing and presentation
 
-Phase 1B is **PAUSED at the owner's request**. PR #46 stays draft. Its ten-run
+Current status: PR #51 (cross-codec audit) is merged; Phase 2 targeted optimization is active. Phase 1B remains paused. This document preserves its original audit/qualification scope; implementation is tracked in [PACER_OWNERSHIP.md](PACER_OWNERSHIP.md).
+
+Phase 1B is **PAUSED at the owner's request**. PR #46 is closed without merging. Its ten-run
 block and all later failed attempts remain unchanged. The unresolved bitrate
 pilot included multiple stream lifetimes; it is not a qualified comparison.
 Phase 2 does not require further multi-run benchmarks.
@@ -96,5 +98,5 @@ manifest editing is needed. Keep profiling disabled and use normal settings.
    check, then disconnect. No repeated measurements are requested.
 
 Report a smoke-test failure with its original log; do not overwrite past evidence.
-This is a functional check, not proof of pacing improvement. Keep both PRs draft;
+This is a functional check, not proof of pacing improvement. PR #46 is closed; keep new implementation PRs draft;
 no merge or release without explicit owner approval.
